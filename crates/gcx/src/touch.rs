@@ -195,15 +195,17 @@ impl Layout {
         // PSX's side rails: density-independent thumb wells, a clear centered
         // picture, and separate reachable auxiliary keys. Scale only transient
         // small surfaces; ordinary phone targets remain at least 48 points.
-        let scale = (width / 640.0).min(height / 360.0).min(1.0);
+        let scale = (width / 640.0).min(height / 344.0).min(1.0);
         let w = width / scale;
         let h = height / scale;
         let rail = 176.0;
-        let gap = if h >= 368.0 { 8.0 } else { 4.0 };
+        let compact = h < 368.0;
+        let face_height = if compact { 116.0 } else { 128.0 };
+        let gap = if compact { 4.0 } else { 8.0 };
         let upper = 56.0 + gap;
-        let auxiliary = upper + 128.0 + gap;
+        let auxiliary = upper + face_height + gap;
         let lower = auxiliary + 48.0 + gap;
-        let stick = (h - lower - 8.0).clamp(104.0, 128.0);
+        let stick = (h - lower - 8.0).clamp(104.0, 128.0).min(face_height);
         let mut zones = Vec::new();
         let mut add = |x, y, width, height, target, label| {
             zones.push(Zone {
@@ -235,7 +237,7 @@ impl Layout {
         }
         add(
             88.0 - stick / 2.0,
-            upper + 64.0 - stick / 2.0,
+            upper + face_height * 0.5 - stick / 2.0,
             stick,
             stick,
             Target::Stick(Control::StickX, Control::StickY),
@@ -263,7 +265,13 @@ impl Layout {
         // Rectangular hit targets have real gaps, including around the large A.
         for (x, y, size, button, label) in [
             (84.0, 84.0, 64.0, Control::A, c"A"),
-            (24.0, 104.0, 48.0, Control::B, c"B"),
+            (
+                24.0,
+                if compact { 92.0 } else { 104.0 },
+                48.0,
+                Control::B,
+                c"B",
+            ),
             (140.0, 58.0, 48.0, Control::X, c"X"),
             (82.0, 24.0, 48.0, Control::Y, c"Y"),
         ] {
@@ -428,6 +436,8 @@ mod tests {
     fn landscape_rails_keep_every_target_clear_and_density_independent() {
         for (width, height, density) in [
             (2280.0, 1080.0, 2.75),
+            // A short phone drawable after ordinary system-bar clearance.
+            (2280.0, 948.0, 2.75),
             (2342.0, 1021.0, 2.625),
             (1920.0, 1080.0, 3.0),
         ] {
