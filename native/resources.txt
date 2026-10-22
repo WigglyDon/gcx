@@ -1,0 +1,5 @@
+GC/font_western.bin
+GC/font_japanese.bin
+GC/font-licenses.txt
+Resources/OSD_Font.ttf
+Resources/OSD_Font_VeraMono_Copyright.txt

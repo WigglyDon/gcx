@@ -1,0 +1,169 @@
+# Direct Dolphin integration
+
+The off-device Rust CPU/lifecycle probe has passed with normal process exit on
+Linux, both with null audio and an intentionally unavailable audio backend. It
+boots an original 20-byte PowerPC program in a correctly padded DOL, observes its
+RAM write through the actual engine, checks native GameCube pad values, commits
+an ordinary raw-card image, neutralizes input and completes teardown before
+releasing its profile lock. Null video/audio are intentional; this is not visible
+gameplay, audible sound or an in-game save/reload result.
+
+The Android candidate has a Rust-owned document picker, host loop, native control
+geometry/input and recovery policy. Its small Java trampoline only forwards
+framework events. Native Vulkan and Cubeb are selected; the ARM64 engine build is
+linked successfully. The private development APK passes ABI/export, 16 KiB ELF/APK
+alignment, signature, manifest, native-library and resource byte checks. Device
+execution is unrun.
+
+## Source and reproduction
+
+Official source: `https://github.com/dolphin-emu/dolphin.git`, revision
+`cf5cb7ef81c3e8e7af5c9d566334219ffda9f68b`, root tree
+`be54b87e1784a9a26bf406a5cc222c642fb13db0`. Resources are bound by its
+`Data/Sys` tree `899ac7b90a5bf93cfd0c1208a920415fe49b7ba0`.
+
+After checking current host capacity and competing work, create exactly one
+checkout at `.local/source/dolphin` using `git init`, add the official origin,
+fetch the exact revision with `--depth 1`, and check it out detached. Apply
+`native/patches/0001-direct-adapter.patch` with `git apply`. Do not substitute
+today's upstream HEAD. Then run:
+
+```sh
+cargo xtask fetch-dependencies
+cargo xtask source-check
+cargo xtask configure-host
+cargo xtask build-host
+GCX_ENGINE_LIB_DIR="$PWD/build/host/gcx" cargo build -p gcx --features native-engine
+LD_LIBRARY_PATH="$PWD/build/host/gcx" target/debug/gcx-probe \
+  "$PWD/.local/probe-unique" "$PWD/.local/source/dolphin/Data/Sys"
+```
+
+Use a new probe directory each time. `--unavailable-audio` additionally exercises
+failed native audio initialization and clean process exit in the host configuration.
+`--reentry` boots isolated A/B/A profiles in one process and checks a marker in
+A's ordinary raw card survives without appearing in B. `--card-retry` blocks only
+a new fixture's candidate path with a directory, checks failure reporting and
+retention of its prior card/RAM, removes that obstruction and verifies retry.
+Both checks passed. Neither is an in-game save or machine-resume test.
+The restricted runner trapped during native setup; the successful probes used
+normal host execution. Failures and profiles are retained. Do not
+point the probe at any existing saves. The source check binds the complete root
+gitlink list in `dolphin-gitlinks.tsv`, verifies each selected dependency in
+`dependencies.txt`, and rejects unreviewed tracked engine/dependency edits.
+Excluded gitlinks remain pinned in the root graph but are not build inputs.
+
+The host configuration bundles the donor libraries instead of automatically
+selecting system copies. Native system dependencies and the compiler/sysroot
+remain platform inputs, not a claim of bit-identical builds on arbitrary hosts.
+Initial host tools: Rust 1.96.1, Clang 22.1.8, CMake 4.3.0 and Ninja. Compilation
+uses one job without LTO or debug information. No source archive is needed.
+
+## Inspected ownership
+
+- `Core/Core.h` and `Core.cpp`: Boot starts donor execution threads; the Rust
+  host pumps `HostDispatchJobs`. `CPUThreadGuard` pauses/locks CPU, DSP and FIFO
+  before temporary host access. `Stop` and `Shutdown` precede UI/controller
+  teardown. Callbacks remain installed until those workers have retired.
+- Android `jni/MainAndroid.cpp`: uses `WindowSystemInfo::Android`, native
+  `ANativeWindow` surfaces and `Presenter::ChangeSurface`. It is a reference,
+  not gcx's frontend. Its JNI helpers also serve core file access, controller
+  discovery, USB adapters and OpenSL audio configuration. The maintained Android
+  graph excludes that JNI frontend and uses Rust document callbacks, emulated pad
+  overrides and native Cubeb. Hardware USB pads/custom drivers/microphone/Wii are
+  excluded from this initial route. Android linking passed; execution is unrun.
+- `InputCommon/ControllerInterface/Touch/InputOverrider.*`: 18 GameCube
+  channels include independent L/R analog and digital signals. The adapter
+  applies a complete Rust-owned pad under the controller's state mutex, avoiding racing
+  the override array with native polling. Native overrides are removed during
+  teardown. Rust touch tests cover simultaneous pointers, partial travel, release
+  and bounded stick motion. Android interruption/controls proof remains due.
+- `Core/HW/EXI/EXI_DeviceMemoryCard.cpp:DoState`: normal states omit card
+  contents; movie states serialize them, and the stored flag controls loading.
+  Both paths must be considered before accepting checkpoints from outside gcx.
+- `GCMemcardRaw.cpp`: a 15-second flush worker writes raw bytes; destruction
+  triggers a final write and joins. The write path does not expose a successful
+  durable-flush acknowledgment to this host. `GCMemcardDirectory.cpp` similarly
+  has delayed GCI flushing, final destructor flushing, cached metadata and state
+  serialization. Neither `State::SaveAs` nor a file timestamp proves card
+  durability. No snapshot API is exposed by this adapter yet.
+
+The initial mode is native raw card A, with no card B. The maintained MemoryCard
+write hook hands a complete native image to Rust's atomic candidate writer. Rust
+checks the owned profile path, writes/syncs, renames and syncs the parent directory;
+the native worker retains dirty status on failure. `FlushToStorage` serializes with
+the worker and snapshots under its data mutex; the adapter calls its barrier under
+a CPU thread guard. Explicit restart/game change retains the old runtime if that
+barrier fails. The host fixture verifies a successful barrier, and an isolated
+Rust fault test verifies a failed candidate leaves the prior card untouched.
+
+These checks do not prove Android filesystem behavior or real game saving. The
+GCI implementation's early dirty clearing and direct truncation are not selected.
+Ordinary saves and machine checkpoints remain separate: no snapshot API is exposed.
+Movie states can restore card bytes/metadata and normal states omit card protocol;
+restored CoreTiming events and pending transactions still require qualification.
+Future restore must verify profile generation and exact core/resource/media binding
+before touching native state. Linux `flock` tests are not Android locking evidence.
+
+## Resource and license handling
+
+`bridge.cpp` adapts Dolphin's Host definitions and is GPL-2.0-or-later with
+upstream attribution. `COPYING` is retained verbatim. Rust host/input/build code
+is original MIT work. The combined program retains all applicable obligations;
+this ABI is not license separation. Keep the upstream revision, patches, selected
+dependency sources/licenses, compiler inputs and resource inventory with each
+candidate. Public binary distribution remains separately gated.
+
+The observed replacement GC fonts identify Droid Sans, Google copyright and
+Apache-2.0 in `Data/Sys/GC/font-licenses.txt`, with the generator at
+`docs/gc-font-tool.cpp`. DSP replacement sources are under `docs/DSP/free_dsp_rom`;
+the first player route uses DSP HLE. `cargo xtask prepare-android` stages the reviewed
+allowlist, source/dependency notices, resource hashes, and compiles the mechanical
+Java trampoline to DEX. This passed; actual APK resources remain to audit. Do not copy the entire donor Sys directory into a shipping package by
+default, or bundle original IPL/game/startup assets.
+
+## Android reproduction
+
+Use the existing licensed SDK without changing shared caches. Bind `ANDROID_HOME`
+to build-tools 37.0.0/platform android-37.0 and `ANDROID_NDK_HOME` to NDK
+30.0.16248370. The configuration selects arm64-v8a, API 28 and libc++_shared.
+The installed Java module compiler is used directly; no Gradle frontend or managed
+application layer is imported.
+
+```sh
+cargo xtask configure-android
+cargo xtask build-android
+cargo xtask prepare-android
+cargo xtask package-android
+```
+
+Native compilation uses one job. The package command requires the built engine;
+it builds the Rust library, checks ARM64/16 KiB segments and entry points, stages
+runtime libraries, aligns and signs with a separate private gcx development key,
+and verifies the resulting signature/manifest/assets. The signing identity and
+backup stay under `.local`, outside public source. Do not delete an existing signer
+or replace it after a partial failure. Packaging passed. Packaged libraries are
+stripped copies; unstripped native builds remain private for debugging. The
+development APK is about 15 MiB; this is not a performance or runtime memory claim.
+
+After committing reviewed source and rebuilding the package, run
+`cargo xtask preserve-candidate`. It refuses changed source and preserves the APK,
+tool/source inventories, every selected Git source bundle, shallow boundaries,
+locked Cargo vendor archive and reconstruction instructions under one private
+APK-digest directory. Each exported repository is checked in a temporary bare
+repository with its shallow boundary. Public binary distribution remains gated.
+See [source reconstruction](CORRESPONDING_SOURCE.txt).
+
+The `gcx-lock-probe` Rust binary uses the product's actual `ProfileLock` and offers
+bounded `hold`, `expect-busy` and `expect-free` modes. Its ARM64 build is prepared
+for stock-device qualification in an isolated app-owned fixture, and against the
+running profile across native teardown. Host success does not qualify Android;
+those actual device checks remain unrun.
+
+This private development manifest is debuggable so the owner can recover and
+verify gcx's own private data with stock `run-as` before an update. It disables
+automatic Android backup and requests no permissions. A release manifest and
+public binary remain separately gated; this is not a store-ready artifact.
+
+A later, fresh exclusive phone window is required for installation, actual Vulkan
+picture, audible sound, touch/interruptions and an in-game save/reload. Resume,
+A-to-B-to-A, shortcuts, updates, folds and speed are separate acceptance checks.

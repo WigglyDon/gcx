@@ -1,6 +1,6 @@
 # Architecture contracts
 
-Status: initial design for Master evaluation, not implemented capabilities.
+Status: implementation in progress; these remain acceptance contracts.
 Use the smallest boundaries justified by the executable player. Do not freeze
 an invented engine API or crate graph before inspecting Dolphin's actual owners.
 
@@ -29,6 +29,12 @@ C exports, not only successful linking or wrapper declarations.
 Candidate Rust responsibilities: gcx-player, a small engine adapter, gcx-android,
 and xtask. Names are not mandatory crates. Reuse upstream CMake/NDK and existing
 Rust bindings. No reimplementation of third-party build tools for language purity.
+
+The current workspace uses `gcx` for input, identity, locking and atomic storage,
+`gcx-android` for the player/platform policy, and `xtask` for reproduction. A small
+GPL native adapter calls the inspected Dolphin owners. An original CPU fixture
+has passed on Linux, including native pad readback and card commit. Android
+graphics/audio/locks and real game saving remain unqualified.
 
 ## Stable identities, ephemeral execution
 
@@ -59,6 +65,17 @@ Dolphin's inspected implementation has raw-memory-card and GCI-directory modes,
 region-dependent paths and card identity reflected in SRAM [S4]. Choose one primary
 mode explicitly after inspecting flush/state behavior. Do not mix modes silently,
 reuse PS1 card sizes or substitute arbitrary card bytes after restoring RAM.
+
+The initial implementation selects native raw card A and no card B, preserving
+Dolphin's GameCube format/capacity handling. A maintained native whole-image write
+hook invokes Rust's atomic candidate write, file sync, rename and directory sync.
+The raw worker retains dirty status on failure. A synchronous barrier runs under
+the native CPU guard and serializes with that worker. GCI-directory mode is not
+selected: its inspected write path clears dirty status before confirming a write
+and truncates the target. Native movie states may restore card bytes and normal
+states omit card protocol/data; pending native events also need qualification.
+The adapter exposes no snapshot restore. A card barrier alone does not establish
+a coherent machine checkpoint or Android durability.
 
 Prefer isolated per-game save profiles for safe A -> B -> A continuity. Keep
 multi-disc games together. Shared cards can enable cross-title interactions, but

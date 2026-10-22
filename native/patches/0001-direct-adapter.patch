@@ -1,0 +1,563 @@
+gcx maintained Dolphin changes, 2026-10-22
+Upstream revision: cf5cb7ef81c3e8e7af5c9d566334219ffda9f68b
+All modifications represented below were made for gcx on 2026-10-21/22.
+Purpose: Rust-hosted Android/native boundary, surface ownership, durable raw-card
+writer and failed-audio-initialization cleanup. Upstream authorship and applicable
+GPL/dependency terms remain intact. This patch is not an upstream Dolphin release.
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 64b9f1b..d779d4f 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -441,6 +441,9 @@ endif()
+ 
+ if(ANDROID)
+   message(STATUS "Building for Android")
++  if(GCX_ADAPTER_DIR)
++    add_compile_definitions(GCX_ANDROID_HOST)
++  endif()
+   if(NOT ENABLE_HEADLESS)
+     add_definitions(-DANDROID)
+     if(ENABLE_NOGUI)
+@@ -642,7 +645,7 @@ if(ENABLE_VULKAN)
+   endif()
+ 
+ 
+-  if (ANDROID AND _M_ARM_64)
++  if (ANDROID AND _M_ARM_64 AND NOT GCX_ADAPTER_DIR)
+     dolphin_add_bundled_library(libadrenotools Externals/libadrenotools)
+   endif()
+ endif()
+@@ -759,7 +762,7 @@ endif()
+ dolphin_add_bundled_library(watcher Externals/watcher)
+ 
+ # Any other platform or BSD is currently unsupported by cpp-ipc
+-if(WIN32 OR LINUX OR CMAKE_SYSTEM_NAME STREQUAL "FreeBSD" OR CMAKE_SYSTEM_NAME STREQUAL "QNX")
++if(NOT GCX_ADAPTER_DIR AND (WIN32 OR LINUX OR CMAKE_SYSTEM_NAME STREQUAL "FreeBSD" OR CMAKE_SYSTEM_NAME STREQUAL "QNX"))
+   dolphin_add_bundled_library(cpp-ipc Externals/cpp-ipc)
+   add_definitions(-DHAVE_CPPIPC)
+ endif()
+@@ -829,6 +832,11 @@ endif()
+ #
+ add_subdirectory(Source)
+ 
++# gcx: build a maintained direct native adapter without the donor frontend.
++if(GCX_ADAPTER_DIR)
++  add_subdirectory("${GCX_ADAPTER_DIR}" "gcx-adapter")
++endif()
++
+ ########################################
+ # Install shared data files
+ #
+diff --git a/Source/CMakeLists.txt b/Source/CMakeLists.txt
+index cdfabd3..348366e 100644
+--- a/Source/CMakeLists.txt
++++ b/Source/CMakeLists.txt
+@@ -99,7 +99,7 @@ if(HAVE_GETEXECPATH)
+ endif()
+ 
+ add_subdirectory(Core)
+-if (ANDROID)
++if (ANDROID AND NOT GCX_ADAPTER_DIR)
+   add_subdirectory(Android/jni)
+ endif()
+ 
+diff --git a/Source/Core/AudioCommon/CMakeLists.txt b/Source/Core/AudioCommon/CMakeLists.txt
+index 04ad967..c24e21e 100644
+--- a/Source/Core/AudioCommon/CMakeLists.txt
++++ b/Source/Core/AudioCommon/CMakeLists.txt
+@@ -23,7 +23,7 @@ if(ENABLE_CUBEB)
+   target_link_libraries(audiocommon PRIVATE cubeb)
+ endif()
+ 
+-if(ANDROID)
++if(ANDROID AND NOT GCX_ADAPTER_DIR)
+   find_package(OpenSLES)
+   if(OPENSLES_FOUND)
+     message(STATUS "OpenSLES found, enabling OpenSLES sound backend")
+diff --git a/Source/Core/AudioCommon/CubebUtils.cpp b/Source/Core/AudioCommon/CubebUtils.cpp
+index 0be4fde..ba30bbb 100644
+--- a/Source/Core/AudioCommon/CubebUtils.cpp
++++ b/Source/Core/AudioCommon/CubebUtils.cpp
+@@ -70,6 +70,9 @@ std::shared_ptr<cubeb> GetContext()
+   cubeb* ctx;
+   if (cubeb_init(&ctx, "Dolphin Emulator", nullptr) != CUBEB_OK)
+   {
++    // Modified for gcx, 2026-10-21: failed init owns no context deleter, so
++    // retire the asynchronous logger here rather than leaving a joinable thread.
++    cubeb_set_log_callback(CUBEB_LOG_DISABLED, nullptr);
+     ERROR_LOG_FMT(AUDIO, "Error initializing cubeb library");
+     return nullptr;
+   }
+diff --git a/Source/Core/Common/GL/GLInterface/EGL.cpp b/Source/Core/Common/GL/GLInterface/EGL.cpp
+index a0bf6dc..6e041a6 100644
+--- a/Source/Core/Common/GL/GLInterface/EGL.cpp
++++ b/Source/Core/Common/GL/GLInterface/EGL.cpp
+@@ -145,6 +145,7 @@ bool GLContextEGL::Initialize(const WindowSystemInfo& wsi, bool stereo, bool cor
+   bool supports_core_profile = false;
+ 
+   m_wsi = wsi;
++  m_surface_owner = AcquireRenderSurface(wsi.type, wsi.render_surface);
+   m_egl_display = OpenEGLDisplay();
+   if (!m_egl_display)
+   {
+@@ -348,9 +349,11 @@ bool GLContextEGL::MakeCurrent()
+ 
+ void GLContextEGL::UpdateSurface(void* window_handle)
+ {
++  auto owner = AcquireRenderSurface(m_wsi.type, window_handle);
+   m_wsi.render_surface = window_handle;
+   ClearCurrent();
+   DestroyWindowSurface();
++  m_surface_owner = std::move(owner);
+   CreateWindowSurface();
+   MakeCurrent();
+ }
+diff --git a/Source/Core/Common/GL/GLInterface/EGL.h b/Source/Core/Common/GL/GLInterface/EGL.h
+index bed1b31..3f5e91e 100644
+--- a/Source/Core/Common/GL/GLInterface/EGL.h
++++ b/Source/Core/Common/GL/GLInterface/EGL.h
+@@ -12,6 +12,7 @@
+ 
+ class GLContextEGL : public GLContext
+ {
++  std::shared_ptr<void> m_surface_owner;
+ public:
+   virtual ~GLContextEGL() override;
+ 
+diff --git a/Source/Core/Common/WindowSystemInfo.h b/Source/Core/Common/WindowSystemInfo.h
+index 9d15477..e560512 100644
+--- a/Source/Core/Common/WindowSystemInfo.h
++++ b/Source/Core/Common/WindowSystemInfo.h
+@@ -3,6 +3,11 @@
+ 
+ #pragma once
+ 
++#include <memory>
++#ifdef ANDROID
++#include <android/native_window.h>
++#endif
++
+ enum class WindowSystemType
+ {
+   Headless,
+@@ -15,6 +20,21 @@ enum class WindowSystemType
+   Haiku,
+ };
+ 
++// Keep Android windows alive while queued or owned by an EGL/Vulkan surface.
++inline std::shared_ptr<void> AcquireRenderSurface(WindowSystemType type, void* handle)
++{
++#ifdef ANDROID
++  if (type == WindowSystemType::Android && handle)
++  {
++    ANativeWindow_acquire(static_cast<ANativeWindow*>(handle));
++    return {handle, [](void* value) { ANativeWindow_release(static_cast<ANativeWindow*>(value)); }};
++  }
++#endif
++  (void)type;
++  (void)handle;
++  return {};
++}
++
+ struct WindowSystemInfo
+ {
+   WindowSystemInfo() = default;
+diff --git a/Source/Core/Core/CMakeLists.txt b/Source/Core/Core/CMakeLists.txt
+index 56c8dba..16b43fa 100644
+--- a/Source/Core/Core/CMakeLists.txt
++++ b/Source/Core/Core/CMakeLists.txt
+@@ -788,7 +788,7 @@ elseif(UNIX)
+   target_sources(core PRIVATE
+     HW/EXI/BBA/TAP_Unix.cpp
+   )
+-  if(ANDROID)
++  if(ANDROID AND NOT GCX_ADAPTER_DIR)
+     target_sources(core PRIVATE
+       HW/WiimoteReal/IOAndroid.cpp
+       HW/WiimoteReal/IOAndroid.h
+diff --git a/Source/Core/Core/HW/EXI/EXI_DeviceMemoryCard.cpp b/Source/Core/Core/HW/EXI/EXI_DeviceMemoryCard.cpp
+index 73ff1d6..9465fd2 100644
+--- a/Source/Core/Core/HW/EXI/EXI_DeviceMemoryCard.cpp
++++ b/Source/Core/Core/HW/EXI/EXI_DeviceMemoryCard.cpp
+@@ -495,6 +495,9 @@ void CEXIMemoryCard::TransferByte(u8& byte)
+   DEBUG_LOG_FMT(EXPANSIONINTERFACE, "EXI MEMCARD: < {:02x}", byte);
+ }
+ 
++// Modified for gcx, 2026-10-21. Caller holds the CPU thread guard.
++bool CEXIMemoryCard::FlushToStorage() { return m_memory_card->FlushToStorage(); }
++
+ void CEXIMemoryCard::DoState(PointerWrap& p)
+ {
+   // for movie sync, we need to save/load memory card contents (and other data) in savestates.
+diff --git a/Source/Core/Core/HW/EXI/EXI_DeviceMemoryCard.h b/Source/Core/Core/HW/EXI/EXI_DeviceMemoryCard.h
+index db9c013..3c3f446 100644
+--- a/Source/Core/Core/HW/EXI/EXI_DeviceMemoryCard.h
++++ b/Source/Core/Core/HW/EXI/EXI_DeviceMemoryCard.h
+@@ -52,6 +52,8 @@ public:
+   bool UseDelayedTransferCompletion() const override;
+   bool IsPresent() const override;
+   void DoState(PointerWrap& p) override;
++  // Modified for gcx, 2026-10-21: synchronous persistence barrier.
++  bool FlushToStorage();
+   void DMARead(u32 addr, u32 size) override;
+   void DMAWrite(u32 addr, u32 size) override;
+ 
+diff --git a/Source/Core/Core/HW/GCMemcard/GCMemcardBase.h b/Source/Core/Core/HW/GCMemcard/GCMemcardBase.h
+index 5805b90..ca4dee8 100644
+--- a/Source/Core/Core/HW/GCMemcard/GCMemcardBase.h
++++ b/Source/Core/Core/HW/GCMemcard/GCMemcardBase.h
+@@ -23,6 +23,8 @@ public:
+   virtual void ClearBlock(u32 address) = 0;
+   virtual void ClearAll() = 0;
+   virtual void DoState(PointerWrap& p) = 0;
++  // Modified for gcx, 2026-10-21: unsupported backends cannot acknowledge durability.
++  virtual bool FlushToStorage() { return false; }
+   u32 GetCardId() const { return m_nintendo_card_id; }
+ 
+ protected:
+diff --git a/Source/Core/Core/HW/GCMemcard/GCMemcardRaw.cpp b/Source/Core/Core/HW/GCMemcard/GCMemcardRaw.cpp
+index 1a8644b..2a14c2e 100644
+--- a/Source/Core/Core/HW/GCMemcard/GCMemcardRaw.cpp
++++ b/Source/Core/Core/HW/GCMemcard/GCMemcardRaw.cpp
+@@ -35,6 +35,26 @@
+ #define SIZE_TO_Mb (1024 * 8 * 16)
+ #define MC_HDR_SIZE 0xA000
+ 
++// Modified for gcx, 2026-10-21. Installed before boot, cleared after flush-worker join.
++static MemoryCard::WriteHandler s_write_handler = nullptr;
++void MemoryCard::SetWriteHandler(WriteHandler handler) { s_write_handler = handler; }
++
++bool MemoryCard::FlushToStorage()
++{
++  std::lock_guard commit(m_commit_mutex);
++  if (!s_write_handler)
++    return false;
++  {
++    std::lock_guard snapshot(m_flush_mutex);
++    m_dirty.TestAndClear();
++    std::memcpy(m_flush_buffer.get(), m_memcard_data.get(), m_memory_card_size);
++  }
++  if (s_write_handler(m_filename, {m_flush_buffer.get(), m_memory_card_size}))
++    return true;
++  m_dirty.Set();
++  return false;
++}
++
+ MemoryCard::MemoryCard(std::string filename, ExpansionInterface::Slot card_slot, u16 size_mbits)
+     : MemoryCardBase(card_slot, size_mbits), m_filename(std::move(filename))
+ {
+@@ -116,6 +136,14 @@ void MemoryCard::FlushThread()
+       }
+     }
+ 
++    if (s_write_handler)
++    {
++      FlushToStorage();
++      if (do_exit)
++        return;
++      continue;
++    }
++
+     // Opening the file is purposefully done each iteration to ensure the
+     // file doesn't disappear out from under us after the first check.
+     File::IOFile file(m_filename, "r+b");
+diff --git a/Source/Core/Core/HW/GCMemcard/GCMemcardRaw.h b/Source/Core/Core/HW/GCMemcard/GCMemcardRaw.h
+index 96e7a29..b8cfe15 100644
+--- a/Source/Core/Core/HW/GCMemcard/GCMemcardRaw.h
++++ b/Source/Core/Core/HW/GCMemcard/GCMemcardRaw.h
+@@ -7,6 +7,7 @@
+ #include <mutex>
+ #include <string>
+ #include <thread>
++#include <span>
+ #include "Common/Event.h"
+ #include "Common/Flag.h"
+ #include "Core/HW/GCMemcard/GCMemcard.h"
+@@ -22,6 +23,10 @@ public:
+   ~MemoryCard() override;
+   void FlushThread();
+   void MakeDirty();
++  // Modified for gcx, 2026-10-21: optional complete-image durable writer.
++  using WriteHandler = bool (*)(const std::string&, std::span<const u8>);
++  static void SetWriteHandler(WriteHandler handler);
++  bool FlushToStorage() override;
+ 
+   s32 Read(u32 src_address, s32 length, u8* dest_address) override;
+   s32 Write(u32 dest_address, s32 length, const u8* src_address) override;
+@@ -41,6 +46,7 @@ private:
+   std::unique_ptr<u8[]> m_flush_buffer;
+   std::thread m_flush_thread;
+   std::mutex m_flush_mutex;
++  std::mutex m_commit_mutex;
+   Common::Event m_flush_trigger;
+   Common::Flag m_dirty;
+   u32 m_memory_card_size;
+diff --git a/Source/Core/Core/HW/WiimoteReal/IOAndroid.h b/Source/Core/Core/HW/WiimoteReal/IOAndroid.h
+index 4a79b90..db4b3b7 100644
+--- a/Source/Core/Core/HW/WiimoteReal/IOAndroid.h
++++ b/Source/Core/Core/HW/WiimoteReal/IOAndroid.h
+@@ -3,7 +3,7 @@
+ 
+ #pragma once
+ 
+-#ifdef ANDROID
++#if defined(ANDROID) && !defined(GCX_ANDROID_HOST)
+ #include <jni.h>
+ #include <string>
+ 
+diff --git a/Source/Core/Core/IOS/USB/Emulated/Microphone.cpp b/Source/Core/Core/IOS/USB/Emulated/Microphone.cpp
+index fe0363c..cf3c32d 100644
+--- a/Source/Core/Core/IOS/USB/Emulated/Microphone.cpp
++++ b/Source/Core/Core/IOS/USB/Emulated/Microphone.cpp
+@@ -98,7 +98,7 @@ void Microphone::StreamStart(u32 sampling_rate)
+     return;
+ 
+   m_worker.Execute([this, sampling_rate] {
+-#ifdef ANDROID
++#if defined(ANDROID) && !defined(GCX_ANDROID_HOST)
+     JNIEnv* env = IDCache::GetEnvForThread();
+     if (jboolean result = env->CallStaticBooleanMethod(
+             IDCache::GetPermissionHandlerClass(),
+diff --git a/Source/Core/InputCommon/CMakeLists.txt b/Source/Core/InputCommon/CMakeLists.txt
+index 5cc6b66..df46e78 100644
+--- a/Source/Core/InputCommon/CMakeLists.txt
++++ b/Source/Core/InputCommon/CMakeLists.txt
+@@ -132,10 +132,11 @@ elseif(X11_FOUND)
+   )
+   target_link_libraries(inputcommon PRIVATE PkgConfig::X11_INPUT)
+ elseif(ANDROID)
+-  target_compile_definitions(inputcommon PRIVATE -DCIFACE_USE_ANDROID)
++  if(NOT GCX_ADAPTER_DIR)
++    target_compile_definitions(inputcommon PRIVATE -DCIFACE_USE_ANDROID)
++    target_sources(inputcommon PRIVATE ControllerInterface/Android/Android.cpp ControllerInterface/Android/Android.h)
++  endif()
+   target_sources(inputcommon PRIVATE
+-    ControllerInterface/Android/Android.cpp
+-    ControllerInterface/Android/Android.h
+     ControllerInterface/Touch/InputOverrider.cpp
+     ControllerInterface/Touch/InputOverrider.h
+   )
+diff --git a/Source/Core/InputCommon/GCAdapter.cpp b/Source/Core/InputCommon/GCAdapter.cpp
+index dbffc4d..4b59f1d 100644
+--- a/Source/Core/InputCommon/GCAdapter.cpp
++++ b/Source/Core/InputCommon/GCAdapter.cpp
+@@ -6,9 +6,12 @@
+ #ifndef ANDROID
+ #define GCADAPTER_USE_LIBUSB_IMPLEMENTATION true
+ #define GCADAPTER_USE_ANDROID_IMPLEMENTATION false
+-#else
++#elif !defined(GCX_ANDROID_HOST)
+ #define GCADAPTER_USE_LIBUSB_IMPLEMENTATION false
+ #define GCADAPTER_USE_ANDROID_IMPLEMENTATION true
++#else
++#define GCADAPTER_USE_LIBUSB_IMPLEMENTATION false
++#define GCADAPTER_USE_ANDROID_IMPLEMENTATION false
+ #endif
+ 
+ #include <array>
+@@ -1070,6 +1073,10 @@ bool IsDetected(const char** error_message)
+   return false;
+ #elif GCADAPTER_USE_ANDROID_IMPLEMENTATION
+   return s_detected;
++#else
++  if (error_message)
++    *error_message = "USB GameCube adapters are not enabled in this build";
++  return false;
+ #endif
+ }
+ 
+diff --git a/Source/Core/VideoBackends/Vulkan/CMakeLists.txt b/Source/Core/VideoBackends/Vulkan/CMakeLists.txt
+index 5f5583f..ae56dca 100644
+--- a/Source/Core/VideoBackends/Vulkan/CMakeLists.txt
++++ b/Source/Core/VideoBackends/Vulkan/CMakeLists.txt
+@@ -46,7 +46,7 @@ PRIVATE
+   xxhash::xxhash
+ )
+ 
+-if (ANDROID AND _M_ARM_64)
++if (ANDROID AND _M_ARM_64 AND NOT GCX_ADAPTER_DIR)
+   target_link_libraries(videovulkan
+   PRIVATE
+       adrenotools
+diff --git a/Source/Core/VideoBackends/Vulkan/VKSwapChain.cpp b/Source/Core/VideoBackends/Vulkan/VKSwapChain.cpp
+index 370e22d..36030e5 100644
+--- a/Source/Core/VideoBackends/Vulkan/VKSwapChain.cpp
++++ b/Source/Core/VideoBackends/Vulkan/VKSwapChain.cpp
+@@ -27,6 +27,7 @@ SwapChain::SwapChain(const WindowSystemInfo& wsi, VkSurfaceKHR surface, bool vsy
+     : m_wsi(wsi), m_surface(surface), m_vsync_enabled(vsync),
+       m_fullscreen_supported(g_vulkan_context->SupportsExclusiveFullscreen(wsi, surface))
+ {
++  m_surface_owner = AcquireRenderSurface(wsi.type, wsi.render_surface);
+ }
+ 
+ SwapChain::~SwapChain()
+@@ -577,6 +578,7 @@ bool SwapChain::RecreateSurface(void* native_handle)
+ 
+   // Re-create the surface with the new native handle
+   m_wsi.render_surface = native_handle;
++  m_surface_owner = AcquireRenderSurface(m_wsi.type, native_handle);
+   m_surface = CreateVulkanSurface(g_vulkan_context->GetVulkanInstance(), m_wsi);
+   if (m_surface == VK_NULL_HANDLE)
+     return false;
+@@ -614,5 +616,6 @@ void SwapChain::DestroySurface()
+ {
+   vkDestroySurfaceKHR(g_vulkan_context->GetVulkanInstance(), m_surface, nullptr);
+   m_surface = VK_NULL_HANDLE;
++  m_surface_owner.reset();
+ }
+ }  // namespace Vulkan
+diff --git a/Source/Core/VideoBackends/Vulkan/VKSwapChain.h b/Source/Core/VideoBackends/Vulkan/VKSwapChain.h
+index 17334db..b3b3b8f 100644
+--- a/Source/Core/VideoBackends/Vulkan/VKSwapChain.h
++++ b/Source/Core/VideoBackends/Vulkan/VKSwapChain.h
+@@ -92,6 +92,7 @@ private:
+   };
+ 
+   WindowSystemInfo m_wsi;
++  std::shared_ptr<void> m_surface_owner;
+   VkSurfaceKHR m_surface = VK_NULL_HANDLE;
+   VkSurfaceFormatKHR m_surface_format = {};
+   VkPresentModeKHR m_present_mode = VK_PRESENT_MODE_IMMEDIATE_KHR;
+diff --git a/Source/Core/VideoBackends/Vulkan/VulkanLoader.cpp b/Source/Core/VideoBackends/Vulkan/VulkanLoader.cpp
+index a761a81..5535a1c 100644
+--- a/Source/Core/VideoBackends/Vulkan/VulkanLoader.cpp
++++ b/Source/Core/VideoBackends/Vulkan/VulkanLoader.cpp
+@@ -4,7 +4,7 @@
+ #define VMA_IMPLEMENTATION
+ #include "VideoBackends/Vulkan/VulkanLoader.h"
+ 
+-#if defined(ANDROID)
++#if defined(ANDROID) && !defined(GCX_ANDROID_HOST)
+ #include <adrenotools/driver.h>
+ #include <dlfcn.h>
+ #endif
+@@ -54,7 +54,7 @@ static bool OpenVulkanLibrary(bool force_system_library)
+   return s_vulkan_module.Open(filename.c_str());
+ #else
+ 
+-#if defined(ANDROID) && _M_ARM_64
++#if defined(ANDROID) && _M_ARM_64 && !defined(GCX_ANDROID_HOST)
+   const std::string& driver_lib_name = g_Config.customDriverLibraryName;
+ 
+   if (!force_system_library && !driver_lib_name.empty() && SupportsCustomDriver())
+@@ -246,7 +246,7 @@ void LogVulkanResult(Common::Log::LogLevel level, const char* func_name, const i
+                   static_cast<int>(res), VkResultToString(res));
+ }
+ 
+-#ifdef ANDROID
++#if defined(ANDROID) && !defined(GCX_ANDROID_HOST)
+ static bool CheckKgslPresent()
+ {
+   constexpr auto KgslPath{"/dev/kgsl-3d0"};
+diff --git a/Source/Core/VideoCommon/OnScreenUI.cpp b/Source/Core/VideoCommon/OnScreenUI.cpp
+index 209e96c..f4b8e81 100644
+--- a/Source/Core/VideoCommon/OnScreenUI.cpp
++++ b/Source/Core/VideoCommon/OnScreenUI.cpp
+@@ -30,6 +30,7 @@
+ #include "VideoCommon/Statistics.h"
+ #include "VideoCommon/VertexManagerBase.h"
+ #include "VideoCommon/VideoConfig.h"
++#include "VideoCommon/VideoEvents.h"
+ 
+ #include <inttypes.h>
+ #include <mutex>
+@@ -422,6 +423,7 @@ void OnScreenUI::Finalize()
+   DrawDebugText();
+   OSD::DrawMessages();
+   DrawChallengesAndLeaderboards();
++  GetVideoEvents().draw_overlay_event.Trigger();
+   ImGui::Render();
+ 
+   // Check for font changes
+diff --git a/Source/Core/VideoCommon/Present.cpp b/Source/Core/VideoCommon/Present.cpp
+index 41d05f3..d3f3953 100644
+--- a/Source/Core/VideoCommon/Present.cpp
++++ b/Source/Core/VideoCommon/Present.cpp
+@@ -4,6 +4,7 @@
+ #include "VideoCommon/Present.h"
+ 
+ #include "Common/ChunkFile.h"
++#include "Common/WindowSystemInfo.h"
+ #include "Core/Config/GraphicsSettings.h"
+ #include "Core/Config/MainSettings.h"
+ #include "Core/CoreTiming.h"
+@@ -590,6 +591,7 @@ void Presenter::ReleaseXFBContentLock()
+ void Presenter::ChangeSurface(void* new_surface_handle)
+ {
+   std::lock_guard<std::mutex> lock(m_swap_mutex);
++  m_pending_surface_owner = AcquireRenderSurface(WindowSystemType::Android, new_surface_handle);
+   m_new_surface_handle = new_surface_handle;
+   m_surface_changed.Set();
+ }
+@@ -743,8 +745,15 @@ void Presenter::UpdateDrawRectangle()
+   }
+ 
+   // The rendering window size
+-  const float win_width = static_cast<float>(m_backbuffer_width);
+-  const float win_height = static_cast<float>(m_backbuffer_height);
++  const int back_width = std::max(1, m_backbuffer_width);
++  const int back_height = std::max(1, m_backbuffer_height);
++  const bool has_area = m_content_area.GetWidth() > 0 && m_content_area.GetHeight() > 0;
++  const int left = has_area ? std::clamp(m_content_area.left, 0, back_width - 1) : 0;
++  const int top = has_area ? std::clamp(m_content_area.top, 0, back_height - 1) : 0;
++  const int right = has_area ? std::clamp(m_content_area.right, left + 1, back_width) : back_width;
++  const int bottom = has_area ? std::clamp(m_content_area.bottom, top + 1, back_height) : back_height;
++  const float win_width = static_cast<float>(right - left);
++  const float win_height = static_cast<float>(bottom - top);
+   const float win_aspect_ratio = win_width / win_height;
+ 
+   // FIXME: this breaks at very low widget sizes
+@@ -809,8 +818,8 @@ void Presenter::UpdateDrawRectangle()
+     int_draw_height = rect.GetHeight();
+   }
+ 
+-  m_target_rectangle.left = static_cast<int>(std::round(win_width / 2.0 - int_draw_width / 2.0));
+-  m_target_rectangle.top = static_cast<int>(std::round(win_height / 2.0 - int_draw_height / 2.0));
++  m_target_rectangle.left = left + static_cast<int>(std::round(win_width / 2.0 - int_draw_width / 2.0));
++  m_target_rectangle.top = top + static_cast<int>(std::round(win_height / 2.0 - int_draw_height / 2.0));
+   m_target_rectangle.right = m_target_rectangle.left + int_draw_width;
+   m_target_rectangle.bottom = m_target_rectangle.top + int_draw_height;
+ }
+diff --git a/Source/Core/VideoCommon/Present.h b/Source/Core/VideoCommon/Present.h
+index 91ba870..ee87946 100644
+--- a/Source/Core/VideoCommon/Present.h
++++ b/Source/Core/VideoCommon/Present.h
+@@ -60,6 +60,8 @@ public:
+   void OnBackbufferSet(bool size_changed, bool is_first_set);
+ 
+   void UpdateDrawRectangle();
++  // Host-owned usable area, applied on the video thread before presenting.
++  void SetContentArea(const MathUtil::Rectangle<int>& area) { m_content_area = area; }
+ 
+   // Get the amount of pixels the given rect should be cropped on all sides from custom cropping.
+   MathUtil::Rectangle<int> GetCustomCrop(const MathUtil::Rectangle<int>& rect) const;
+@@ -141,6 +143,7 @@ private:
+   AbstractTextureFormat m_backbuffer_format = AbstractTextureFormat::Undefined;
+ 
+   void* m_new_surface_handle = nullptr;
++  std::shared_ptr<void> m_pending_surface_owner;
+   Common::Flag m_surface_changed;
+   Common::Flag m_surface_resized;
+ 
+@@ -148,6 +151,7 @@ private:
+   // Width and height correspond to the final output resolution.
+   // Offsets imply black borders (if the window aspect ratio doesn't match the game's one).
+   MathUtil::Rectangle<int> m_target_rectangle = {};
++  MathUtil::Rectangle<int> m_content_area = {};
+ 
+   u32 m_auto_resolution_scale = 1;
+ 
+diff --git a/Source/Core/VideoCommon/VideoEvents.h b/Source/Core/VideoCommon/VideoEvents.h
+index f037dc2..e6eaa87 100644
+--- a/Source/Core/VideoCommon/VideoEvents.h
++++ b/Source/Core/VideoCommon/VideoEvents.h
+@@ -69,6 +69,8 @@ struct PresentInfo
+ 
+ struct VideoEvents
+ {
++  // Frontend drawing primitives, on the video thread with an active ImGui frame.
++  Common::HookableEvent<> draw_overlay_event;
+   // Called when certain video config setting are changed
+   Common::HookableEvent<u32> config_changed_event;
+ 

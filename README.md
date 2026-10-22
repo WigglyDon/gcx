@@ -12,11 +12,13 @@ uploads or mandatory network connection.
 
 ## What exists today
 
-**Project foundation only.** This repository starts with a complete product and
-engineering seed, prepared assignments, source observations and local setup tools.
-It does not yet contain an incorporated emulator, native player, APK or earned
-gameplay result. Dolphin is the first engine candidate, not an accepted gcx build.
-The source pin and its limits are recorded in `upstream-candidates.json`.
+**GCX-1 implementation in progress.** A Rust host now builds against pinned Dolphin
+and passes an original GameCube CPU fixture, native input readback, atomic card
+commit and teardown checks on Linux. The Android Rust player and narrow native
+adapter link on ARM64. A private development APK passes ABI, alignment, signature
+and resource checks. Visible gameplay, audible sound, ordinary in-game save/reload,
+Android locking and automatic resume are unrun. See
+[native reproduction and limits](native/README.md).
 
 GameCube is the initial scope. Dolphin's Wii capability is not a promise of Wii
 support in gcx. A Wii expansion, iOS implementation and multiple resident games
