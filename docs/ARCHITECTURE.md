@@ -37,8 +37,10 @@ has passed on Linux, including native pad readback and card commit. A secondary
 Android device passed the private-directory lock contention fixture, chooser and
 scoped RVZ selection. Wind Waker renders its title, intro and file menu, responds
 to Start/Control Stick/A and has owner-confirmed audible sound. The game-created
-ordinary card file is privately backed up. Interactive world control, progress
-save/reload and joined native teardown exclusion remain unqualified.
+ordinary card file is privately backed up. The owner has played into the interactive world, saved in-game and loaded the
+one-rupee marker after normal Stop and a confirmed cold process. Android lock
+contention samples span native teardown; acquisition succeeds after joined workers
+and metadata publication. A native Android surface-replacement crash remains open.
 The Android-only analytics metadata provider was invoked while empty even with
 reporting disabled. A guard at that owner passes the host regression of the actual
 Android branch and the secondary Android device's boot test.
@@ -59,7 +61,9 @@ for Stop retry. Menu generations and runtime epochs reject stale actions.
 A backward-compatible saved `stopped` flag prevents unintended boot after Stop,
 including in a fresh process; Open retains the same GameId/profile/document grant.
 Focused host coverage includes failed barrier/retry, duplicate/stale Stop, metadata
-failure and lock ordering. Android Stop/progress reload qualification is pending.
+failure and lock ordering. Pixel 4 normal Stop passed twice, with visible unload, clean metadata and no
+automatic boot in a cold process. The ordinary progress reload passed; the Resume
+button itself and the complete input matrix remain unqualified.
 
 ## Stable identities, ephemeral execution
 

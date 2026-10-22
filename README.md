@@ -18,10 +18,11 @@ commit and teardown checks on Linux. The Android Rust player and narrow native
 adapter link on ARM64. A private development APK passes ABI, alignment, signature
 and resource checks. Wind Waker renders its title, intro and file-selection menu
 on a secondary stock Android device, with Start, Control Stick and A input and
-owner-confirmed audible sound. The game creates its ordinary card file, which is
-privately preserved. Save-profile lock contention passes while the game is live.
-Playable world control, in-game progress save/reload and automatic resume remain
-unqualified. See
+owner-confirmed audible sound. The owner has played into Wind Waker’s interactive world and saved through the
+game. Normal gcx Stop, exclusion through native teardown, and a cold-process
+game-menu reload preserved the one-rupee marker. Actual cards are privately backed
+up. A surface-replacement crash and the missing landscape presentation remain
+open; full controls, Fold play and automatic resume remain unqualified. See
 [native reproduction and limits](native/README.md).
 
 GameCube is the initial scope. Dolphin's Wii capability is not a promise of Wii

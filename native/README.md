@@ -21,8 +21,9 @@ with its class loader and forwards destruction for Rust-owned dialog retirement.
 Scoped Wind Waker RVZ selection now reaches its rendered title, intro and file
 menu through native Vulkan. Start, Control Stick and A work; the owner confirmed
 audible sound. The game reported ordinary Slot A file creation; its 16 MiB native
-raw card with a 12-block game directory entry is privately backed up. Playable
-world control, progress save/reload and Fold results remain unqualified.
+raw card with a 12-block game directory entry is privately backed up. The owner subsequently played into the world and saved in-game. Normal Stop and
+a confirmed cold-process game-menu load retained the visible one-rupee marker.
+Fold results and the full control matrix remain unqualified.
 Private diagnostics/data and each
 tested APK/source pair are retained; each Pixel 4 window returned screen-off and
 released before off-device work.
@@ -50,7 +51,17 @@ metadata publication. A failed barrier keeps the paused runtime available for
 retry. Later failure records interrupted recovery. A durable `stopped` flag keeps
 the game unloaded until Open, preserving its identities and document access.
 Four focused stop tests pass, including actual profile-lock exclusion during join
-and publication; Android acceptance of this new flow remains pending.
+and publication. Pixel 4 normal Stop passed twice. An actual competing Android
+writer observed 313 busy samples spanning the native shutdown interval and
+acquired only after join; a subsequent acquisition passed. The cold process stayed
+unloaded until explicit Open. Final app-scoped inspection found no CPU, Video,
+AudioTrack, card or DVD workers. Resume itself remains unqualified.
+
+One earlier intro run crashed on the Video thread while releasing an Android
+window in Vulkan surface replacement. Exact crash frames and matching symbols
+are retained privately; later successful Stop/reload does not clear this defect.
+The owner also reported missing landscape presentation and requested adaptation
+of the public PSX layout. Repairs are prepared off-device before further custody.
 
 ## Source and reproduction
 
@@ -216,7 +227,8 @@ See [source reconstruction](CORRESPONDING_SOURCE.txt).
 The `gcx-lock-probe` Rust binary uses the product's actual `ProfileLock` and offers
 bounded `hold`, `expect-busy` and `expect-free` modes. Its ARM64 build is prepared
 for stock-device qualification. The isolated app-owned two-process fixture passed
-on Pixel 4; checking a running profile across native teardown remains unrun.
+on Pixel 4; the later live-game observer also proved exclusion across joined
+native teardown and acquisition afterward.
 
 This private development manifest is debuggable so the owner can recover and
 verify gcx's own private data with stock `run-as` before an update. It disables
