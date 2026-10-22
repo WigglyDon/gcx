@@ -24,8 +24,11 @@ fixed PS1 aspect, saved profiles, GL or emulator/storage code is transferred.
 Rust uses actual display density and the engine's reported aspect. The MIT
 copyright notice is preserved in the root license and therefore APK notices.
 Host tests cover non-overlap, bounds/minimum targets, all 18 reachable channels,
-diagonal D-pad and simultaneous independent trigger release. Device landscape,
-insets/cutouts and full physical control qualification remain due.
+diagonal D-pad and simultaneous independent trigger release. The candidate now
+runs in landscape on Pixel 4; its native colors/labels and clear side rails were
+visually inspected, and the owner reports it works. System bars still overlap
+the upper trigger area and bottom picture; inset/cutout handling and independent
+physical qualification of every control remain due.
 
 This is selected public-source adaptation. PSX's checkout, private files, app
 resources and active work were not read or changed for it.

@@ -21,8 +21,10 @@ on a secondary stock Android device, with Start, Control Stick and A input and
 owner-confirmed audible sound. The owner has played into Wind Waker’s interactive world and saved through the
 game. Normal gcx Stop, exclusion through native teardown, and a cold-process
 game-menu reload preserved the one-rupee marker. Actual cards are privately backed
-up. A surface-replacement crash repair and new GameCube landscape controls await
-device qualification; full controls, Fold play and automatic resume remain unqualified. See
+up. The landscape update now runs on Pixel 4 with GameCube colors and labels;
+the owner reports it works. Pause/Resume, one Home/return and clean Stop passed.
+System bar clearance, the full control matrix, extended surface transitions,
+Fold play and automatic resume remain unqualified. See
 [native reproduction and limits](native/README.md).
 
 GameCube is the initial scope. Dolphin's Wii capability is not a promise of Wii
