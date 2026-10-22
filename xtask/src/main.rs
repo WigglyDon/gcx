@@ -124,6 +124,32 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "source-check" => {
             source_check(&source)?;
         }
+        "check-render-surface" => {
+            source_check(&source)?;
+            let directory = root.join(".local/render-surface-check");
+            std::fs::create_dir_all(&directory)?;
+            let executable = directory.join("check");
+            run(Command::new("clang++")
+                .args([
+                    "-std=c++20",
+                    "-pthread",
+                    "-Wall",
+                    "-Wextra",
+                    "-Werror",
+                    "-DANDROID",
+                ])
+                .arg("-I")
+                .arg(root.join("native/tests/stubs"))
+                .arg("-I")
+                .arg(source.join("Source/Core"))
+                .arg(root.join("native/tests/render_surface.cpp"))
+                .arg("-o")
+                .arg(&executable))?;
+            run(&mut Command::new(executable))?;
+            println!(
+                "PASS: actual surface owner prepares final-release thread and balances references"
+            );
+        }
         "check-android-analytics" => {
             source_check(&source)?;
             analytics::check(&root, &source)?;

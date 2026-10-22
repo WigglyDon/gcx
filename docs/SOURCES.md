@@ -92,5 +92,6 @@ availability and publication must be verified when it runs.
 - PSX public reference: https://github.com/WigglyDon/psx/tree/1e4ba86fa0a5fc1470837b6bcc06bd20b6642c11
 - The owner-provided xbx foundation supplied the generic publication workflow.
 
-No PSX implementation, xbx engine source, private data, game or firmware is bundled.
+Selected public MIT PSX landscape geometry has since been adapted as recorded in
+PSX_TRANSFER.md. No sibling engine source, private data, game or firmware is bundled.
 All console-specific architecture in this gcx seed is independently specified.

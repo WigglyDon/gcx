@@ -6,6 +6,30 @@ Historical public source binding: `WigglyDon/psx` at `1e4ba86fa0a5fc1470837b6bcc
 This is a retained reference, not a claim to be its latest branch head or to prove
 every source path was tested. Re-read current public files before actual reuse.
 
+## Landscape adaptation, 2026-10-22
+
+Owner requested the public PSX layout as gcx's clean default landscape reference.
+Reviewed public revision `4277d4ca651a4c9c2e8e88113a0ef092e330f01c`, MIT LICENSE
+(Machine Rhythm contributors, 2026), and `crates/player/src/input.rs`, blob
+`c3d90f7ca21e1a18b1f945cef999287af054ec9c`. Relevant owners: `side_rails`, the
+density-independent control metrics, `ps2_camera_rails` spacing, `PlayerViewport`
+and high, centered clear-picture placement. Also inspected the public Android
+platform's fullscreen/inset handling; it is not transplanted into gcx.
+
+`crates/gcx/src/touch.rs` adapts the side-rail arrangement and spacing to a bounded
+GameCube layout: large green A, red B, gray X/Y and L/R, purple Z, gray Control
+Stick and yellow C Stick; independent trigger travel/clicks, a captured eight-way
+D-pad, Start and a separate gcx Pause action. No PS1 masks, PS2 stick clicks,
+fixed PS1 aspect, saved profiles, GL or emulator/storage code is transferred.
+Rust uses actual display density and the engine's reported aspect. The MIT
+copyright notice is preserved in the root license and therefore APK notices.
+Host tests cover non-overlap, bounds/minimum targets, all 18 reachable channels,
+diagonal D-pad and simultaneous independent trigger release. Device landscape,
+insets/cutouts and full physical control qualification remain due.
+
+This is selected public-source adaptation. PSX's checkout, private files, app
+resources and active work were not read or changed for it.
+
 Candidate reusable concepts: validated opaque GameId/OpenGame requests, input
 capture and cancellation, aspect-correct layout/editor behavior, atomic settings,
 private-source separation, document grants, launch-intent handling, native Android

@@ -19,7 +19,7 @@ use std::{
     path::{Path, PathBuf},
     sync::{
         Mutex,
-        atomic::{AtomicBool, AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
     },
     time::Duration,
 };
@@ -28,6 +28,14 @@ type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 static OWNER: AtomicBool = AtomicBool::new(false);
 static NEXT_RUNTIME: AtomicU64 = AtomicU64::new(1);
 static UI: Mutex<TouchPad> = Mutex::new(TouchPad::new());
+static DENSITY: AtomicU32 = AtomicU32::new(1.0_f32.to_bits());
+fn display_layout(width: f32, height: f32) -> Layout {
+    Layout::for_display(
+        width,
+        height,
+        f32::from_bits(DENSITY.load(Ordering::Relaxed)),
+    )
+}
 
 struct SaveProfile {
     path: PathBuf,
@@ -153,11 +161,11 @@ unsafe extern "C" fn event(context: *mut std::ffi::c_void, id: u32, message: *co
         platform::push(Command::Notice(message));
     }
 }
-extern "C" fn draw(phase: u32, width: f32, height: f32, _aspect: f32) -> Rect {
+extern "C" fn draw(phase: u32, width: f32, height: f32, aspect: f32) -> Rect {
     if !width.is_finite() || !height.is_finite() || width < 1.0 || height < 1.0 {
         return Rect::default();
     }
-    let layout = Layout::new(width, height);
+    let layout = display_layout(width, height);
     if phase == 1 {
         let pad = UI.lock().map(|touch| touch.pad()).unwrap_or_default();
         let value = |control: gcx::Control| pad.values()[control as usize] as f32;
@@ -169,24 +177,45 @@ extern "C" fn draw(phase: u32, width: f32, height: f32, _aspect: f32) -> Rect {
                 let radius = (a.right - a.left) * 0.5;
                 match zone.target {
                     Target::Stick(cx, cy) => {
-                        gcx_ui_circle(x, y, radius, 0xe0475057);
+                        gcx_ui_circle(x, y, radius, 0x703c3b3a);
+                        let reach = radius * if cx == gcx::Control::CX { 0.6 } else { 0.5 };
+                        let knob_x = x + value(cx) * reach;
+                        let knob_y = y - value(cy) * reach;
                         gcx_ui_circle(
-                            x + value(cx) * radius * 0.7,
-                            y - value(cy) * radius * 0.7,
-                            radius * 0.28,
-                            0xff78cbd4,
+                            knob_x,
+                            knob_y,
+                            radius * if cx == gcx::Control::CX { 0.38 } else { 0.48 },
+                            if cx == gcx::Control::CX {
+                                0xff51cfe6
+                            } else {
+                                0xffb5b3ae
+                            },
                         );
+                        if cx == gcx::Control::CX {
+                            let font = radius * 0.4;
+                            gcx_ui_text(
+                                knob_x - font * 0.3,
+                                knob_y - font * 0.5,
+                                font,
+                                c"C".as_ptr(),
+                                0xff252629,
+                            );
+                        }
+                        continue;
                     }
-                    Target::Button(control) => gcx_ui_circle(
-                        x,
-                        y,
-                        radius,
-                        if value(control) > 0.0 {
-                            0xff529777
+                    Target::Button(control) => {
+                        let color = zone.target.color();
+                        let color = if value(control) > 0.0 {
+                            0xffeeeeee
                         } else {
-                            0xe0475057
-                        },
-                    ),
+                            color
+                        };
+                        if (a.right - a.left - (a.bottom - a.top)).abs() < 1.0 {
+                            gcx_ui_circle(x, y, radius, color);
+                        } else {
+                            gcx_ui_rect(a.left, a.top, a.right, a.bottom, color);
+                        }
+                    }
                     Target::Travel(control) => {
                         gcx_ui_rect(a.left, a.top, a.right, a.bottom, 0xe0475057);
                         gcx_ui_rect(
@@ -194,31 +223,51 @@ extern "C" fn draw(phase: u32, width: f32, height: f32, _aspect: f32) -> Rect {
                             a.bottom - (a.bottom - a.top) * 0.25,
                             a.left + (a.right - a.left) * value(control),
                             a.bottom,
-                            0xff78cbd4,
+                            0xffb5b3ae,
                         );
                     }
-                    Target::Pause => gcx_ui_rect(a.left, a.top, a.right, a.bottom, 0xe0475057),
+                    Target::Dpad => {
+                        let step = (a.right - a.left) / 3.0;
+                        gcx_ui_rect(a.left + step, a.top, a.right - step, a.bottom, 0xffaaa6a2);
+                        gcx_ui_rect(a.left, a.top + step, a.right, a.bottom - step, 0xffaaa6a2);
+                        continue;
+                    }
+                    Target::Pause => gcx_ui_rect(a.left, a.top, a.right, a.bottom, 0xb03c3b3a),
                 }
                 let count = zone.label.to_bytes().len() as f32;
+                let density = f32::from_bits(DENSITY.load(Ordering::Relaxed));
                 let font = ((a.bottom - a.top) * 0.4)
                     .min((a.right - a.left) / (count * 0.65 + 1.0))
-                    .clamp(12.0, 48.0);
+                    .clamp(10.0 * density, 32.0 * density);
                 gcx_ui_text(
                     x - count * font * 0.3,
                     y - font * 0.5,
                     font,
                     zone.label.as_ptr(),
-                    0xffeeeeee,
+                    if matches!(zone.target, Target::Button(_) | Target::Dpad) {
+                        0xff252629
+                    } else {
+                        0xffeeeeee
+                    },
                 );
             }
         }
     }
     let a = layout.game;
+    // As in PSX, keep the complete picture high and centered horizontally.
+    // Use this engine's reported aspect, including widescreen/region behavior.
+    let aspect = if aspect.is_finite() && aspect > 0.0 {
+        aspect
+    } else {
+        1.0
+    };
+    let game_width = (a.right - a.left).min((a.bottom - a.top) * aspect);
+    let game_left = a.left + (a.right - a.left - game_width) * 0.5;
     Rect {
-        left: a.left as i32,
+        left: game_left as i32,
         top: a.top as i32,
-        right: a.right as i32,
-        bottom: a.bottom as i32,
+        right: (game_left + game_width) as i32,
+        bottom: (a.top + game_width / aspect) as i32,
     }
 }
 fn id() -> Result<String> {
@@ -304,7 +353,7 @@ fn boot(
     });
     // SAFETY: serialized owner, valid strings and stable process-long callbacks.
     unsafe {
-        if gcx_engine_abi() != 4 {
+        if gcx_engine_abi() != 5 {
             return Err("engine ABI mismatch".into());
         }
         let cards = gcx::storage::CardStore::bind(&profile.path)?;
@@ -356,6 +405,10 @@ pub fn run(app: AndroidApp) {
 }
 fn run_owned(app: &AndroidApp) -> Result<()> {
     platform::init(app)?;
+    DENSITY.store(
+        (app.config().density().unwrap_or(160) as f32 / 160.0).to_bits(),
+        Ordering::Relaxed,
+    );
     let root = app
         .internal_data_path()
         .ok_or("private storage unavailable")?
@@ -439,7 +492,8 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                         }
                     }
                     MainEvent::Destroy => destroyed = true,
-                    MainEvent::WindowResized { .. } | MainEvent::ContentRectChanged { .. } => {
+                    MainEvent::WindowResized { .. } | MainEvent::ContentRectChanged { .. } | MainEvent::ConfigChanged { .. } => {
+                        DENSITY.store((app.config().density().unwrap_or(160) as f32 / 160.0).to_bits(), Ordering::Relaxed);
                         if let Ok(mut touch) = UI.lock() {
                             touch.cancel();
                         }
@@ -457,7 +511,7 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                                         && runtime.is_some()
                                         && let Some(window) = &window
                                     {
-                                        let layout = Layout::new(
+                                        let layout = display_layout(
                                             window.width() as f32,
                                             window.height() as f32,
                                         );

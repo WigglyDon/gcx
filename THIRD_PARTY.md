@@ -1,8 +1,11 @@
 # Source lineage and dependency obligations
 
 Original gcx Rust host, player, input, storage and build logic uses [MIT](LICENSE).
-The foundation's supplied xbx bootstrap attribution remains intact. No PSX source
-or private sibling data has been reused.
+The foundation's supplied xbx bootstrap attribution remains intact. Landscape
+geometry adapts selected public PSX MIT layout concepts at
+`4277d4ca651a4c9c2e8e88113a0ef092e330f01c`; its copyright notice is retained in
+LICENSE and the packaged MIT notice. See [transfer review](docs/PSX_TRANSFER.md).
+No private sibling data or emulation/persistence code is reused.
 
 The engine is official [Dolphin](https://github.com/dolphin-emu/dolphin), pinned at
 `cf5cb7ef81c3e8e7af5c9d566334219ffda9f68b`, with a maintained patch in

@@ -89,7 +89,12 @@ pub fn init(app: &AndroidApp) -> Result<()> {
     // SAFETY: AndroidApp supplies the process VM and NativeActivity's global object.
     let vm = unsafe { JavaVM::from_raw(app.vm_as_ptr().cast())? };
     let _ = VM.set(vm);
-    let env = VM.get().ok_or("VM unavailable")?.attach_current_thread()?;
+    // NativeWindow's final release can destroy Android framework JNI objects.
+    // Keep android_main attached through all window drops, including shutdown.
+    let env = VM
+        .get()
+        .ok_or("VM unavailable")?
+        .attach_current_thread_permanently()?;
     let activity = unsafe { JObject::from_raw(app.activity_as_ptr().cast()) };
     *ACTIVITY.lock().map_err(|_| "activity lock poisoned")? = Some(env.new_global_ref(activity)?);
     Ok(())
@@ -583,7 +588,7 @@ fn current_activity(env: &JNIEnv<'_>, activity: &JObject<'_>) -> bool {
         })
 }
 
-/// Called only by the mechanical native file adapter; no provider writes.
+/// Called only by the mechanical native platform adapter; no provider writes.
 pub extern "C" fn dispatch(
     op: u32,
     path: *const c_char,
@@ -596,6 +601,16 @@ pub extern "C" fn dispatch(
         let path = unsafe { CStr::from_ptr(path) }.to_str()?;
         let argument = unsafe { CStr::from_ptr(argument) }.to_str()?;
         match op {
+            // Native video workers can own the final surface reference. Android
+            // 13's BLAST hang-callback destructor uses GetEnv, without attaching.
+            // jni's TLS guard detaches this thread when it exits, after its last
+            // native window release. No Activity or UI-thread dispatch is needed.
+            10 => {
+                VM.get()
+                    .ok_or("VM unavailable")?
+                    .attach_current_thread_permanently()?;
+                Ok(1)
+            }
             1 if argument == "r" => Ok(i64::from(open_document(path)?.into_raw_fd())),
             2 => Ok(0),
             3 => Ok(i64::try_from(open_document(path)?.metadata()?.len())?),

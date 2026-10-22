@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-//! Unsafe declarations for native/bridge.h, ABI 4. One Rust host thread owns
+//! Unsafe declarations for native/bridge.h, ABI 5. One Rust host thread owns
 //! lifecycle calls. Callbacks must not unwind and remain valid through teardown.
 use std::ffi::{c_char, c_void};
 

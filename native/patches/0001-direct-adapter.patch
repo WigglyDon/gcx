@@ -126,22 +126,23 @@ index bed1b31..3f5e91e 100644
    virtual ~GLContextEGL() override;
  
 diff --git a/Source/Core/Common/WindowSystemInfo.h b/Source/Core/Common/WindowSystemInfo.h
-index 9d15477..e560512 100644
+index 9d15477..9b42f7c 100644
 --- a/Source/Core/Common/WindowSystemInfo.h
 +++ b/Source/Core/Common/WindowSystemInfo.h
-@@ -3,6 +3,11 @@
+@@ -3,6 +3,12 @@
  
  #pragma once
  
 +#include <memory>
 +#ifdef ANDROID
 +#include <android/native_window.h>
++extern "C" void gcx_prepare_render_thread();
 +#endif
 +
  enum class WindowSystemType
  {
    Headless,
-@@ -15,6 +20,21 @@ enum class WindowSystemType
+@@ -15,6 +21,24 @@ enum class WindowSystemType
    Haiku,
  };
  
@@ -152,7 +153,10 @@ index 9d15477..e560512 100644
 +  if (type == WindowSystemType::Android && handle)
 +  {
 +    ANativeWindow_acquire(static_cast<ANativeWindow*>(handle));
-+    return {handle, [](void* value) { ANativeWindow_release(static_cast<ANativeWindow*>(value)); }};
++    return {handle, [](void* value) {
++              gcx_prepare_render_thread();
++              ANativeWindow_release(static_cast<ANativeWindow*>(value));
++            }};
 +  }
 +#endif
 +  (void)type;

@@ -59,7 +59,7 @@ bool Host_UpdateDiscordPresenceRaw(const std::string& details, const std::string
     int64_t start_timestamp, int64_t end_timestamp, int party_size, int party_max) { return false; }
 std::unique_ptr<GBAHostInterface> Host_CreateGBAHost(std::weak_ptr<HW::GBA::Core> core) { return nullptr; }
 
-uint32_t gcx_engine_abi() { return 4; }
+uint32_t gcx_engine_abi() { return 5; }
 void gcx_engine_card_writer(gcx_card_write_fn writer) { s_card_writer = writer; }
 void gcx_engine_platform(gcx_platform_fn platform) { s_platform = platform; }
 void gcx_engine_ui(gcx_ui_fn ui) { s_ui = ui; }

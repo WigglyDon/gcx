@@ -13,6 +13,9 @@ extern "C" {
 typedef int (*gcx_card_write_fn)(const char* path, const uint8_t* bytes, uintptr_t length);
 typedef void (*gcx_event_fn)(void* context, uint32_t event, const char* message);
 typedef int64_t (*gcx_platform_fn)(uint32_t operation, const char* path, const char* argument, char* output, uintptr_t capacity);
+// ABI 5 additionally requires platform operation 10: attach the calling native
+// thread to the JVM through thread exit, return 1 on success. Empty strings and
+// no output are supplied. This precedes the final Android surface release.
 typedef struct gcx_rect { int32_t left, top, right, bottom; } gcx_rect;
 typedef struct gcx_media_info { char game_code[8]; uint32_t region; uint16_t revision; uint8_t disc; uint8_t reserved; } gcx_media_info;
 typedef struct gcx_pad_status { uint16_t buttons; uint8_t axes[4]; uint8_t triggers[2]; uint8_t connected; uint8_t reserved; } gcx_pad_status;

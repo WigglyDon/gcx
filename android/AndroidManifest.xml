@@ -4,7 +4,7 @@
   <uses-sdk android:minSdkVersion="28" android:targetSdkVersion="37" />
   <uses-feature android:glEsVersion="0x00030000" android:required="true" />
   <application android:label="gcx" android:debuggable="true" android:allowBackup="false" android:extractNativeLibs="false">
-    <activity android:name="com.machinerhythm.gcx.GcxActivity" android:exported="true" android:launchMode="singleTask"
+    <activity android:name="com.machinerhythm.gcx.GcxActivity" android:exported="true" android:launchMode="singleTask" android:screenOrientation="sensorLandscape"
         android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|density|uiMode">
       <meta-data android:name="android.app.lib_name" android:value="gcx_android" />
       <intent-filter>
