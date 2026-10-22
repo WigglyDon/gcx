@@ -5,6 +5,7 @@ use android_activity::{
     input::{InputEvent, MotionAction},
 };
 use gcx::library::{Collection, GameId, SaveProfileId, SavedSession, valid_id};
+use gcx::lifecycle::{StopResult, StopRuntime, stop_game};
 use gcx::{
     Pad, ProfileLock,
     engine::*,
@@ -33,6 +34,7 @@ struct SaveProfile {
     _writer: ProfileLock,
 }
 struct LiveRuntime {
+    native_alive: bool,
     events: Box<RuntimeEvents>,
     _cards: gcx::storage::CardStore,
     _profile: SaveProfile,
@@ -42,6 +44,7 @@ struct RuntimeEvents {
     game_id: String,
     epoch: u64,
     stopped: AtomicBool,
+    teardown_error: Mutex<Option<String>>,
 }
 impl LiveRuntime {
     fn commit_for_departure(&self) -> bool {
@@ -57,6 +60,42 @@ impl LiveRuntime {
         }
     }
 }
+impl StopRuntime for LiveRuntime {
+    fn epoch(&self) -> u64 {
+        self.events.epoch
+    }
+    fn pause_commit(&mut self) -> std::result::Result<(), String> {
+        if self.commit_for_departure() {
+            Ok(())
+        } else {
+            Err("Could not durably commit the card. The paused game is retained; Stop game can be retried.".into())
+        }
+    }
+    fn join(&mut self) -> std::result::Result<(), String> {
+        if self.native_alive {
+            if let Ok(mut error) = self.events.teardown_error.lock() {
+                *error = None;
+            }
+            // SAFETY: same serialized native owner. Keep all Rust fields/profile
+            // alive until the stop caller has durably published its result.
+            unsafe {
+                gcx_engine_stop();
+                gcx_engine_shutdown();
+            }
+            self.native_alive = false;
+        }
+        if let Some(error) = gcx::storage::last_card_error().or_else(|| {
+            self.events
+                .teardown_error
+                .lock()
+                .ok()
+                .and_then(|e| e.clone())
+        }) {
+            return Err(error);
+        }
+        Ok(())
+    }
+}
 impl Drop for LiveRuntime {
     fn drop(&mut self) {
         if let Ok(mut touch) = UI.lock() {
@@ -65,10 +104,11 @@ impl Drop for LiveRuntime {
         // SAFETY: the one android_main thread owns this runtime; callbacks are
         // static and the profile lock outlives completed native teardown.
         unsafe {
-            gcx_engine_input(Pad::default().values().as_ptr());
-            gcx_engine_stop();
-            gcx_engine_shutdown();
+            if self.native_alive {
+                gcx_engine_input(Pad::default().values().as_ptr());
+            }
         }
+        let _ = self.join();
     }
 }
 unsafe extern "C" fn event(context: *mut std::ffi::c_void, id: u32, message: *const c_char) {
@@ -88,6 +128,9 @@ unsafe extern "C" fn event(context: *mut std::ffi::c_void, id: u32, message: *co
                 gcx::storage::last_card_error().unwrap_or_default()
             )
         } else {
+            if let Ok(mut error) = context.teardown_error.lock() {
+                *error = Some(message.clone());
+            }
             message
         };
         platform::push(Command::NativeError {
@@ -251,6 +294,7 @@ fn boot(
         game_id: entry.game_id.0.clone(),
         epoch: NEXT_RUNTIME.fetch_add(1, Ordering::Relaxed),
         stopped: AtomicBool::new(false),
+        teardown_error: Mutex::new(None),
     });
     // SAFETY: serialized owner, valid strings and stable process-long callbacks.
     unsafe {
@@ -273,6 +317,7 @@ fn boot(
             return Err("engine initialization rejected".into());
         }
         let runtime = LiveRuntime {
+            native_alive: true,
             events,
             _cards: cards,
             _profile: profile,
@@ -347,6 +392,8 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                     .unwrap_or("The previous runtime needs an explicit restart.")
             )),
         );
+    } else if let Some(index) = selected.filter(|i| collection.entries[*i].stopped) {
+        platform::unloaded_menu(app, &collection.entries[index].title, None);
     } else if selected.is_some() {
         platform::menu(app, false, None);
     } else {
@@ -420,16 +467,13 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                                                         &layout,
                                                     ) && let Some(index) = selected
                                                     {
-                                                        collection.entries[index].paused =
-                                                            !collection.entries[index].paused;
+                                                        collection.entries[index].paused = true;
                                                         touch.cancel();
-                                                        let message =
-                                                            if collection.entries[index].paused {
-                                                                "Paused"
-                                                            } else {
-                                                                "Playing"
-                                                            };
-                                                        platform::notice(app, message.into());
+                                                        hidden = false;
+                                                        if let Some(active) = &runtime {
+                                                            platform::player_menu(app, active.events.epoch,
+                                                                !collection.entries[index].restart_required, None);
+                                                        }
                                                     }
                                                 }
                                                 MotionAction::Move => {
@@ -512,6 +556,64 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                     }
                 }
                 Command::Restart => restart_requested = true,
+                Command::Resume(epoch) => {
+                    if runtime.as_ref().is_some_and(|r| r.events.epoch == epoch)
+                        && let Some(index) = selected
+                        && !collection.entries[index].restart_required
+                    {
+                        collection.entries[index].paused = false;
+                        platform::menu(app, false, None);
+                    }
+                }
+                Command::Stop(epoch) => {
+                    if let Some(index) = selected {
+                        match stop_game(&mut runtime, epoch, &mut collection, index, |c| {
+                            save_collection(&root, c).map_err(|e| e.to_string())
+                        }) {
+                            StopResult::Ignored => {}
+                            StopResult::Retained(error) => {
+                                hidden = false;
+                                native_paused = Some(true);
+                                platform::player_menu(app, epoch, false, Some(error));
+                            }
+                            StopResult::Unloaded { error } => {
+                                hidden = false;
+                                native_paused = None;
+                                surface_pending = false;
+                                restart_requested = false;
+                                platform::diagnostic(if error.is_none() {
+                                    "Stop complete: native workers joined, clean metadata durable, profile released; game unloaded"
+                                } else {
+                                    "Stop unloaded the native runtime; recovery metadata/error retained"
+                                });
+                                platform::unloaded_menu(
+                                    app,
+                                    &collection.entries[index].title,
+                                    error,
+                                );
+                            }
+                        }
+                    }
+                }
+                Command::Open => {
+                    if runtime.is_none()
+                        && let Some(index) = selected
+                        && collection.entries[index].stopped
+                        && !collection.entries[index].restart_required
+                    {
+                        collection.entries[index].request_restart();
+                        if save_collection(&root, &collection).is_ok() {
+                            platform::menu(app, false, None);
+                        } else {
+                            collection.entries[index].stopped = true;
+                            platform::notice(
+                                app,
+                                "Could not preserve launch intent; the game remains unloaded."
+                                    .into(),
+                            );
+                        }
+                    }
+                }
                 Command::Selected(uri) => {
                     picker_pending = false;
                     if runtime.is_some() {
@@ -559,18 +661,32 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                                 last_error: None,
                                 restart_required: false,
                                 runtime_incomplete: false,
+                                stopped: false,
                             });
                             collection.entries.len() - 1
                         };
                     collection.selected = Some(collection.entries[index].game_id.0.clone());
                     selected = Some(index);
+                    if collection.entries[index].stopped
+                        && !collection.entries[index].restart_required
+                    {
+                        collection.entries[index].request_restart();
+                    }
                     if save_collection(&root, &collection).is_err() {
                         platform::notice(app,"Could not durably save the collection. Files are retained; choose the document again to retry.".into());
                         continue;
                     }
-                    platform::menu(app, false, None);
+                    if collection.entries[index].restart_required {
+                        platform::menu(app, true, collection.entries[index].last_error.clone());
+                    } else {
+                        platform::menu(app, false, None);
+                    }
                 }
-                Command::MenuHidden => hidden = true,
+                Command::MenuHidden(generation) => {
+                    if platform::menu_current(generation) {
+                        hidden = true;
+                    }
+                }
                 Command::Canceled => picker_pending = false,
                 Command::Error(error) => {
                     picker_pending = false;
@@ -592,11 +708,14 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                         } else {
                             ""
                         };
-                        platform::menu(
-                            app,
-                            true,
-                            Some(format!("gcx paused\n\n{error}{persistence}")),
-                        );
+                        if let Some(active) = &runtime {
+                            platform::player_menu(
+                                app,
+                                active.events.epoch,
+                                false,
+                                Some(format!("{error}{persistence}")),
+                            );
+                        }
                     } else {
                         platform::notice(app, error);
                     }
@@ -645,7 +764,7 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
             && hidden
             && foreground
             && let (Some(index), Some(window)) = (selected, &window)
-            && !collection.entries[index].restart_required
+            && collection.entries[index].boot_allowed()
             && window.width() > 32
             && window.height() > 32
         {
@@ -691,7 +810,8 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                     surface_pending = gcx_engine_surface(window.ptr().as_ptr().cast()) == 0;
                 }
                 if matches!(gcx_engine_state(), 1 | 2) {
-                    let paused = !foreground
+                    let paused = !hidden
+                        || !foreground
                         || window.is_none()
                         || selected.is_some_and(|i| collection.entries[i].paused);
                     if native_paused != Some(paused) {
@@ -721,12 +841,12 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                 .as_ref()
                 .is_some_and(|active| active.events.stopped.load(Ordering::Relaxed))
             {
-                drop(runtime.take());
+                let joined = runtime.as_mut().expect("checked live runtime").join();
                 hidden = false;
                 if let Some(index) = selected {
-                    collection.entries[index].runtime_incomplete =
-                        gcx::storage::last_card_error().is_some();
-                    if let Some(error) = gcx::storage::last_card_error() {
+                    collection.entries[index].runtime_incomplete = joined.is_err();
+                    collection.entries[index].stopped = true;
+                    if let Err(error) = joined {
                         collection.entries[index].fail(format!(
                             "Card persistence failed during native stop: {error}"
                         ));
@@ -741,29 +861,41 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                         }
                         platform::menu(app, true, Some(message));
                     } else {
-                        selected = None;
-                        platform::menu(app, true, None);
+                        if save_collection(&root, &collection).is_err() {
+                            collection.entries[index].runtime_incomplete = true;
+                            collection.entries[index]
+                                .fail("Could not preserve native stop metadata.".into());
+                            let _ = save_collection(&root, &collection);
+                        }
+                        platform::unloaded_menu(
+                            app,
+                            &collection.entries[index].title,
+                            collection.entries[index]
+                                .restart_required
+                                .then(|| collection.entries[index].last_error.clone())
+                                .flatten(),
+                        );
                     }
                 } else {
                     platform::menu(app, true, None);
                 }
+                drop(runtime.take());
             }
         }
     }
-    let departure = runtime
-        .as_ref()
-        .is_some_and(|active| active.commit_for_departure());
-    let had_runtime = runtime.is_some();
+    if let Some(active) = runtime.as_mut() {
+        let barrier = active.pause_commit();
+        let joined = active.join();
+        if let Some(index) = selected {
+            collection.entries[index].stopped = true;
+            collection.entries[index].runtime_incomplete = barrier.is_err() || joined.is_err();
+            if let Some(error) = barrier.err().or_else(|| joined.err()) {
+                collection.entries[index].fail(format!("Interrupted departure: {error}"));
+            }
+        }
+    }
+    let saved = save_collection(&root, &collection);
     drop(runtime.take());
-    if had_runtime && let Some(index) = selected {
-        collection.entries[index].runtime_incomplete =
-            !departure || gcx::storage::last_card_error().is_some();
-    }
-    if let Some(error) = gcx::storage::last_card_error()
-        && let Some(index) = selected
-    {
-        collection.entries[index].fail(format!("Card persistence failed during teardown: {error}"));
-    }
-    save_collection(&root, &collection)?;
+    saved?;
     Ok(())
 }

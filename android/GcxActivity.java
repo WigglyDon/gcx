@@ -8,14 +8,18 @@ public final class GcxActivity extends android.app.NativeActivity {
     // this Java class loader. Associate the same library before callbacks.
     static { System.loadLibrary("gcx_android"); }
     private native void documentResult(int request, int result, android.content.Intent data);
-    private native void uiAction(int action);
+    private native void uiAction(int action, long menu, long runtime);
     private native void beforeDestroy();
 
     public static final class Action implements android.view.View.OnClickListener {
         private final int action;
+        private final long menu;
+        private final long runtime;
         private final GcxActivity activity;
-        public Action(GcxActivity activity, int action) { this.activity = activity; this.action = action; }
-        @Override public void onClick(android.view.View view) { activity.uiAction(action); }
+        public Action(GcxActivity activity, int action, long menu, long runtime) {
+            this.activity = activity; this.action = action; this.menu = menu; this.runtime = runtime;
+        }
+        @Override public void onClick(android.view.View view) { activity.uiAction(action, menu, runtime); }
     }
 
     @Override

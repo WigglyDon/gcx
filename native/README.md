@@ -43,6 +43,15 @@ does not establish exclusion through joined native teardown. The interrupted
 runtime marker remains and requires explicit restart with current card data at
 the next launch. No machine snapshot or automatic resume is involved.
 
+The next candidate adds Rust-owned Resume and Stop game actions to the existing
+dialog. Stop warns that unsaved play is lost; committed ordinary card data remains.
+The profile/card binding outlives the pause/barrier, joined native shutdown and
+metadata publication. A failed barrier keeps the paused runtime available for
+retry. Later failure records interrupted recovery. A durable `stopped` flag keeps
+the game unloaded until Open, preserving its identities and document access.
+Four focused stop tests pass, including actual profile-lock exclusion during join
+and publication; Android acceptance of this new flow remains pending.
+
 ## Source and reproduction
 
 Official source: `https://github.com/dolphin-emu/dolphin.git`, revision

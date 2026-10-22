@@ -20,6 +20,8 @@ pub struct SavedSession {
     pub restart_required: bool,
     #[serde(default)]
     pub runtime_incomplete: bool,
+    #[serde(default)]
+    pub stopped: bool,
 }
 impl SavedSession {
     pub fn fail(&mut self, error: String) {
@@ -32,6 +34,10 @@ impl SavedSession {
         self.paused = false;
         self.restart_required = false;
         self.runtime_incomplete = false;
+        self.stopped = false;
+    }
+    pub fn boot_allowed(&self) -> bool {
+        !self.stopped && !self.restart_required
     }
     pub fn recover_interrupted(&mut self) -> bool {
         if !self.runtime_incomplete || self.restart_required {
@@ -46,7 +52,7 @@ impl SavedSession {
         true
     }
 }
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Collection {
     pub schema_version: u32,
     pub entries: Vec<SavedSession>,
@@ -114,6 +120,7 @@ mod tests {
             last_error: None,
             restart_required: false,
             runtime_incomplete: false,
+            stopped: false,
         }
     }
     #[test]

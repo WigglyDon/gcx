@@ -50,6 +50,17 @@ saves. Departure stays paused across the barrier and teardown, and the native
 writer skips a redundant unchanged write after its successful acknowledgment.
 These are tested host/metadata behaviors; their Android lifecycle scenario is due.
 
+The Rust pause control opens a small Resume / Stop game dialog. Stop explicitly
+warns that play since the game's own last save is lost; it creates no snapshot.
+Its owner pauses/quiesces and neutralizes, acknowledges the native card barrier,
+joins native workers, publishes clean or recovery metadata while retaining the
+profile lock, then releases ownership. Barrier failure retains the paused runtime
+for Stop retry. Menu generations and runtime epochs reject stale actions.
+A backward-compatible saved `stopped` flag prevents unintended boot after Stop,
+including in a fresh process; Open retains the same GameId/profile/document grant.
+Focused host coverage includes failed barrier/retry, duplicate/stale Stop, metadata
+failure and lock ordering. Android Stop/progress reload qualification is pending.
+
 ## Stable identities, ephemeral execution
 
 GameId is a local opaque stable entry ID. Content fingerprints validate files,

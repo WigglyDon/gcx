@@ -7,6 +7,7 @@ use std::path::Path;
 
 #[cfg(feature = "native-engine")]
 pub mod engine;
+pub mod lifecycle;
 pub mod touch;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

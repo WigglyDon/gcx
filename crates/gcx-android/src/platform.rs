@@ -3,7 +3,7 @@ use android_activity::AndroidApp;
 use jni::{
     JNIEnv, JavaVM,
     objects::{GlobalRef, JClass, JObject, JString, JValue},
-    sys::jint,
+    sys::{jint, jlong},
 };
 use std::{
     collections::VecDeque,
@@ -36,6 +36,7 @@ static ACTIVITY: Mutex<Option<GlobalRef>> = Mutex::new(None);
 static MENU: Mutex<Option<GlobalRef>> = Mutex::new(None);
 static COMMANDS: Mutex<VecDeque<Command>> = Mutex::new(VecDeque::new());
 static EPOCH: AtomicU64 = AtomicU64::new(0);
+static MENU_GENERATION: AtomicU64 = AtomicU64::new(0);
 
 pub enum Command {
     NativeError {
@@ -45,9 +46,12 @@ pub enum Command {
     },
     Choose,
     Restart,
+    Resume(u64),
+    Stop(u64),
+    Open,
     Selected(String),
     Canceled,
-    MenuHidden,
+    MenuHidden(u64),
     Error(String),
     Notice(String),
 }
@@ -254,9 +258,68 @@ pub fn picker(app: &AndroidApp) {
     }));
 }
 pub fn menu(app: &AndroidApp, show: bool, message: Option<String>) {
+    let recovery = message.is_some();
+    let mut actions = Vec::new();
+    if recovery {
+        actions.push((2, "Restart with current saves".to_owned()));
+    }
+    actions.push((1, "Choose a GameCube game".to_owned()));
+    render_menu(
+        app,
+        show,
+        message.unwrap_or_else(|| "gcx\n\nChoose a GameCube game".into()),
+        actions,
+        0,
+    );
+}
+pub fn unloaded_menu(app: &AndroidApp, title: &str, error: Option<String>) {
+    let recovery = error.is_some();
+    let text = error
+        .unwrap_or_else(|| format!("gcx\n\nGame stopped. Card saves are preserved.\n\n{title}"));
+    render_menu(
+        app,
+        true,
+        text,
+        vec![
+            (
+                if recovery { 2 } else { 5 },
+                if recovery {
+                    "Restart with current saves".into()
+                } else {
+                    format!("Open {title}")
+                },
+            ),
+            (1, "Choose a GameCube game".into()),
+        ],
+        0,
+    );
+}
+pub fn player_menu(app: &AndroidApp, runtime: u64, can_resume: bool, error: Option<String>) {
+    let mut text = error
+        .map(|s| format!("gcx paused\n\n{s}"))
+        .unwrap_or_else(|| "gcx paused".into());
+    text.push_str("\n\nStop game preserves card saves. Play since the game's own last save is not preserved. No scene snapshot is saved.");
+    let mut actions = Vec::new();
+    if can_resume {
+        actions.push((3, "Resume".into()));
+    }
+    actions.push((4, "Stop game".into()));
+    render_menu(app, true, text, actions, runtime);
+}
+pub fn menu_current(generation: u64) -> bool {
+    MENU_GENERATION.load(Ordering::Acquire) == generation
+}
+fn render_menu(
+    app: &AndroidApp,
+    show: bool,
+    text: String,
+    actions: Vec<(i32, String)>,
+    runtime: u64,
+) {
     let epoch = EPOCH.load(Ordering::Acquire);
+    let generation = MENU_GENERATION.fetch_add(1, Ordering::AcqRel) + 1;
     app.run_on_java_main_thread(Box::new(move || {
-        if EPOCH.load(Ordering::Acquire) != epoch {
+        if EPOCH.load(Ordering::Acquire) != epoch || !menu_current(generation) {
             return;
         }
         let result = with_env(|env, activity| {
@@ -277,10 +340,7 @@ pub fn menu(app: &AndroidApp, show: bool, message: Option<String>) {
                     "(Landroid/content/Context;)V",
                     &[JValue::Object(activity)],
                 )?;
-                let recovery = message.is_some();
-                let text = env.new_string(
-                    message.unwrap_or_else(|| "gcx\n\nChoose a GameCube game".into()),
-                )?;
+                let text = env.new_string(text)?;
                 env.call_method(
                     &label,
                     "setText",
@@ -302,13 +362,7 @@ pub fn menu(app: &AndroidApp, show: bool, message: Option<String>) {
                     "(I)V",
                     &[JValue::Int(0xff14232b_u32 as i32)],
                 )?;
-                for (action, text) in [
-                    (2, "Restart with current saves"),
-                    (1, "Choose a GameCube game"),
-                ] {
-                    if action == 2 && !recovery {
-                        continue;
-                    }
+                for (action, text) in actions {
                     let button = env.new_object(
                         "android/widget/Button",
                         "(Landroid/content/Context;)V",
@@ -339,8 +393,13 @@ pub fn menu(app: &AndroidApp, show: bool, message: Option<String>) {
                     );
                     let listener = env.new_object(
                         class,
-                        "(Lcom/machinerhythm/gcx/GcxActivity;I)V",
-                        &[JValue::Object(activity), JValue::Int(action)],
+                        "(Lcom/machinerhythm/gcx/GcxActivity;IJJ)V",
+                        &[
+                            JValue::Object(activity),
+                            JValue::Int(action),
+                            JValue::Long(generation as i64),
+                            JValue::Long(runtime as i64),
+                        ],
                     )?;
                     env.call_method(
                         &button,
@@ -390,7 +449,7 @@ pub fn menu(app: &AndroidApp, show: bool, message: Option<String>) {
                 "Could not prepare the player surface.".into(),
             ));
         } else if !show {
-            push(Command::MenuHidden);
+            push(Command::MenuHidden(generation));
         }
     }));
 }
@@ -419,13 +478,18 @@ extern "system" fn Java_com_machinerhythm_gcx_GcxActivity_uiAction(
     env: JNIEnv<'_>,
     activity: JObject<'_>,
     action: jint,
+    menu: jlong,
+    runtime: jlong,
 ) {
-    if !current_activity(&env, &activity) {
+    if !current_activity(&env, &activity) || !menu_current(menu as u64) {
         return;
     }
     match action {
         1 => push(Command::Choose),
         2 => push(Command::Restart),
+        3 => push(Command::Resume(runtime as u64)),
+        4 => push(Command::Stop(runtime as u64)),
+        5 => push(Command::Open),
         _ => {}
     }
 }
