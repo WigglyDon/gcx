@@ -7,7 +7,10 @@ or private sibling data has been reused.
 The engine is official [Dolphin](https://github.com/dolphin-emu/dolphin), pinned at
 `cf5cb7ef81c3e8e7af5c9d566334219ffda9f68b`, with a maintained patch in
 `native/patches/0001-direct-adapter.patch`. Its GPL-2.0-or-later terms and authorship
-remain applicable. `native/COPYING` retains upstream's license text. The native
+remain applicable. `native/COPYING` retains upstream's licensing statement,
+including its aggregate GPLv3 compatibility statement; the GPL text for the adapter
+is retained in `native/LICENSES`. Packaging also preserves upstream's full license
+directory and dependency-specific terms. The native
 Host adapter derives from the pinned MainNoGUI implementation and retains GPL
 attribution. New donor-owner repairs retain the donor file licenses and recorded
 change provenance. A C ABI does not provide license separation.

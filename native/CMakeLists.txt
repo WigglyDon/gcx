@@ -19,4 +19,3 @@ set_target_properties(gcx_engine PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BI
 if(UNIX AND NOT APPLE)
   target_link_options(gcx_engine PRIVATE "-Wl,--no-undefined")
 endif()
-

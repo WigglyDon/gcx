@@ -41,4 +41,3 @@ GCX_EXPORT void gcx_ui_text(float x, float y, float size, const char* text, uint
 #ifdef __cplusplus
 }
 #endif
-

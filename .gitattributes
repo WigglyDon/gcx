@@ -1,0 +1,2 @@
+# Unified diff context includes a required space on otherwise blank lines.
+native/patches/*.patch -whitespace

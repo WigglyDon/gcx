@@ -13,4 +13,3 @@ incremental = false
 
 [profile.release]
 strip = "debuginfo"
-
