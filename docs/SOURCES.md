@@ -95,3 +95,21 @@ availability and publication must be verified when it runs.
 Selected public MIT PSX landscape geometry has since been adapted as recorded in
 PSX_TRANSFER.md. No sibling engine source, private data, game or firmware is bundled.
 All console-specific architecture in this gcx seed is independently specified.
+
+## S11 — Android app-window geometry and immersive mode
+
+- https://developer.android.com/develop/ui/views/layout/immersive
+- https://developer.android.com/develop/ui/views/layout/edge-to-edge
+- https://developer.android.com/reference/android/view/WindowInsets
+- https://developer.android.com/reference/android/view/WindowInsetsController
+- https://github.com/aosp-mirror/platform_frameworks_base/blob/android-13.0.0_r8/core/java/android/app/NativeActivity.java
+
+Read for the bounded fullscreen/inset continuation after Master6348389764.
+NativeActivity takes the window surface/input queue; its content rectangle can be
+inset within that surface. Rust queries current bounds rather than assuming a bar
+height or equating screen, input and buffer coordinates. API30+ uses the platform
+insets controller with transient swipe access; API28/29 uses supported legacy
+immersive-sticky flags. Stable bar clearance protects controls during transient
+reveal; this conservative choice is independent of successful hiding. Framework
+callbacks are mechanical forwarding only. No AndroidX/managed frontend is added.
+These sources inform implementation; they do not establish device qualification.

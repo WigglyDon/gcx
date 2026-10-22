@@ -10,6 +10,29 @@ public final class GcxActivity extends android.app.NativeActivity {
     private native void documentResult(int request, int result, android.content.Intent data);
     private native void uiAction(int action, long menu, long runtime);
     private native void beforeDestroy();
+    private native void windowChanged();
+    private native void windowFocus(boolean focused);
+
+    public static final class Insets implements android.view.View.OnApplyWindowInsetsListener {
+        private final GcxActivity activity;
+        public Insets(GcxActivity activity) { this.activity = activity; }
+        @Override public android.view.WindowInsets onApplyWindowInsets(
+                android.view.View view, android.view.WindowInsets insets) {
+            android.view.WindowInsets result = view.onApplyWindowInsets(insets);
+            activity.windowChanged();
+            return result;
+        }
+    }
+
+    @Override public void onGlobalLayout() {
+        super.onGlobalLayout();
+        windowChanged();
+    }
+
+    @Override public void onWindowFocusChanged(boolean focused) {
+        super.onWindowFocusChanged(focused);
+        windowFocus(focused);
+    }
 
     public static final class Action implements android.view.View.OnClickListener {
         private final int action;

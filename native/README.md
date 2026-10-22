@@ -112,6 +112,21 @@ screen-off and keyguard state verified, and the exclusive lease released without
 pending restoration. Fold, sibling projects, signer and earlier recovery data
 were untouched. This is a bounded device result, not general lifecycle acceptance.
 
+The next bounded continuation adds app-local immersive play and a single Rust
+`PlayerView` geometry owner. Main-thread measurements include current window,
+decor surface, content bounds, input origin, density and stable bar/cutout/mandatory
+gesture clearance. Intersecting before mapping avoids double subtraction on
+already-inset surfaces. Drawn controls, game picture and window-local native input
+use the same geometry; changed/invalid/rotation-mismatched geometry releases input.
+Stable bar space remains reserved during immersive play to protect transient
+swipe reveal. API30+ uses the platform insets controller; API28/29 retains supported
+immersive-sticky flags. Pause/dialog/picker navigation restores visible bars.
+Activity identity and epoch checks retire old callbacks. Twenty host tests and
+warnings-denied host/ARM64 Clippy pass. The native ABI5 engine and its symbols are
+unchanged; this new Rust/platform behavior still needs packaging and a fresh
+exclusive Pixel4 window, including both landscape orientations and a compact
+save/normal-Stop/fresh-process game-menu reload on its exact build.
+
 ## Source and reproduction
 
 Official source: `https://github.com/dolphin-emu/dolphin.git`, revision
@@ -174,7 +189,8 @@ uses one job without LTO or debug information. No source archive is needed.
   discovery, USB adapters and OpenSL audio configuration. The maintained Android
   graph excludes that JNI frontend and uses Rust document callbacks, emulated pad
   overrides and native Cubeb. Hardware USB pads/custom drivers/microphone/Wii are
-  excluded from this initial route. Android linking passed; execution is unrun.
+  excluded from this initial route. Android linking and the bounded Pixel 4
+  gameplay/ordinary-save/lifecycle paths above passed.
 - `InputCommon/ControllerInterface/Touch/InputOverrider.*`: 18 GameCube
   channels include independent L/R analog and digital signals. The adapter
   applies a complete Rust-owned pad under the controller's state mutex, avoiding racing
@@ -214,13 +230,15 @@ Future restore must verify profile generation and exact core/resource/media bind
 before touching native state. A two-process Android test of the same Rust
 `ProfileLock` passed in gcx's private directory through stock debug `run-as`:
 contender refused, then acquisition succeeded after release. This is primitive/
-path evidence; exclusion through native-game teardown still needs qualification.
+path evidence. The later live-game observer proved exclusion across native join
+and acquisition after durable Stop publication, as recorded above.
 
 SavedSession records a durable incomplete-runtime marker before native startup.
 Clean card acknowledgment and joined teardown clear it; a later launch retains
 an interrupted runtime's error and requires explicit restart with current saves.
 This prevents an automatic startup loop after a future crash. The added metadata
-recovery test passes; the device scenario remains unrun. No machine state is
+recovery test and actual Pixel 4 interrupted-error/explicit-restart scenario pass.
+No machine state is
 restored or synthesized by that marker.
 
 ## Resource and license handling
@@ -237,7 +255,8 @@ Apache-2.0 in `Data/Sys/GC/font-licenses.txt`, with the generator at
 `docs/gc-font-tool.cpp`. DSP replacement sources are under `docs/DSP/free_dsp_rom`;
 the first player route uses DSP HLE. `cargo xtask prepare-android` stages the reviewed
 allowlist, source/dependency notices, resource hashes, and compiles the mechanical
-Java trampoline to DEX. This passed; actual APK resources remain to audit. Do not copy the entire donor Sys directory into a shipping package by
+Java trampoline to DEX. The staged and actual APK native/resource byte audits
+passed for the retained candidates. Do not copy the entire donor Sys directory into a shipping package by
 default, or bundle original IPL/game/startup assets.
 
 ## Android reproduction
@@ -284,6 +303,8 @@ verify gcx's own private data with stock `run-as` before an update. It disables
 automatic Android backup and requests no permissions. A release manifest and
 public binary remain separately gated; this is not a store-ready artifact.
 
-A later, fresh exclusive phone window is required for installation, actual Vulkan
-picture, audible sound, touch/interruptions and an in-game save/reload. Resume,
-A-to-B-to-A, shortcuts, updates, folds and speed are separate acceptance checks.
+The retained candidates earned the scoped Pixel 4 installation/Vulkan/audio,
+ordinary-save/reload and lifecycle evidence at the top of this document. The new
+fullscreen/inset continuation still needs a fresh exclusive Pixel 4 window after
+packaging/source checks. A-to-B-to-A, shortcuts, folds and measured speed remain
+separate acceptance checks.

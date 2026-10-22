@@ -5,7 +5,7 @@
 use crate::{Control, Pad};
 use std::collections::BTreeMap;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Area {
     pub left: f32,
     pub top: f32,
@@ -50,6 +50,7 @@ pub struct Zone {
     pub label: &'static CStrLabel,
 }
 pub type CStrLabel = std::ffi::CStr;
+#[derive(Clone, Debug)]
 pub struct Layout {
     pub game: Area,
     pub zones: Vec<Zone>,

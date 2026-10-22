@@ -9,7 +9,8 @@ use gcx::lifecycle::{StopResult, StopRuntime, stop_game};
 use gcx::{
     Pad, ProfileLock,
     engine::*,
-    touch::{Layout, Target, TouchPad},
+    touch::Target,
+    viewport::{PlayerView, WindowGeometry},
 };
 use ndk::native_window::NativeWindow;
 use std::{
@@ -19,7 +20,7 @@ use std::{
     path::{Path, PathBuf},
     sync::{
         Mutex,
-        atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
     },
     time::Duration,
 };
@@ -27,14 +28,11 @@ use std::{
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 static OWNER: AtomicBool = AtomicBool::new(false);
 static NEXT_RUNTIME: AtomicU64 = AtomicU64::new(1);
-static UI: Mutex<TouchPad> = Mutex::new(TouchPad::new());
-static DENSITY: AtomicU32 = AtomicU32::new(1.0_f32.to_bits());
-fn display_layout(width: f32, height: f32) -> Layout {
-    Layout::for_display(
-        width,
-        height,
-        f32::from_bits(DENSITY.load(Ordering::Relaxed)),
-    )
+static UI: Mutex<PlayerView> = Mutex::new(PlayerView::new());
+pub(crate) fn measure_window(geometry: Option<WindowGeometry>) {
+    if let Ok(mut ui) = UI.lock() {
+        ui.measure(geometry);
+    }
 }
 
 struct SaveProfile {
@@ -162,12 +160,17 @@ unsafe extern "C" fn event(context: *mut std::ffi::c_void, id: u32, message: *co
     }
 }
 extern "C" fn draw(phase: u32, width: f32, height: f32, aspect: f32) -> Rect {
-    if !width.is_finite() || !height.is_finite() || width < 1.0 || height < 1.0 {
-        return Rect::default();
-    }
-    let layout = display_layout(width, height);
+    let (geometry, pad) = {
+        let Ok(mut ui) = UI.lock() else {
+            return Rect::default();
+        };
+        let Some(geometry) = ui.present(width, height).cloned() else {
+            return Rect::default();
+        };
+        (geometry, ui.pad())
+    };
+    let layout = &geometry.layout;
     if phase == 1 {
-        let pad = UI.lock().map(|touch| touch.pad()).unwrap_or_default();
         let value = |control: gcx::Control| pad.values()[control as usize] as f32;
         // SAFETY: called on the video thread with the donor ImGui frame active.
         unsafe {
@@ -235,7 +238,7 @@ extern "C" fn draw(phase: u32, width: f32, height: f32, aspect: f32) -> Rect {
                     Target::Pause => gcx_ui_rect(a.left, a.top, a.right, a.bottom, 0xb03c3b3a),
                 }
                 let count = zone.label.to_bytes().len() as f32;
-                let density = f32::from_bits(DENSITY.load(Ordering::Relaxed));
+                let density = geometry.density;
                 let font = ((a.bottom - a.top) * 0.4)
                     .min((a.right - a.left) / (count * 0.65 + 1.0))
                     .clamp(10.0 * density, 32.0 * density);
@@ -253,23 +256,15 @@ extern "C" fn draw(phase: u32, width: f32, height: f32, aspect: f32) -> Rect {
             }
         }
     }
-    let a = layout.game;
-    // As in PSX, keep the complete picture high and centered horizontally.
-    // Use this engine's reported aspect, including widescreen/region behavior.
-    let aspect = if aspect.is_finite() && aspect > 0.0 {
-        aspect
-    } else {
-        1.0
-    };
-    let game_width = (a.right - a.left).min((a.bottom - a.top) * aspect);
-    let game_left = a.left + (a.right - a.left - game_width) * 0.5;
+    let a = geometry.picture(aspect);
     Rect {
-        left: game_left as i32,
+        left: a.left as i32,
         top: a.top as i32,
-        right: (game_left + game_width) as i32,
-        bottom: (a.top + game_width / aspect) as i32,
+        right: a.right as i32,
+        bottom: a.bottom as i32,
     }
 }
+
 fn id() -> Result<String> {
     let mut bytes = [0_u8; 16];
     File::open("/dev/urandom")?.read_exact(&mut bytes)?;
@@ -405,10 +400,6 @@ pub fn run(app: AndroidApp) {
 }
 fn run_owned(app: &AndroidApp) -> Result<()> {
     platform::init(app)?;
-    DENSITY.store(
-        (app.config().density().unwrap_or(160) as f32 / 160.0).to_bits(),
-        Ordering::Relaxed,
-    );
     let root = app
         .internal_data_path()
         .ok_or("private storage unavailable")?
@@ -464,6 +455,8 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                 match event {
                     MainEvent::InitWindow { .. } => {
                         window = app.native_window();
+                        measure_window(None);
+                        platform::refresh_window(app);
                         surface_pending = runtime.is_some();
                     }
                     MainEvent::TerminateWindow { .. } => {
@@ -480,11 +473,12 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                             native_paused = Some(true);
                         }
                         window = None;
+                        measure_window(None);
                         if let Ok(mut touch) = UI.lock() {
                             touch.cancel();
                         }
                     }
-                    MainEvent::GainedFocus => foreground = true,
+                    MainEvent::GainedFocus => { foreground = true; platform::refresh_window(app); },
                     MainEvent::LostFocus | MainEvent::Pause | MainEvent::Stop => {
                         foreground = false;
                         if let Ok(mut touch) = UI.lock() {
@@ -493,7 +487,8 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                     }
                     MainEvent::Destroy => destroyed = true,
                     MainEvent::WindowResized { .. } | MainEvent::ContentRectChanged { .. } | MainEvent::ConfigChanged { .. } => {
-                        DENSITY.store((app.config().density().unwrap_or(160) as f32 / 160.0).to_bits(), Ordering::Relaxed);
+                        measure_window(None);
+                        platform::refresh_window(app);
                         if let Ok(mut touch) = UI.lock() {
                             touch.cancel();
                         }
@@ -509,50 +504,44 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                                 if let InputEvent::MotionEvent(motion) = event {
                                     if hidden
                                         && runtime.is_some()
-                                        && let Some(window) = &window
+                                        && window.is_some()
+                                        && let Ok(mut touch) = UI.lock()
                                     {
-                                        let layout = display_layout(
-                                            window.width() as f32,
-                                            window.height() as f32,
-                                        );
-                                        if let Ok(mut touch) = UI.lock() {
-                                            match motion.action() {
-                                                MotionAction::Down | MotionAction::PointerDown => {
-                                                    let pointer = motion
-                                                        .pointer_at_index(motion.pointer_index());
-                                                    if touch.down(
+                                        match motion.action() {
+                                            MotionAction::Down | MotionAction::PointerDown => {
+                                                let pointer = motion
+                                                    .pointer_at_index(motion.pointer_index());
+                                                if touch.down(
+                                                    pointer.pointer_id(),
+                                                    pointer.x(),
+                                                    pointer.y(),
+                                                ) && let Some(index) = selected
+                                                {
+                                                    collection.entries[index].paused = true;
+                                                    touch.cancel();
+                                                    hidden = false;
+                                                    if let Some(active) = &runtime {
+                                                        platform::player_menu(app, active.events.epoch,
+                                                            !collection.entries[index].restart_required, None);
+                                                    }
+                                                }
+                                            }
+                                            MotionAction::Move => {
+                                                for pointer in motion.pointers() {
+                                                    touch.moved(
                                                         pointer.pointer_id(),
                                                         pointer.x(),
                                                         pointer.y(),
-                                                        &layout,
-                                                    ) && let Some(index) = selected
-                                                    {
-                                                        collection.entries[index].paused = true;
-                                                        touch.cancel();
-                                                        hidden = false;
-                                                        if let Some(active) = &runtime {
-                                                            platform::player_menu(app, active.events.epoch,
-                                                                !collection.entries[index].restart_required, None);
-                                                        }
-                                                    }
+                                                    );
                                                 }
-                                                MotionAction::Move => {
-                                                    for pointer in motion.pointers() {
-                                                        touch.moved(
-                                                            pointer.pointer_id(),
-                                                            pointer.x(),
-                                                            pointer.y(),
-                                                        );
-                                                    }
-                                                }
-                                                MotionAction::Up | MotionAction::PointerUp => {
-                                                    let pointer = motion
-                                                        .pointer_at_index(motion.pointer_index());
-                                                    touch.up(pointer.pointer_id());
-                                                }
-                                                MotionAction::Cancel => touch.cancel(),
-                                                _ => {}
                                             }
+                                            MotionAction::Up | MotionAction::PointerUp => {
+                                                let pointer = motion
+                                                    .pointer_at_index(motion.pointer_index());
+                                                touch.up(pointer.pointer_id());
+                                            }
+                                            MotionAction::Cancel => touch.cancel(),
+                                            _ => {}
                                         }
                                     }
                                     InputStatus::Handled

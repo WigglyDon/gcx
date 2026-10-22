@@ -50,7 +50,8 @@ incomplete. A clean card barrier followed by joined teardown clears the marker.
 After interruption, retain the error and require explicit restart with current
 saves. Departure stays paused across the barrier and teardown, and the native
 writer skips a redundant unchanged write after its successful acknowledgment.
-These are tested host/metadata behaviors; their Android lifecycle scenario is due.
+The host failure/retry fixtures and actual Pixel4 interrupted-error recovery and
+normal joined Stop provide separate evidence; fault injection remains isolated.
 
 The Rust pause control opens a small Resume / Stop game dialog. Stop explicitly
 warns that play since the game's own last save is lost; it creates no snapshot.
@@ -62,8 +63,23 @@ A backward-compatible saved `stopped` flag prevents unintended boot after Stop,
 including in a fresh process; Open retains the same GameId/profile/document grant.
 Focused host coverage includes failed barrier/retry, duplicate/stale Stop, metadata
 failure and lock ordering. Pixel 4 normal Stop passed twice, with visible unload, clean metadata and no
-automatic boot in a cold process. The ordinary progress reload passed; the Resume
-button itself and the complete input matrix remain unqualified.
+automatic boot in a cold process. The ordinary progress reload passed on2793162;
+the ABI5 candidate162d6b4 subsequently passed Pause/Resume and one Home/return.
+The complete input matrix remains unqualified.
+
+Rust owns a single measured presentation/input geometry. Android supplies current
+window, taken decor surface and content rectangles, density, stable system-bar,
+cutout and mandatory-gesture clearance. Intersections occur in screen coordinates
+before mapping to buffer coordinates, so already inset surfaces are not inset
+twice. Native motion starts in window coordinates and maps to the very same
+presented targets. A geometry change, invalid measurement or mismatched rotation
+releases held input; the game is retained. Stable bar clearance deliberately
+remains during immersive play so transient bar reveal cannot cover controls.
+App-local API30+ WindowInsetsController (API28/29 immersive-sticky fallback) hides
+bars only while playing; menus/picker restore ordinary navigation. Main-thread
+callbacks are checked against the bound Activity; posted work also checks its
+epoch. This fullscreen/inset continuation is prepared off-device; its new Android
+behavior still needs the next separately authorized Pixel4 window.
 
 ## Stable identities, ephemeral execution
 

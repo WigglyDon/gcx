@@ -478,6 +478,8 @@ pub fn package(root: &Path, source: &Path) -> Result<()> {
         "Java_com_machinerhythm_gcx_GcxActivity_documentResult",
         "Java_com_machinerhythm_gcx_GcxActivity_uiAction",
         "Java_com_machinerhythm_gcx_GcxActivity_beforeDestroy",
+        "Java_com_machinerhythm_gcx_GcxActivity_windowChanged",
+        "Java_com_machinerhythm_gcx_GcxActivity_windowFocus",
     ] {
         if !symbols.lines().any(|line| {
             line.split_whitespace().last() == Some(symbol)

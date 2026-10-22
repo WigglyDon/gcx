@@ -9,6 +9,7 @@ use std::path::Path;
 pub mod engine;
 pub mod lifecycle;
 pub mod touch;
+pub mod viewport;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(usize)]

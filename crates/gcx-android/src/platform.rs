@@ -13,7 +13,7 @@ use std::{
     os::fd::{FromRawFd, IntoRawFd},
     sync::{
         Mutex, OnceLock,
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
     },
 };
 
@@ -37,6 +37,7 @@ static MENU: Mutex<Option<GlobalRef>> = Mutex::new(None);
 static COMMANDS: Mutex<VecDeque<Command>> = Mutex::new(VecDeque::new());
 static EPOCH: AtomicU64 = AtomicU64::new(0);
 static MENU_GENERATION: AtomicU64 = AtomicU64::new(0);
+static PLAYING: AtomicBool = AtomicBool::new(false);
 
 pub enum Command {
     NativeError {
@@ -82,6 +83,7 @@ pub fn commands() -> Vec<Command> {
 }
 pub fn init(app: &AndroidApp) -> Result<()> {
     EPOCH.fetch_add(1, Ordering::AcqRel);
+    PLAYING.store(false, Ordering::Release);
     COMMANDS
         .lock()
         .map_err(|_| "command lock poisoned")?
@@ -97,6 +99,34 @@ pub fn init(app: &AndroidApp) -> Result<()> {
         .attach_current_thread_permanently()?;
     let activity = unsafe { JObject::from_raw(app.activity_as_ptr().cast()) };
     *ACTIVITY.lock().map_err(|_| "activity lock poisoned")? = Some(env.new_global_ref(activity)?);
+    let epoch = EPOCH.load(Ordering::Acquire);
+    app.run_on_java_main_thread(Box::new(move || {
+        if EPOCH.load(Ordering::Acquire) != epoch {
+            return;
+        }
+        let _ = with_env(|env, activity| {
+            let window = env
+                .call_method(activity, "getWindow", "()Landroid/view/Window;", &[])?
+                .l()?;
+            let decor = env
+                .call_method(window, "getDecorView", "()Landroid/view/View;", &[])?
+                .l()?;
+            let class = activity_class(env, activity, "com.machinerhythm.gcx.GcxActivity$Insets")?;
+            let listener = env.new_object(
+                class,
+                "(Lcom/machinerhythm/gcx/GcxActivity;)V",
+                &[JValue::Object(activity)],
+            )?;
+            env.call_method(
+                &decor,
+                "setOnApplyWindowInsetsListener",
+                "(Landroid/view/View$OnApplyWindowInsetsListener;)V",
+                &[JValue::Object(&listener)],
+            )?;
+            update_window(env, activity);
+            Ok(())
+        });
+    }));
     Ok(())
 }
 fn with_env<T>(f: impl FnOnce(&mut JNIEnv<'_>, &JObject<'_>) -> Result<T>) -> Result<T> {
@@ -120,7 +150,325 @@ fn with_env<T>(f: impl FnOnce(&mut JNIEnv<'_>, &JObject<'_>) -> Result<T>) -> Re
     }
     result
 }
+fn activity_class<'a>(
+    env: &mut JNIEnv<'a>,
+    activity: &JObject<'_>,
+    name: &str,
+) -> Result<JClass<'a>> {
+    let class = env
+        .call_method(activity, "getClass", "()Ljava/lang/Class;", &[])?
+        .l()?;
+    let loader = env
+        .call_method(class, "getClassLoader", "()Ljava/lang/ClassLoader;", &[])?
+        .l()?;
+    let name = env.new_string(name)?;
+    Ok(JClass::from(
+        env.call_method(
+            loader,
+            "loadClass",
+            "(Ljava/lang/String;)Ljava/lang/Class;",
+            &[JValue::Object(&name)],
+        )?
+        .l()?,
+    ))
+}
+fn sdk(env: &mut JNIEnv<'_>) -> Result<i32> {
+    Ok(env
+        .get_static_field("android/os/Build$VERSION", "SDK_INT", "I")?
+        .i()?)
+}
+/// App-window policy only. No gesture exclusion, global settings or navigation
+/// mode changes. Stable inset clearance remains even during transient reveals.
+fn playing_window(env: &mut JNIEnv<'_>, activity: &JObject<'_>, playing: bool) -> Result<()> {
+    let window = env
+        .call_method(activity, "getWindow", "()Landroid/view/Window;", &[])?
+        .l()?;
+    let decor = env
+        .call_method(&window, "getDecorView", "()Landroid/view/View;", &[])?
+        .l()?;
+    if sdk(env)? >= 30 {
+        env.call_method(
+            &window,
+            "setDecorFitsSystemWindows",
+            "(Z)V",
+            &[JValue::Bool((!playing).into())],
+        )?;
+        let controller = env
+            .call_method(
+                &window,
+                "getInsetsController",
+                "()Landroid/view/WindowInsetsController;",
+                &[],
+            )?
+            .l()?;
+        if !controller.is_null() {
+            env.call_method(
+                &controller,
+                "setSystemBarsBehavior",
+                "(I)V",
+                &[JValue::Int(2)],
+            )?;
+            env.call_method(
+                controller,
+                if playing { "hide" } else { "show" },
+                "(I)V",
+                &[JValue::Int(7)],
+            )?;
+        }
+    } else {
+        // API28/29 supported legacy immersive-sticky path; layout flags keep
+        // the taken surface stable while swipes temporarily reveal the bars.
+        env.call_method(
+            decor,
+            "setSystemUiVisibility",
+            "(I)V",
+            &[JValue::Int(if playing { 5894 } else { 0 })],
+        )?;
+    }
+    Ok(())
+}
+fn view_bounds(env: &mut JNIEnv<'_>, view: &JObject<'_>) -> Result<gcx::touch::Area> {
+    let location = env.new_int_array(2)?;
+    env.call_method(
+        view,
+        "getLocationOnScreen",
+        "([I)V",
+        &[JValue::Object(&location)],
+    )?;
+    let mut xy = [0; 2];
+    env.get_int_array_region(&location, 0, &mut xy)?;
+    let width = env.call_method(view, "getWidth", "()I", &[])?.i()?;
+    let height = env.call_method(view, "getHeight", "()I", &[])?.i()?;
+    Ok(gcx::touch::Area {
+        left: xy[0] as f32,
+        top: xy[1] as f32,
+        right: (xy[0] + width) as f32,
+        bottom: (xy[1] + height) as f32,
+    })
+}
+fn measure(env: &mut JNIEnv<'_>, activity: &JObject<'_>) -> Result<gcx::viewport::WindowGeometry> {
+    use gcx::{
+        touch::Area,
+        viewport::{Insets, WindowGeometry},
+    };
+    let version = sdk(env)?;
+    let window = env
+        .call_method(activity, "getWindow", "()Landroid/view/Window;", &[])?
+        .l()?;
+    let decor = env
+        .call_method(&window, "getDecorView", "()Landroid/view/View;", &[])?
+        .l()?;
+    let surface = view_bounds(env, &decor)?;
+    let location = env.new_int_array(2)?;
+    env.call_method(
+        &decor,
+        "getLocationInWindow",
+        "([I)V",
+        &[JValue::Object(&location)],
+    )?;
+    let mut xy = [0; 2];
+    env.get_int_array_region(&location, 0, &mut xy)?;
+    let content = env
+        .call_method(
+            activity,
+            "findViewById",
+            "(I)Landroid/view/View;",
+            &[JValue::Int(16908290)],
+        )?
+        .l()?;
+    if content.is_null() {
+        return Err("NativeActivity content bounds unavailable".into());
+    }
+    let content = view_bounds(env, &content)?;
+    let root_insets = env
+        .call_method(
+            &decor,
+            "getRootWindowInsets",
+            "()Landroid/view/WindowInsets;",
+            &[],
+        )?
+        .l()?;
+    if root_insets.is_null() {
+        return Err("Window insets not ready".into());
+    }
+    let mut bounds = surface;
+    let mut inset = Insets::default();
+    if version >= 30 {
+        let manager = env
+            .call_method(
+                activity,
+                "getWindowManager",
+                "()Landroid/view/WindowManager;",
+                &[],
+            )?
+            .l()?;
+        let metrics = env
+            .call_method(
+                manager,
+                "getCurrentWindowMetrics",
+                "()Landroid/view/WindowMetrics;",
+                &[],
+            )?
+            .l()?;
+        let rect = env
+            .call_method(&metrics, "getBounds", "()Landroid/graphics/Rect;", &[])?
+            .l()?;
+        bounds = Area {
+            left: env.get_field(&rect, "left", "I")?.i()? as f32,
+            top: env.get_field(&rect, "top", "I")?.i()? as f32,
+            right: env.get_field(&rect, "right", "I")?.i()? as f32,
+            bottom: env.get_field(&rect, "bottom", "I")?.i()? as f32,
+        };
+        let insets = env
+            .call_method(
+                metrics,
+                "getWindowInsets",
+                "()Landroid/view/WindowInsets;",
+                &[],
+            )?
+            .l()?;
+        let stable = env
+            .call_method(
+                insets,
+                "getInsetsIgnoringVisibility",
+                "(I)Landroid/graphics/Insets;",
+                &[JValue::Int(135)],
+            )?
+            .l()?;
+        for (name, value) in [
+            ("left", &mut inset.left),
+            ("top", &mut inset.top),
+            ("right", &mut inset.right),
+            ("bottom", &mut inset.bottom),
+        ] {
+            *value = env.get_field(&stable, name, "I")?.i()? as f32;
+        }
+    } else {
+        for (name, value) in [
+            ("getStableInsetLeft", &mut inset.left),
+            ("getStableInsetTop", &mut inset.top),
+            ("getStableInsetRight", &mut inset.right),
+            ("getStableInsetBottom", &mut inset.bottom),
+        ] {
+            *value = env.call_method(&root_insets, name, "()I", &[])?.i()? as f32;
+        }
+        let cutout = env
+            .call_method(
+                &root_insets,
+                "getDisplayCutout",
+                "()Landroid/view/DisplayCutout;",
+                &[],
+            )?
+            .l()?;
+        if !cutout.is_null() {
+            for (name, value) in [
+                ("getSafeInsetLeft", &mut inset.left),
+                ("getSafeInsetTop", &mut inset.top),
+                ("getSafeInsetRight", &mut inset.right),
+                ("getSafeInsetBottom", &mut inset.bottom),
+            ] {
+                *value = value.max(env.call_method(&cutout, name, "()I", &[])?.i()? as f32);
+            }
+        }
+    }
+    if version >= 29 {
+        let gestures = env
+            .call_method(
+                &root_insets,
+                "getMandatorySystemGestureInsets",
+                "()Landroid/graphics/Insets;",
+                &[],
+            )?
+            .l()?;
+        for (name, value) in [
+            ("left", &mut inset.left),
+            ("top", &mut inset.top),
+            ("right", &mut inset.right),
+            ("bottom", &mut inset.bottom),
+        ] {
+            *value = value.max(env.get_field(&gestures, name, "I")?.i()? as f32);
+        }
+    }
+    let resources = env
+        .call_method(
+            activity,
+            "getResources",
+            "()Landroid/content/res/Resources;",
+            &[],
+        )?
+        .l()?;
+    let metrics = env
+        .call_method(
+            resources,
+            "getDisplayMetrics",
+            "()Landroid/util/DisplayMetrics;",
+            &[],
+        )?
+        .l()?;
+    let density = env.get_field(metrics, "density", "F")?.f()?;
+    Ok(WindowGeometry {
+        window: bounds,
+        surface,
+        content,
+        input_origin: (surface.left - xy[0] as f32, surface.top - xy[1] as f32),
+        clearance: inset,
+        density,
+    })
+}
+fn update_window(env: &mut JNIEnv<'_>, activity: &JObject<'_>) {
+    let result = env.with_local_frame(64, |env| measure(env, activity));
+    // Initial layout can legitimately lack insets. A later inset/layout callback
+    // retries; until then no touch geometry is admitted.
+    crate::player::measure_window(result.ok());
+    if env.exception_check().unwrap_or(false) {
+        let _ = env.exception_describe();
+        let _ = env.exception_clear();
+        diagnostic("Could not measure the current app window; input neutralized");
+    }
+}
+pub fn refresh_window(app: &AndroidApp) {
+    let epoch = EPOCH.load(Ordering::Acquire);
+    app.run_on_java_main_thread(Box::new(move || {
+        if EPOCH.load(Ordering::Acquire) != epoch {
+            return;
+        }
+        let _ = with_env(|env, activity| {
+            update_window(env, activity);
+            Ok(())
+        });
+    }));
+}
+#[unsafe(no_mangle)]
+extern "system" fn Java_com_machinerhythm_gcx_GcxActivity_windowChanged(
+    mut env: JNIEnv<'_>,
+    activity: JObject<'_>,
+) {
+    if current_activity(&env, &activity) {
+        update_window(&mut env, &activity);
+    }
+}
+#[unsafe(no_mangle)]
+extern "system" fn Java_com_machinerhythm_gcx_GcxActivity_windowFocus(
+    mut env: JNIEnv<'_>,
+    activity: JObject<'_>,
+    focused: jni::sys::jboolean,
+) {
+    if !current_activity(&env, &activity) {
+        return;
+    }
+    if focused != 0 {
+        if playing_window(&mut env, &activity, PLAYING.load(Ordering::Acquire)).is_err() {
+            diagnostic("Could not apply app-local system-bar mode");
+            let _ = env.exception_clear();
+        }
+        update_window(&mut env, &activity);
+    } else {
+        crate::player::measure_window(None);
+    }
+}
 pub fn shutdown() {
+    PLAYING.store(false, Ordering::Release);
+    crate::player::measure_window(None);
     EPOCH.fetch_add(1, Ordering::AcqRel);
     if let Ok(mut menu) = MENU.lock() {
         *menu = None;
@@ -223,6 +571,8 @@ pub fn picker(app: &AndroidApp) {
             return;
         }
         let result = with_env(|env, activity| {
+            PLAYING.store(false, Ordering::Release);
+            playing_window(env, activity, false)?;
             let action = env.new_string("android.intent.action.OPEN_DOCUMENT")?;
             let intent = env.new_object(
                 "android/content/Intent",
@@ -328,6 +678,8 @@ fn render_menu(
             return;
         }
         let result = with_env(|env, activity| {
+            PLAYING.store(!show, Ordering::Release);
+            playing_window(env, activity, !show)?;
             let old = MENU.lock().map_err(|_| "menu lock poisoned")?.take();
             if let Some(dialog) = old {
                 env.call_method(dialog.as_obj(), "dismiss", "()V", &[])?;
@@ -447,6 +799,7 @@ fn render_menu(
                 )?;
                 *MENU.lock().map_err(|_| "menu lock poisoned")? = Some(env.new_global_ref(dialog)?);
             }
+            update_window(env, activity);
             Ok(())
         });
         if result.is_err() {
@@ -468,6 +821,13 @@ extern "system" fn Java_com_machinerhythm_gcx_GcxActivity_beforeDestroy(
         return;
     }
     EPOCH.fetch_add(1, Ordering::AcqRel);
+    // Retire the binding before dismissing: reentrant and late window/focus
+    // callbacks from this Activity must not publish geometry or hide bars.
+    PLAYING.store(false, Ordering::Release);
+    crate::player::measure_window(None);
+    if let Ok(mut bound) = ACTIVITY.lock() {
+        *bound = None;
+    }
     let dialog = MENU.lock().ok().and_then(|mut menu| menu.take());
     if let Some(dialog) = dialog
         && let Err(error) = env.call_method(dialog.as_obj(), "dismiss", "()V", &[])
