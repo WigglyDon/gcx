@@ -132,6 +132,18 @@ states omit card protocol/data; pending native events also need qualification.
 The adapter exposes no snapshot restore. A card barrier alone does not establish
 a coherent machine checkpoint or Android durability.
 
+The pinned off-device [checkpoint audit](../native/README.md#off-device-checkpoint-audit-2026-10-22)
+confirms that normal states omit staged card commands while restoring timing
+events, SRAM and channel identity. The card completion handlers themselves do not
+replay writes; restored guest execution can still write stale data. Movie payloads
+can replace the raw card in RAM, and a forced barrier can then publish it. A future
+state adapter must preserve protocol coherence independently of optional card
+contents and report actual capture/load success. Dolphin's void SaveAs/LoadAs and
+after-load callback do not provide that contract. Rust must validate the complete
+generation before native mutation; failed partial loads must not flush mutated
+card/SRAM during recovery. No state API or automatic resume is implemented by this
+audit. Existing ordinary card save/Stop/reload evidence is unchanged.
+
 Prefer isolated per-game save profiles for safe A -> B -> A continuity. Keep
 multi-disc games together. Shared cards can enable cross-title interactions, but
 an independently paused machine can retain stale card/cache state; shared profiles

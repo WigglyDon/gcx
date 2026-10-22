@@ -38,9 +38,12 @@ L/R analog and digital inputs. Touch/control acceptance must preserve this model
 https://github.com/dolphin-emu/dolphin/blob/cf5cb7ef81c3e8e7af5c9d566334219ffda9f68b/Source/Core/Core/HW/EXI/EXI_DeviceMemoryCard.cpp
 
 Inspected construction supports raw cards and GCI directories, region-qualified
-paths and card flash identity connected to SRAM. Complete DoState/flush semantics
-have NOT been audited in this seed; the worker must inspect the selected revision
-and test stale-state/current-card behavior before automatic resume claims.
+paths and card flash identity connected to SRAM. The 2026-10-22 pinned
+[checkpoint audit](../native/README.md#off-device-checkpoint-audit-2026-10-22)
+records the inspected raw-card/protocol, timing, SRAM and state completion paths.
+It identifies concrete gaps rather than proving safe restore. Isolated
+stale-state/current-card tests and a completion-bearing adapter are still required
+before automatic resume claims.
 
 ## S5 — iOS execution limitation, maintained project statement
 

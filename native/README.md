@@ -245,11 +245,11 @@ uses one job without LTO or debug information. No source archive is needed.
   teardown. Rust touch tests cover simultaneous pointers, partial travel, release
   and bounded stick motion. Android interruption/controls proof remains due.
 - `Core/HW/EXI/EXI_DeviceMemoryCard.cpp:DoState`: normal states omit card
-  contents; movie states serialize them, and the stored flag controls loading.
+  contents and command/protocol state; movie states serialize both, and the stored flag controls loading.
   Both paths must be considered before accepting checkpoints from outside gcx.
 - `GCMemcardRaw.cpp`: a 15-second flush worker writes raw bytes; destruction
-  triggers a final write and joins. The write path does not expose a successful
-  durable-flush acknowledgment to this host. `GCMemcardDirectory.cpp` similarly
+  triggers a final write and joins. Upstream lacks the durable-flush acknowledgment
+  added by the maintained raw-card patch below. `GCMemcardDirectory.cpp` similarly
   has delayed GCI flushing, final destructor flushing, cached metadata and state
   serialization. Neither `State::SaveAs` nor a file timestamp proves card
   durability. No snapshot API is exposed by this adapter yet.
@@ -268,7 +268,9 @@ Explicit barriers still force the requested durable write and report failures.
 An isolated Rust fault test verifies a failed candidate leaves the prior card
 untouched.
 
-These checks do not prove Android filesystem behavior or real game saving. The
+The isolated host checks alone do not prove Android filesystem behavior or real
+game saving; the separately recorded Pixel 4 ordinary-save/Stop/cold-reload and
+live lock observations above provide their bounded device evidence. The
 GCI implementation's early dirty clearing and direct truncation are not selected.
 Ordinary saves and machine checkpoints remain separate: no snapshot API is exposed.
 Movie states can restore card bytes/metadata and normal states omit card protocol;
@@ -287,6 +289,43 @@ This prevents an automatic startup loop after a future crash. The added metadata
 recovery test and actual Pixel 4 interrupted-error/explicit-restart scenario pass.
 No machine state is
 restored or synthesized by that marker.
+
+### Off-device checkpoint audit, 2026-10-22
+
+Inspected the actual Dolphin pin `cf5cb7ef81c3e8e7af5c9d566334219ffda9f68b`
+with maintained patch SHA256
+`92735cf12f0827b71783eab6280ac6221bd30b2ff387f0a3305220e303d93b0f`.
+This is source inspection, not a state round-trip test. It leaves ABI5 and the
+preserved full-drawable APK unchanged. No state capture/load API is exposed.
+Paths below are relative to Dolphin's `Source/Core`.
+
+| Actual owner | Observed behavior and consequence |
+| --- | --- |
+| `Core/HW/EXI/EXI_DeviceMemoryCard.cpp:DoState` | Normal movie-inactive capture writes a false flag and omits the interrupt flags, command, status, position, 128-byte programming buffer, address and card image. Load reads the flag from the payload, so disabling movies in the host does not prevent an externally supplied true flag restoring card bytes. |
+| Same file: `SetCS`, `DMAWrite`, `CmdDone`, `TransferComplete` | Erase/page-program writes happen synchronously at deselection; DMA writes happen before scheduling completion. The two delayed completion handlers change status/interrupts, not card bytes. Restored timing callbacks alone do not repeat those writes. However, omitted staged command bytes and restored guest execution can still cause incoherent or stale writes. A CPU pause plus raw-image flush does not finish or serialize a partially received command. |
+| `Core/CoreTiming.cpp:DoState`; `Core/State.cpp:DoState` | Timing serializes pending events by name before hardware restores. Card events are registered during boot. Queue/protocol coherence is required; do not discard events as a substitute for capturing the device. |
+| `Core/HW/GCMemcard/GCMemcardRaw.cpp:DoState`, `CommitSnapshot` | The movie path replaces the raw image/size/slot in RAM without marking it dirty. Our explicit forced barrier can subsequently commit those older bytes regardless of dirty status. Reject incompatible/stale state before native mutation; never fix it by copying an older card onto disk. |
+| `Core/HW/EXI/EXI_DeviceIPL.cpp:DoState`; `EXI.cpp:Shutdown`; `EXI_Channel.cpp:DoState` | Even a normal state restores SRAM and channel/header/device identity. SRAM is written separately at shutdown through upstream IOFile, outside the Rust card barrier. The GCI-folder header-change path removes/reconnects a card to avoid stale writes; that safeguard does not apply to our raw-card mode. Console/card identity and durable SRAM handling need qualification too. |
+| `Core/State.cpp:SaveAs`, `CompressAndDumpState` | Save schedules CPU capture and a compression/file worker and returns void. Worker completion/flush hooks do not return durable success. The file path reports write/close errors to OSD, can proceed to publication after an earlier error, and uses close/rename without file or directory sync in this path. It cannot serve as gcx's checkpoint commit acknowledgment. |
+| `Core/State.cpp:LoadAs`, `LoadAsFromCore`, `ValidateHeaders` | Load returns void; the after-load callback also runs after missing/failed input. Deserialization can partially mutate the machine and attempts an undo on failure. State version192 is checked, but an exact revision string is deliberately not required. Neither the callback nor the six-byte game ID proves successful compatible gcx restore. |
+
+The next native checkpoint work must address the actual card protocol owner:
+capture/restore protocol independently of optional card bytes, or prove a complete
+guest transaction boundary. Do not enable movie mode as a shortcut. Any changed
+serialization needs a distinct gcx state ABI and rejection of prior payloads.
+Use a completion-bearing native capture/load operation; Rust should own bounded
+payload validation, durable publication and the checkpoint/card generation gate.
+The already-held profile lock must cover capture, publication, validation, load
+and teardown. Compare current durable card generation/digest before native load,
+not after it; bind SRAM identity, media/disc, resources and exact engine/patch ABI.
+On mismatch or load failure, retain the checkpoint and error and offer explicit
+restart with current ordinary saves. A partial load must remain paused and must
+not flush mutated card/SRAM over current progress during recovery teardown.
+
+Before automatic resume, use isolated original fixtures to interrupt a page
+program, retain pending completion events, reject a deliberately newer card,
+exercise a movie-card payload, and inject capture/publication/load failures.
+No such machine-state fixture or hardware resume result is claimed by this audit.
 
 ## Resource and license handling
 
