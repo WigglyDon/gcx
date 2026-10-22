@@ -33,8 +33,17 @@ Rust bindings. No reimplementation of third-party build tools for language purit
 The current workspace uses `gcx` for input, identity, locking and atomic storage,
 `gcx-android` for the player/platform policy, and `xtask` for reproduction. A small
 GPL native adapter calls the inspected Dolphin owners. An original CPU fixture
-has passed on Linux, including native pad readback and card commit. Android
-graphics/audio/locks and real game saving remain unqualified.
+has passed on Linux, including native pad readback and card commit. A secondary
+Android device passed the private-directory lock contention fixture, chooser and
+scoped RVZ selection; native game startup currently aborts on its CPU thread.
+Actual game graphics/audio, native teardown exclusion and saving remain unqualified.
+
+Before starting native execution, SavedSession durably marks that runtime as
+incomplete. A clean card barrier followed by joined teardown clears the marker.
+After interruption, retain the error and require explicit restart with current
+saves. Departure stays paused across the barrier and teardown, and the native
+writer skips a redundant unchanged write after its successful acknowledgment.
+These are tested host/metadata behaviors; their Android lifecycle scenario is due.
 
 ## Stable identities, ephemeral execution
 

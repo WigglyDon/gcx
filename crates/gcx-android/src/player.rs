@@ -43,6 +43,20 @@ struct RuntimeEvents {
     epoch: u64,
     stopped: AtomicBool,
 }
+impl LiveRuntime {
+    fn commit_for_departure(&self) -> bool {
+        if let Ok(mut touch) = UI.lock() {
+            touch.cancel();
+        }
+        // SAFETY: this live owner retains the native runtime and profile lock.
+        // Keep execution paused after the barrier until stop/join completes.
+        unsafe {
+            gcx_engine_pause(1);
+            gcx_engine_input(Pad::default().values().as_ptr());
+            gcx_engine_flush_cards() != 0
+        }
+    }
+}
 impl Drop for LiveRuntime {
     fn drop(&mut self) {
         if let Ok(mut touch) = UI.lock() {
@@ -299,6 +313,15 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
     let sys = resources(app, &root)?;
     platform::diagnostic("Resources ready; loading collection");
     let mut collection = load_collection(&root)?;
+    let mut interrupted = false;
+    for entry in &mut collection.entries {
+        interrupted |= entry.recover_interrupted();
+    }
+    if interrupted && save_collection(&root, &collection).is_err() {
+        platform::diagnostic(
+            "Could not persist interrupted-runtime recovery; the original intent marker remains retained.",
+        );
+    }
     let mut selected = collection
         .selected
         .as_ref()
@@ -507,11 +530,19 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                         }
                     }
                     // Retain the old writer and its RAM on failed card durability.
-                    if runtime.is_some() && unsafe { gcx_engine_flush_cards() } == 0 {
+                    if runtime
+                        .as_ref()
+                        .is_some_and(|active| !active.commit_for_departure())
+                    {
+                        native_paused = Some(true);
                         platform::push(Command::Error("The current memory card could not be committed; its runtime is retained. Retry after resolving storage.".into()));
                         continue;
                     }
                     drop(runtime.take());
+                    if let Some(index) = selected {
+                        collection.entries[index].runtime_incomplete =
+                            gcx::storage::last_card_error().is_some();
+                    }
                     native_paused = None;
                     let index =
                         if let Some(index) = collection.entries.iter().position(|e| e.uri == uri) {
@@ -527,6 +558,7 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                                 paused: false,
                                 last_error: None,
                                 restart_required: false,
+                                runtime_incomplete: false,
                             });
                             collection.entries.len() - 1
                         };
@@ -575,11 +607,28 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
         if restart_requested {
             restart_requested = false;
             if let Some(index) = selected {
-                if runtime.is_some() && unsafe { gcx_engine_flush_cards() } == 0 {
+                if runtime
+                    .as_ref()
+                    .is_some_and(|active| !active.commit_for_departure())
+                {
+                    native_paused = Some(true);
                     platform::push(Command::Error("The memory card could not be committed. The current runtime is retained; restart has not occurred.".into()));
                     continue;
                 }
                 drop(runtime.take());
+                if let Some(error) = gcx::storage::last_card_error() {
+                    collection.entries[index].fail(format!(
+                        "Card persistence failed during restart teardown: {error}"
+                    ));
+                    hidden = false;
+                    platform::menu(app, true, collection.entries[index].last_error.clone());
+                    if save_collection(&root, &collection).is_err() {
+                        platform::diagnostic(
+                            "Could not preserve restart teardown failure on disk.",
+                        );
+                    }
+                    continue;
+                }
                 collection.entries[index].request_restart();
                 if save_collection(&root, &collection).is_err() {
                     platform::notice(
@@ -600,6 +649,14 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
             && window.width() > 32
             && window.height() > 32
         {
+            collection.entries[index].runtime_incomplete = true;
+            if save_collection(&root, &collection).is_err() {
+                collection.entries[index]
+                    .fail("Could not durably record the runtime start. No game was booted.".into());
+                hidden = false;
+                platform::menu(app, true, collection.entries[index].last_error.clone());
+                continue;
+            }
             match boot(&root, &sys, &collection.entries[index], window) {
                 Ok(active) => {
                     runtime = Some(active);
@@ -667,6 +724,8 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                 drop(runtime.take());
                 hidden = false;
                 if let Some(index) = selected {
+                    collection.entries[index].runtime_incomplete =
+                        gcx::storage::last_card_error().is_some();
                     if let Some(error) = gcx::storage::last_card_error() {
                         collection.entries[index].fail(format!(
                             "Card persistence failed during native stop: {error}"
@@ -691,7 +750,15 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
             }
         }
     }
+    let departure = runtime
+        .as_ref()
+        .is_some_and(|active| active.commit_for_departure());
+    let had_runtime = runtime.is_some();
     drop(runtime.take());
+    if had_runtime && let Some(index) = selected {
+        collection.entries[index].runtime_incomplete =
+            !departure || gcx::storage::last_card_error().is_some();
+    }
     if let Some(error) = gcx::storage::last_card_error()
         && let Some(index) = selected
     {

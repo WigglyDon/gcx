@@ -16,8 +16,10 @@ uploads or mandatory network connection.
 and passes an original GameCube CPU fixture, native input readback, atomic card
 commit and teardown checks on Linux. The Android Rust player and narrow native
 adapter link on ARM64. A private development APK passes ABI, alignment, signature
-and resource checks. Visible gameplay, audible sound, ordinary in-game save/reload,
-Android locking and automatic resume are unrun. See
+and resource checks. The chooser and scoped RVZ selection work on a secondary
+stock Android device; the engine currently aborts on its CPU thread during game
+startup. Android app-private lock contention passes. Visible gameplay, audible
+sound, ordinary in-game save/reload and automatic resume remain unqualified. See
 [native reproduction and limits](native/README.md).
 
 GameCube is the initial scope. Dolphin's Wii capability is not a promise of Wii

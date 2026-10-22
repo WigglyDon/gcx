@@ -217,10 +217,10 @@ index 5805b90..ca4dee8 100644
  
  protected:
 diff --git a/Source/Core/Core/HW/GCMemcard/GCMemcardRaw.cpp b/Source/Core/Core/HW/GCMemcard/GCMemcardRaw.cpp
-index 1a8644b..2a14c2e 100644
+index 1a8644b..94d0b03 100644
 --- a/Source/Core/Core/HW/GCMemcard/GCMemcardRaw.cpp
 +++ b/Source/Core/Core/HW/GCMemcard/GCMemcardRaw.cpp
-@@ -35,6 +35,26 @@
+@@ -35,6 +35,36 @@
  #define SIZE_TO_Mb (1024 * 8 * 16)
  #define MC_HDR_SIZE 0xA000
  
@@ -230,16 +230,26 @@ index 1a8644b..2a14c2e 100644
 +
 +bool MemoryCard::FlushToStorage()
 +{
++  return CommitSnapshot(true);
++}
++
++bool MemoryCard::CommitSnapshot(bool force)
++{
 +  std::lock_guard commit(m_commit_mutex);
 +  if (!s_write_handler)
 +    return false;
++  if (!force && m_has_committed && !m_dirty.IsSet())
++    return true;
 +  {
 +    std::lock_guard snapshot(m_flush_mutex);
 +    m_dirty.TestAndClear();
 +    std::memcpy(m_flush_buffer.get(), m_memcard_data.get(), m_memory_card_size);
 +  }
 +  if (s_write_handler(m_filename, {m_flush_buffer.get(), m_memory_card_size}))
++  {
++    m_has_committed = true;
 +    return true;
++  }
 +  m_dirty.Set();
 +  return false;
 +}
@@ -247,23 +257,24 @@ index 1a8644b..2a14c2e 100644
  MemoryCard::MemoryCard(std::string filename, ExpansionInterface::Slot card_slot, u16 size_mbits)
      : MemoryCardBase(card_slot, size_mbits), m_filename(std::move(filename))
  {
-@@ -116,6 +136,14 @@ void MemoryCard::FlushThread()
-       }
-     }
- 
+@@ -107,6 +137,15 @@ void MemoryCard::FlushThread()
+     // If triggered, we're exiting.
+     // If timed out, check if we need to flush.
+     const bool do_exit = m_flush_trigger.WaitFor(flush_interval);
 +    if (s_write_handler)
 +    {
-+      FlushToStorage();
++      // Dirty testing and its durable acknowledgment are serialized together.
++      // A paused, committed image needs no second fallible write at teardown.
++      CommitSnapshot(false);
 +      if (do_exit)
 +        return;
 +      continue;
 +    }
-+
-     // Opening the file is purposefully done each iteration to ensure the
-     // file doesn't disappear out from under us after the first check.
-     File::IOFile file(m_filename, "r+b");
+     if (!do_exit)
+     {
+       const bool is_dirty = m_dirty.TestAndClear();
 diff --git a/Source/Core/Core/HW/GCMemcard/GCMemcardRaw.h b/Source/Core/Core/HW/GCMemcard/GCMemcardRaw.h
-index 96e7a29..b8cfe15 100644
+index 96e7a29..6f3d9b4 100644
 --- a/Source/Core/Core/HW/GCMemcard/GCMemcardRaw.h
 +++ b/Source/Core/Core/HW/GCMemcard/GCMemcardRaw.h
 @@ -7,6 +7,7 @@
@@ -285,11 +296,20 @@ index 96e7a29..b8cfe15 100644
  
    s32 Read(u32 src_address, s32 length, u8* dest_address) override;
    s32 Write(u32 dest_address, s32 length, const u8* src_address) override;
-@@ -41,6 +46,7 @@ private:
+@@ -30,6 +35,7 @@ public:
+   void DoState(PointerWrap& p) override;
+ 
+ private:
++  bool CommitSnapshot(bool force);
+   bool IsAddressInBounds(u32 address, u32 length) const
+   {
+     const u64 end_address = static_cast<u64>(address) + static_cast<u64>(length);
+@@ -41,6 +47,8 @@ private:
    std::unique_ptr<u8[]> m_flush_buffer;
    std::thread m_flush_thread;
    std::mutex m_flush_mutex;
 +  std::mutex m_commit_mutex;
++  bool m_has_committed = false;  // Protected by m_commit_mutex; gcx, 2026-10-22.
    Common::Event m_flush_trigger;
    Common::Flag m_dirty;
    u32 m_memory_card_size;

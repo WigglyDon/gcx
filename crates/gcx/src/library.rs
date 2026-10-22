@@ -18,6 +18,8 @@ pub struct SavedSession {
     pub last_error: Option<String>,
     #[serde(default)]
     pub restart_required: bool,
+    #[serde(default)]
+    pub runtime_incomplete: bool,
 }
 impl SavedSession {
     pub fn fail(&mut self, error: String) {
@@ -29,6 +31,19 @@ impl SavedSession {
     pub fn request_restart(&mut self) {
         self.paused = false;
         self.restart_required = false;
+        self.runtime_incomplete = false;
+    }
+    pub fn recover_interrupted(&mut self) -> bool {
+        if !self.runtime_incomplete || self.restart_required {
+            return false;
+        }
+        let mut message = "The previous runtime ended without a completed card barrier and teardown. Restart explicitly with current saves.".to_owned();
+        if let Some(earlier) = &self.last_error {
+            message.push_str("\nEarlier retained error: ");
+            message.push_str(earlier);
+        }
+        self.fail(message);
+        true
     }
 }
 #[derive(Serialize, Deserialize)]
@@ -98,6 +113,7 @@ mod tests {
             paused: false,
             last_error: None,
             restart_required: false,
+            runtime_incomplete: false,
         }
     }
     #[test]
@@ -132,5 +148,29 @@ mod tests {
         c.entries[0] = entry();
         c.selected = Some("c".repeat(32));
         assert!(c.validate().is_err());
+    }
+    #[test]
+    fn interrupted_runtime_requires_explicit_restart_without_changing_save_identity() {
+        let mut original = entry();
+        original.runtime_incomplete = true;
+        original.last_error = Some("earlier diagnosed write failure".into());
+        let mut loaded: SavedSession =
+            serde_json::from_slice(&serde_json::to_vec(&original).unwrap()).unwrap();
+        assert!(loaded.recover_interrupted());
+        assert!(loaded.paused && loaded.restart_required && loaded.runtime_incomplete);
+        assert_eq!(loaded.profile_id.0, original.profile_id.0);
+        assert_eq!(loaded.game_id.0, original.game_id.0);
+        let message = loaded.last_error.clone();
+        assert!(
+            message
+                .as_ref()
+                .unwrap()
+                .contains("Earlier retained error: earlier diagnosed write failure")
+        );
+        assert!(!loaded.recover_interrupted());
+        assert_eq!(loaded.last_error, message);
+        loaded.request_restart();
+        assert!(!loaded.recover_interrupted());
+        assert!(loaded.last_error.is_some());
     }
 }

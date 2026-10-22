@@ -13,7 +13,16 @@ geometry/input and recovery policy. Its small Java trampoline only forwards
 framework events. Native Vulkan and Cubeb are selected; the ARM64 engine build is
 linked successfully. The private development APK passes ABI/export, 16 KiB ELF/APK
 alignment, signature, manifest, native-library and resource byte checks. Device
-execution is unrun.
+installation and compatible same-signer updates passed on the secondary stock
+Pixel 4 (Android 13/API 33, 4 KiB pages). The Rust-built chooser is visible in its
+own dialog window; the NativeActivity root hierarchy accepted views without
+painting them. The Java trampoline explicitly associates the native library
+with its class loader and forwards destruction for Rust-owned dialog retirement.
+Scoped Wind Waker RVZ selection reached native Vulkan/audio initialization, then
+the CPU thread aborted with `bad_function_call`. No game picture, audible sound,
+in-game save/reload or Fold result is qualified. Private diagnostics/data and each
+tested APK/source pair are retained; each Pixel 4 window returned screen-off and
+released before off-device work.
 
 ## Source and reproduction
 
@@ -93,8 +102,13 @@ checks the owned profile path, writes/syncs, renames and syncs the parent direct
 the native worker retains dirty status on failure. `FlushToStorage` serializes with
 the worker and snapshots under its data mutex; the adapter calls its barrier under
 a CPU thread guard. Explicit restart/game change retains the old runtime if that
-barrier fails. The host fixture verifies a successful barrier, and an isolated
-Rust fault test verifies a failed candidate leaves the prior card untouched.
+barrier fails. Departure stays paused from the barrier through native teardown.
+The worker skips a redundant unchanged write after an acknowledged image; dirty
+testing and acknowledgment are serialized under its commit mutex. The host
+fixture blocks candidate writes during joined teardown to prove that behavior.
+Explicit barriers still force the requested durable write and report failures.
+An isolated Rust fault test verifies a failed candidate leaves the prior card
+untouched.
 
 These checks do not prove Android filesystem behavior or real game saving. The
 GCI implementation's early dirty clearing and direct truncation are not selected.
@@ -102,7 +116,17 @@ Ordinary saves and machine checkpoints remain separate: no snapshot API is expos
 Movie states can restore card bytes/metadata and normal states omit card protocol;
 restored CoreTiming events and pending transactions still require qualification.
 Future restore must verify profile generation and exact core/resource/media binding
-before touching native state. Linux `flock` tests are not Android locking evidence.
+before touching native state. A two-process Android test of the same Rust
+`ProfileLock` passed in gcx's private directory through stock debug `run-as`:
+contender refused, then acquisition succeeded after release. This is primitive/
+path evidence; exclusion through native-game teardown still needs qualification.
+
+SavedSession records a durable incomplete-runtime marker before native startup.
+Clean card acknowledgment and joined teardown clear it; a later launch retains
+an interrupted runtime's error and requires explicit restart with current saves.
+This prevents an automatic startup loop after a future crash. The added metadata
+recovery test passes; the device scenario remains unrun. No machine state is
+restored or synthesized by that marker.
 
 ## Resource and license handling
 
@@ -155,9 +179,8 @@ See [source reconstruction](CORRESPONDING_SOURCE.txt).
 
 The `gcx-lock-probe` Rust binary uses the product's actual `ProfileLock` and offers
 bounded `hold`, `expect-busy` and `expect-free` modes. Its ARM64 build is prepared
-for stock-device qualification in an isolated app-owned fixture, and against the
-running profile across native teardown. Host success does not qualify Android;
-those actual device checks remain unrun.
+for stock-device qualification. The isolated app-owned two-process fixture passed
+on Pixel 4; checking a running profile across native teardown remains unrun.
 
 This private development manifest is debuggable so the owner can recover and
 verify gcx's own private data with stock `run-as` before an update. It disables

@@ -144,6 +144,7 @@ fn fixture(
     let media = c_path(&media)?;
     let mut observed = false;
     let mut input_verified = false;
+    let mut shutdown_obstruction = None;
     let mut pad = Pad::default();
     pad.set(Control::A, 1.0)?;
     pad.set(Control::StickX, 0.5)?;
@@ -233,7 +234,15 @@ fn fixture(
             eprintln!(
                 "fixture card failure={failed}, retained={retained}, reported={reported}, retry={retried}"
             );
+            // A successful barrier followed by paused teardown must not issue
+            // another fallible write of the same image from the native worker.
+            std::fs::create_dir(&pending)?;
+            shutdown_obstruction = Some(pending);
         }
+    }
+    if let Some(pending) = shutdown_obstruction {
+        std::fs::remove_dir(pending)?;
+        eprintln!("fixture completed joined teardown without a redundant post-barrier card write");
     }
     // _writer remains held past native teardown, including joined card workers.
     if !observed
