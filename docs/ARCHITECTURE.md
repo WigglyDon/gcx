@@ -35,11 +35,13 @@ The current workspace uses `gcx` for input, identity, locking and atomic storage
 GPL native adapter calls the inspected Dolphin owners. An original CPU fixture
 has passed on Linux, including native pad readback and card commit. A secondary
 Android device passed the private-directory lock contention fixture, chooser and
-scoped RVZ selection; native game startup currently aborts on its CPU thread.
-Actual game graphics/audio, native teardown exclusion and saving remain unqualified.
+scoped RVZ selection. Wind Waker renders its title, intro and file menu, responds
+to Start/Control Stick/A and has owner-confirmed audible sound. The game-created
+ordinary card file is privately backed up. Interactive world control, progress
+save/reload and joined native teardown exclusion remain unqualified.
 The Android-only analytics metadata provider was invoked while empty even with
-reporting disabled. A guard at that owner passes a host regression of the actual
-Android branch that reproduced the exception; the fix awaits a device boot test.
+reporting disabled. A guard at that owner passes the host regression of the actual
+Android branch and the secondary Android device's boot test.
 
 Before starting native execution, SavedSession durably marks that runtime as
 incomplete. A clean card barrier followed by joined teardown clears the marker.

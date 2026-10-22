@@ -18,9 +18,12 @@ Pixel 4 (Android 13/API 33, 4 KiB pages). The Rust-built chooser is visible in i
 own dialog window; the NativeActivity root hierarchy accepted views without
 painting them. The Java trampoline explicitly associates the native library
 with its class loader and forwards destruction for Rust-owned dialog retirement.
-Scoped Wind Waker RVZ selection reached native Vulkan/audio initialization, then
-the CPU thread aborted with `bad_function_call`. No game picture, audible sound,
-in-game save/reload or Fold result is qualified. Private diagnostics/data and each
+Scoped Wind Waker RVZ selection now reaches its rendered title, intro and file
+menu through native Vulkan. Start, Control Stick and A work; the owner confirmed
+audible sound. The game reported ordinary Slot A file creation; its 16 MiB native
+raw card with a 12-block game directory entry is privately backed up. Playable
+world control, progress save/reload and Fold results remain unqualified.
+Private diagnostics/data and each
 tested APK/source pair are retained; each Pixel 4 window returned screen-off and
 released before off-device work.
 
@@ -29,8 +32,16 @@ builder called an empty `std::function` normally installed by Dolphin's managed
 frontend. Reporting being disabled does not skip that builder. A focused host
 regression using the actual Android analytics translation-unit branch reproduced
 `bad_function_call`; guarding the optional provider at its owner lets the same
-Rust CPU/input/card/teardown fixture finish successfully. The ARM64 fix still
-needs device qualification; no successful game boot follows from this regression.
+Rust CPU/input/card/teardown fixture finish successfully. The same repair now
+passes actual Pixel 4 boot through the title and game menus. The host regression
+alone is not Android execution evidence.
+
+A second process is refused by the real live game's SaveProfile writer lock.
+Android's root Back action backgrounds the activity and retains the paused runtime
+and lock. Acquisition succeeds after the gcx process is explicitly stopped; that
+does not establish exclusion through joined native teardown. The interrupted
+runtime marker remains and requires explicit restart with current card data at
+the next launch. No machine snapshot or automatic resume is involved.
 
 ## Source and reproduction
 
