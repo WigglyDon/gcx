@@ -166,7 +166,8 @@ runtime libraries, aligns and signs with a separate private gcx development key,
 and verifies the resulting signature/manifest/assets. The signing identity and
 backup stay under `.local`, outside public source. Do not delete an existing signer
 or replace it after a partial failure. Packaging passed. Packaged libraries are
-stripped copies; unstripped native builds remain private for debugging. The
+stripped copies; the exact unstripped engine is copied into private hash-addressed
+symbol storage before packaging so later links cannot replace its debug evidence. The
 development APK is about 15 MiB; this is not a performance or runtime memory claim.
 
 After committing reviewed source and rebuilding the package, run

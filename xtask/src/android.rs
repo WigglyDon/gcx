@@ -392,6 +392,28 @@ pub fn package(root: &Path, source: &Path) -> Result<()> {
     if !engine.is_file() {
         return Err("build the pinned Android native engine first".into());
     }
+    // Preserve this exact debug image before a later native link replaces it.
+    // The package receipt records its content hash beside the stripped copy.
+    let engine_hash = crate::receipt::digest(&engine)?;
+    let symbols = root.join(".local/symbols");
+    fs::create_dir_all(&symbols)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&symbols, fs::Permissions::from_mode(0o700))?;
+    }
+    let debug = symbols.join(format!("{engine_hash}.libgcx_engine.so"));
+    if !debug.exists() {
+        copy(&engine, &debug)?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&debug, fs::Permissions::from_mode(0o600))?;
+        }
+    }
+    if crate::receipt::digest(&debug)? != engine_hash {
+        return Err("retained native debug image differs from the package input".into());
+    }
     prepare(root, source)?;
     let linker =
         ndk.join("toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android28-clang");
