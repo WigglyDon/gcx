@@ -4,6 +4,9 @@ package com.machinerhythm.gcx;
 
 @SuppressWarnings("deprecation")
 public final class GcxActivity extends android.app.NativeActivity {
+    // NativeActivity's native-code loader does not register JNI methods with
+    // this Java class loader. Associate the same library before callbacks.
+    static { System.loadLibrary("gcx_android"); }
     private native void documentResult(int request, int result, android.content.Intent data);
     private native void uiAction(int action);
     private native void beforeDestroy();
