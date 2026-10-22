@@ -123,8 +123,13 @@ swipe reveal. API30+ uses the platform insets controller; API28/29 retains suppo
 immersive-sticky flags. Pause/dialog/picker navigation restores visible bars.
 Activity identity and epoch checks retire old callbacks. Twenty host tests and
 warnings-denied host/ARM64 Clippy pass. The native ABI5 engine and its symbols are
-unchanged; this new Rust/platform behavior still needs packaging and a fresh
-exclusive Pixel4 window, including both landscape orientations and a compact
+unchanged. Implementation `52e240d08f0efc0d902d80e478e8dbe31042668b` produced
+private APK SHA256 `053ad7f653c062c9107206ed04f5f3fd627c997f34aa78265a276fe24b04a062`
+(15,409,094 bytes). Package ABI/defined JNI exports, native dependency closure,
+16 KiB ELF/ZIP alignment, unchanged signer, resource/native bytes and all 65
+corresponding-source checksums pass. The exact Rust symbol image is retained.
+This behavior still needs a fresh exclusive Pixel4 window, including both
+landscape orientations and a compact
 save/normal-Stop/fresh-process game-menu reload on its exact build.
 
 ## Source and reproduction
