@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+mod analytics;
 mod android;
 mod corresponding;
 mod receipt;
@@ -122,6 +123,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         "source-check" => {
             source_check(&source)?;
+        }
+        "check-android-analytics" => {
+            source_check(&source)?;
+            analytics::check(&root, &source)?;
         }
         "source-receipt" => {
             source_check(&source)?;

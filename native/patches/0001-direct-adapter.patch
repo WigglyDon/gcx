@@ -2,7 +2,7 @@ gcx maintained Dolphin changes, 2026-10-22
 Upstream revision: cf5cb7ef81c3e8e7af5c9d566334219ffda9f68b
 All modifications represented below were made for gcx on 2026-10-21/22.
 Purpose: Rust-hosted Android/native boundary, surface ownership, durable raw-card
-writer and failed-audio-initialization cleanup. Upstream authorship and applicable
+writer, optional Android metadata and audio-init cleanup. Upstream authorship and
 GPL/dependency terms remain intact. This patch is not an upstream Dolphin release.
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -176,6 +176,28 @@ index 56c8dba..16b43fa 100644
      target_sources(core PRIVATE
        HW/WiimoteReal/IOAndroid.cpp
        HW/WiimoteReal/IOAndroid.h
+diff --git a/Source/Core/Core/DolphinAnalytics.cpp b/Source/Core/Core/DolphinAnalytics.cpp
+index 8ae3bf6..3271440 100644
+--- a/Source/Core/Core/DolphinAnalytics.cpp
++++ b/Source/Core/Core/DolphinAnalytics.cpp
+@@ -296,9 +296,14 @@ void DolphinAnalytics::MakeBaseBuilder()
+   builder.AddData("win-ver-build", static_cast<u32>(winver.dwBuildNumber));
+ #elif defined(ANDROID)
+   builder.AddData("os-type", "android");
+-  builder.AddData("android-manufacturer", s_get_val_func("DEVICE_MANUFACTURER"));
+-  builder.AddData("android-model", s_get_val_func("DEVICE_MODEL"));
+-  builder.AddData("android-version", s_get_val_func("DEVICE_OS"));
++  // Native hosts need not install the managed frontend's optional metadata provider.
++  // This builder also runs when reporting is disabled.
++  if (s_get_val_func)
++  {
++    builder.AddData("android-manufacturer", s_get_val_func("DEVICE_MANUFACTURER"));
++    builder.AddData("android-model", s_get_val_func("DEVICE_MODEL"));
++    builder.AddData("android-version", s_get_val_func("DEVICE_OS"));
++  }
+ #elif defined(__APPLE__)
+   builder.AddData("os-type", "osx");
+ 
 diff --git a/Source/Core/Core/HW/EXI/EXI_DeviceMemoryCard.cpp b/Source/Core/Core/HW/EXI/EXI_DeviceMemoryCard.cpp
 index 73ff1d6..9465fd2 100644
 --- a/Source/Core/Core/HW/EXI/EXI_DeviceMemoryCard.cpp

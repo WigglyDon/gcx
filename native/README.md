@@ -24,6 +24,14 @@ in-game save/reload or Fold result is qualified. Private diagnostics/data and ea
 tested APK/source pair are retained; each Pixel 4 window returned screen-off and
 released before off-device work.
 
+The CPU-thread startup path constructs `DolphinAnalytics`, whose Android metadata
+builder called an empty `std::function` normally installed by Dolphin's managed
+frontend. Reporting being disabled does not skip that builder. A focused host
+regression using the actual Android analytics translation-unit branch reproduced
+`bad_function_call`; guarding the optional provider at its owner lets the same
+Rust CPU/input/card/teardown fixture finish successfully. The ARM64 fix still
+needs device qualification; no successful game boot follows from this regression.
+
 ## Source and reproduction
 
 Official source: `https://github.com/dolphin-emu/dolphin.git`, revision
@@ -54,6 +62,13 @@ A's ordinary raw card survives without appearing in B. `--card-retry` blocks onl
 a new fixture's candidate path with a directory, checks failure reporting and
 retention of its prior card/RAM, removes that obstruction and verifies retry.
 Both checks passed. Neither is an in-game save or machine-resume test.
+`cargo xtask check-android-analytics` repeats the absent-provider regression after
+the normal host engine and Rust probe are built. It compiles only the real
+analytics translation unit with its Android branch, using preincluded host window
+declarations, and links it ahead of the normal core archive into an isolated
+fixture library. The ordinary host build is unchanged. Compile/link/probe logs
+remain in a new private `.local/android-analytics-*` directory. This bounded host
+branch test needs normal native execution; it does not emulate Android or ARM64.
 The restricted runner trapped during native setup; the successful probes used
 normal host execution. Failures and profiles are retained. Do not
 point the probe at any existing saves. The source check binds the complete root
