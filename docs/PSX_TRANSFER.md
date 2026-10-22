@@ -29,7 +29,8 @@ runs in landscape on Pixel 4 as162d6b4/be16792a; its native colors/labels and cl
 visually inspected, and the owner reported it works. Its system bars overlapped
 the upper trigger area and bottom picture. Later52e240d/74b2ac4 passes hid bars
 and aligned Pause correctly but the inset picture was rejected. Edge-to-edge
-picture and independent physical qualification of every control remain due.
+picture was subsequently accepted on58335ff/f4f60fa0. Independent physical
+qualification of every control remains due.
 
 This is selected public-source adaptation. PSX's checkout, private files, app
 resources and active work were not read or changed for it.
@@ -53,8 +54,17 @@ picture margins; no stretch, crop, private preset, GL, core or persistence code 
 copied. The original MIT notice remains in LICENSE and packaged notices. New host
 fixtures check full drawable height for a1.25 aspect fixture, multiple engine
 aspects without overlap, stable bar-reveal picture and shared input mapping.
-The original placeholder preview uses this actual Geometry; device acceptance
-for this correction remains due. No sibling checkout or private files were read.
+The original placeholder preview uses this actual Geometry. The owner accepted
+the picture size on Pixel4; an existing-card cold reload passed. A system Home
+handle remained across the picture centre after bar reveal. No sibling checkout
+or private files were read.
+
+The same public platform.rs blob was re-read for that artifact. Its fullscreen
+owner uses BEHAVIOR_DEFAULT on API31+ to keep navigation gestures available with
+hidden bars, retaining transient behavior on API30. The bounded gcx policy
+candidate adopts that version guard; it does not copy PSX storage, permissions,
+background services or frontend. This policy choice is not a verified cause/fix
+of the artifact. Geometry, stable control clearance and picture bounds stay intact.
 
 Candidate reusable concepts: validated opaque GameId/OpenGame requests, input
 capture and cancellation, aspect-correct layout/editor behavior, atomic settings,

@@ -88,8 +88,21 @@ with normal joined Stop, matching protected card backups and verified return.
 The title-free74b2ac4 candidate reclaimed space and passed aligned Pause/Stop,
 but the owner rejected its inset picture and explicitly required edge-to-edge
 like PSX. That clarification governs the independent picture bounds above.
-The new viewport and remaining bar, rotation, repeated-return and fresh-reload
-checks need a new authorized window. The title-free window/menu are retained.
+The58335ff/f4f60fa0 Pixel4 pass earned owner acceptance of picture size, broad
+other-landscape/control/sound feedback, aligned menu actions and normal Stop with
+a confirmed fresh-process load of the earlier one-rupee card save. The owner
+corrected an initial Save-finished response: the two-rupee play was unsaved and
+disposable. No new in-game-save result transfers to this build. A white system
+Home handle remained across the picture centre after reveal and cold relaunch;
+the two extra Home/return cycles were skipped. Actual final card/SRAM backups were
+retained and the phone returned screen-off/released. Its changed final card was
+preserved separately; no older backup was restored.
+
+The next bounded policy candidate follows public PSX's API31+ BEHAVIOR_DEFAULT,
+which permits navigation gestures while bars are hidden; API30 retains transient
+bars. This is an app-local candidate change, not proof of the handle's cause or
+repair. Shared picture/control geometry and title-free window/menu are retained.
+The remaining artifact and repeated-return checks need a new authorized window.
 
 ## Stable identities, ephemeral execution
 

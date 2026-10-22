@@ -186,7 +186,8 @@ fn playing_window(env: &mut JNIEnv<'_>, activity: &JObject<'_>, playing: bool) -
     let decor = env
         .call_method(&window, "getDecorView", "()Landroid/view/View;", &[])?
         .l()?;
-    if sdk(env)? >= 30 {
+    let api = sdk(env)?;
+    if api >= 30 {
         env.call_method(
             &window,
             "setDecorFitsSystemWindows",
@@ -206,7 +207,11 @@ fn playing_window(env: &mut JNIEnv<'_>, activity: &JObject<'_>, playing: bool) -
                 &controller,
                 "setSystemBarsBehavior",
                 "(I)V",
-                &[JValue::Int(2)],
+                // Match the reviewed public PSX path on API31+: DEFAULT keeps
+                // system gestures active while bars are hidden. API30 retains
+                // its transient-bars behavior. This changes only app policy;
+                // the observed misplaced Home handle still needs a device test.
+                &[JValue::Int(if api >= 31 { 1 } else { 2 })],
             )?;
             env.call_method(
                 controller,

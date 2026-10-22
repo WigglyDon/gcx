@@ -23,7 +23,9 @@ game. Normal gcx Stop, exclusion through native teardown, and a cold-process
 game-menu reload preserved the one-rupee marker. Actual cards are privately backed
 up. The landscape update now runs on Pixel 4 with GameCube colors and labels;
 the owner reports it works. Pause/Resume, one Home/return and clean Stop passed.
-The edge-to-edge picture correction, full control matrix, extended surface transitions,
+The owner accepted the edge-to-edge picture correction, and a fresh-process reload
+of the earlier card save passed on that build. A misplaced system Home handle
+after bar reveal remains open. The full control matrix, extended surface transitions,
 Fold play and automatic resume remain unqualified. See
 [native reproduction and limits](native/README.md).
 

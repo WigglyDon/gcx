@@ -171,8 +171,30 @@ private APK SHA256 `f4f60fa0dfecaa13e1bf1d9852ccafb81f5f7d6b26b343c556025abb5eec
 (15,409,094bytes). Package/signature/ABI/defined JNI exports/dependency closure,
 resource/native bytes, 16KiB ELF/ZIP alignment and all65 corresponding-source
 checksums pass. Matching Rust image is retained; native engine remains unchanged.
-Owner requested off-device continuation; a new exclusive Pixel4 sizing/remaining
-save→normalStop→fresh-process game-menu reload window remains pending.
+The subsequent fresh Pixel4 window ended with verified return at2026-10-22
+23:28:04UTC. The actual installed APK hash matches this candidate. The owner
+accepted picture size and reported the other landscape/control/sound check good,
+apart from a white Home gesture handle stuck across the picture centre after
+bar reveal. That artifact is captured before and after cold relaunch. Scoped
+app/navigation window geometry is retained; its cause is not established. Two
+extra Home/return cycles were skipped. Pause/Resume and menu navigation worked.
+The owner corrected an initial Save-finished response: the two-rupee play was
+unsaved/disposable. No new in-game save is earned. Normal Stop joined, clean
+metadata/no emulation workers were verified, and only then was the unloaded app
+retired. A confirmed new process stayed unloaded until explicit Open. The earlier
+one-rupee quest loaded and the owner/capture confirmed it. Final normal Stop again
+joined with clean metadata; actual final card/SRAM backups were retained
+separately from earlier backups, with no rollback of the changed final card.
+Eight minimized captures were opened. Physical screenOFF/nonsecure keyguard,
+client retirement, foreground exit0 and lease release were verified; no pending
+recovery. Fold and siblings were untouched. This earns current-build existing-card
+cold reload, not a new-save round trip or automatic scene resume.
+
+The next bounded Rust app-window candidate follows public PSX's API31+
+BEHAVIOR_DEFAULT choice, keeping navigation gestures active while bars are hidden;
+API30 retains transient-bars behavior. Shared geometry, native ABI5 and engine
+objects remain unchanged. This policy adjustment is not a proven cause/fix of the
+handle artifact and needs a new authorized device window after package checks.
 
 ## Source and reproduction
 

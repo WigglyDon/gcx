@@ -116,3 +116,12 @@ immersive-sticky flags. Stable bar clearance protects controls during transient
 reveal; this conservative choice is independent of successful hiding. Framework
 callbacks are mechanical forwarding only. No AndroidX/managed frontend is added.
 These sources inform implementation; they do not establish device qualification.
+
+After the full-drawable Pixel4 sizing acceptance, the owner reported a misplaced
+Home gesture handle following bar reveal. The requested-hidden navigation window
+still had its normal bottom frame; scoped evidence is retained privately. The
+API31+ candidate now uses BEHAVIOR_DEFAULT, following the reviewed public PSX
+platform owner (exact blob in PSX_TRANSFER.md). Android documents that mode as
+allowing navigation gestures while bars are hidden. API30 retains transient mode.
+This is a supported policy adjustment pending device verification, not an
+established explanation or repair of the handle artifact.
