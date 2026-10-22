@@ -1,0 +1,4 @@
+GCX-1: Qualify Dolphin and run a Rust-hosted GameCube slice	docs/issues/GCX-1.md	phase:active,type:engineering
+GCX-2: Game-first library, safe resume and Home Screen games	docs/issues/GCX-2.md	phase:next,type:engineering
+GCX-3: Complete installation, source delivery and mobile release gates	docs/issues/GCX-3.md	phase:next,type:release
+GCX-4: Optional paused-resident games after measured single-runtime success	docs/issues/GCX-4.md	phase:deferred,type:architecture

@@ -1,0 +1,7 @@
+schema_version = 1
+repository = "WigglyDon/gcx"
+repository_url = "https://github.com/WigglyDon/gcx"
+publication_status = "not_created_by_seed_author"
+seed_id = "gcx-foundation-2026-10-21-v1"
+# The local bootstrap replaces this file only after actual remote/issue readback.
+# Prepared GCX-1..4 labels do not assert actual GitHub issue numbers.

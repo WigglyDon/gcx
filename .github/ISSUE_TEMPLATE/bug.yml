@@ -1,0 +1,28 @@
+name: Bug report
+description: Report a reproducible gcx problem without private content.
+title: "Bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: "Do not upload games, firmware, memory cards, checkpoints, saves, keys, or unreviewed device logs."
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction and source/build identity
+    validations:
+      required: true
+  - type: textarea
+    id: platform
+    attributes:
+      label: Platform, selected engine and relevant sanitized observations
+  - type: textarea
+    id: preservation
+    attributes:
+      label: Progress preservation or recovery concerns

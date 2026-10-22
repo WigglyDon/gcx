@@ -1,0 +1,7 @@
+bug	d73a4a	Reproducible product defect without private payloads
+phase:active	0E8A16	Initial authorized implementation assignment
+phase:next	1D76DB	Defined continuation; follow actual active worker scope
+phase:deferred	D4C5F9	Not dispatched; later explicit milestone
+type:engineering	0075CA	Implementation and focused qualification
+type:release	D93F0B	Distribution and release evidence
+type:architecture	5319E7	Ownership and platform architecture

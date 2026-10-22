@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "observed_on": "2026-10-21",
+  "status": "research observations, not incorporated dependencies or a full lock",
+  "candidates": [
+    {
+      "role": "first GameCube engine candidate",
+      "repository": "dolphin-emu/dolphin",
+      "ref": "cf5cb7ef81c3e8e7af5c9d566334219ffda9f68b",
+      "url": "https://github.com/dolphin-emu/dolphin/tree/cf5cb7ef81c3e8e7af5c9d566334219ffda9f68b",
+      "declared_license": "GPL-2.0-or-later; inspect every incorporated component",
+      "qualification": "source excerpts only; no build/device result"
+    }
+  ],
+  "behavior_reference": {
+    "repository": "WigglyDon/psx",
+    "ref": "1e4ba86fa0a5fc1470837b6bcc06bd20b6642c11",
+    "status": "historical public reference; recheck before selective reuse"
+  },
+  "incorporated_engine": null,
+  "device_results": []
+}
