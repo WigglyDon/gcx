@@ -69,21 +69,27 @@ The complete input matrix remains unqualified.
 
 Rust owns a single measured presentation/input geometry. Android supplies current
 window, taken decor surface and content rectangles, density, stable system-bar,
-cutout and mandatory-gesture clearance. Intersections occur in screen coordinates
-before mapping to buffer coordinates, so already inset surfaces are not inset
-twice. Native motion starts in window coordinates and maps to the very same
-presented targets. A geometry change, invalid measurement or mismatched rotation
-releases held input; the game is retained. Stable bar clearance deliberately
-remains during immersive play so transient bar reveal cannot cover controls.
+cutout and mandatory-gesture clearance. Control intersections occur in screen
+coordinates before mapping to buffer coordinates, so already inset surfaces are
+not inset twice. Native motion maps to those same presented targets. The picture
+independently uses the complete taken drawable/window intersection, including
+pixels reserved only for gestures. PSX's reviewed public clear-picture policy is
+adapted to maximize the complete picture around actual control targets using
+Dolphin's reported aspect. It does not reserve entire side rails or shrink for
+transient bars. The OS can overlay its temporarily revealed bars on that stable
+picture; controls retain clearance. A changed/invalid measurement or mismatched
+rotation releases held input; the game is retained.
 App-local API30+ WindowInsetsController (API28/29 immersive-sticky fallback) hides
 bars only while playing; menus/picker restore ordinary navigation. Main-thread
 callbacks are checked against the bound Activity; posted work also checks its
 epoch. Candidate52e240d passed hidden bars, world rendering and the aligned Pause
 target on Pixel4; its picture was too small for owner acceptance. The pass ended
 with normal joined Stop, matching protected card backups and verified return.
-The Activity now selects a title-free theme before window creation and the Rust
-menu removes the unused dialog title. That correction and the remaining bar,
-rotation, repeated-return and fresh-reload checks need a new authorized window.
+The title-free74b2ac4 candidate reclaimed space and passed aligned Pause/Stop,
+but the owner rejected its inset picture and explicitly required edge-to-edge
+like PSX. That clarification governs the independent picture bounds above.
+The new viewport and remaining bar, rotation, repeated-return and fresh-reload
+checks need a new authorized window. The title-free window/menu are retained.
 
 ## Stable identities, ephemeral execution
 

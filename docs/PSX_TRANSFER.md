@@ -25,13 +25,36 @@ Rust uses actual display density and the engine's reported aspect. The MIT
 copyright notice is preserved in the root license and therefore APK notices.
 Host tests cover non-overlap, bounds/minimum targets, all 18 reachable channels,
 diagonal D-pad and simultaneous independent trigger release. The candidate now
-runs in landscape on Pixel 4; its native colors/labels and clear side rails were
-visually inspected, and the owner reports it works. System bars still overlap
-the upper trigger area and bottom picture; inset/cutout handling and independent
-physical qualification of every control remain due.
+runs in landscape on Pixel 4 as162d6b4/be16792a; its native colors/labels and clear side rails were
+visually inspected, and the owner reported it works. Its system bars overlapped
+the upper trigger area and bottom picture. Later52e240d/74b2ac4 passes hid bars
+and aligned Pause correctly but the inset picture was rejected. Edge-to-edge
+picture and independent physical qualification of every control remain due.
 
 This is selected public-source adaptation. PSX's checkout, private files, app
 resources and active work were not read or changed for it.
+
+## Full drawable picture, 2026-10-22
+
+After rejecting the inset picture, the owner clarified edge-to-edge like PSX.
+Reviewed the same public revision4277d4ca651a4c9c2e8e88113a0ef092e330f01c:
+`input.rs` PlayerViewport/place_game_in/clear_picture (blob above), Android
+`mod.rs` resize/picture-inset split (blob8fe79a4625b05659fb9a703d986b66124c9c6b55),
+`graphics.rs` picture fit (blob87b1a704bc1b5d38502512ebb905ccb16dec5310), and
+`platform.rs` fullscreen API calls (blob26342f631287aaff509b5199d87d30ce741ed607).
+The public input blob was unchanged at readback. These MIT files distinguish
+the full picture viewport from the gesture-safe control surface; transient bars
+overlay the stable picture instead of reducing it.
+
+`crates/gcx/src/viewport.rs` adapts the centered clear_picture calculation around
+real control rectangles. It takes Dolphin's reported aspect rather than PSX's
+fixed4:3 and uses the actual window/drawable mapping. Control insets never become
+picture margins; no stretch, crop, private preset, GL, core or persistence code is
+copied. The original MIT notice remains in LICENSE and packaged notices. New host
+fixtures check full drawable height for a1.25 aspect fixture, multiple engine
+aspects without overlap, stable bar-reveal picture and shared input mapping.
+The original placeholder preview uses this actual Geometry; device acceptance
+for this correction remains due. No sibling checkout or private files were read.
 
 Candidate reusable concepts: validated opaque GameId/OpenGame requests, input
 capture and cancellation, aspect-correct layout/editor behavior, atomic settings,

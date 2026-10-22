@@ -2,20 +2,50 @@
 //! Off-device preview of the actual shared geometry. No game artwork or pixels.
 use gcx::{
     Control,
-    touch::{Layout, Target},
+    touch::{Area, Target},
+    viewport::{Geometry, Insets, WindowGeometry},
 };
 fn main() {
-    let layout = Layout::new(830.0, 393.0);
+    let bounds = Area {
+        left: 0.0,
+        top: 0.0,
+        right: 830.0,
+        bottom: 393.0,
+    };
+    let geometry = Geometry::new(
+        WindowGeometry {
+            window: bounds,
+            surface: bounds,
+            content: bounds,
+            input_origin: (0.0, 0.0),
+            clearance: Insets {
+                top: 24.0,
+                bottom: 24.0,
+                ..Insets::default()
+            },
+            density: 1.0,
+        },
+        830.0,
+        393.0,
+    )
+    .unwrap();
+    let aspect = std::env::args()
+        .nth(1)
+        .and_then(|s| s.parse::<f32>().ok())
+        .unwrap_or(1.25);
+    let picture = geometry.picture(aspect);
+    let layout = geometry.layout;
     println!(
         r##"<svg xmlns="http://www.w3.org/2000/svg" width="1660" height="786" viewBox="0 0 830 393"><rect width="830" height="393" fill="#101214"/>"##
     );
-    let a = layout.game;
+    let a = picture;
     let w = a.right - a.left;
-    let h = (w * 3.0 / 4.0).min(a.bottom - a.top);
+    let h = a.bottom - a.top;
     println!(
-        r##"<rect x="{}" y="0" width="{w}" height="{h}" fill="#26323a"/><text x="415" y="{}" text-anchor="middle" fill="#b9c5cd" font-family="DejaVu Sans" font-size="16">Game picture · 4:3 example</text>"##,
+        r##"<rect x="{}" y="{}" width="{w}" height="{h}" fill="#26323a"/><text x="415" y="{}" text-anchor="middle" fill="#b9c5cd" font-family="DejaVu Sans" font-size="16">Game picture · aspect {aspect}</text>"##,
         a.left,
-        h / 2.0
+        a.top,
+        a.top + h / 2.0
     );
     for zone in layout.zones {
         let a = zone.area;

@@ -147,9 +147,27 @@ and host/ARM64 warnings-denied Clippy pass. Implementation
 `5aa4ee8082ee3682c78e1f029b00fd029277c7039c5805df2019a161018ecc69`;
 package, unchanged signer, ABI/export/dependency, resource/native byte, 16KiB
 alignment and all65 corresponding-source checksums pass. The actual compiled
-manifest's theme ID resolves to platform Theme.Material.NoActionBar. This needs
-a new exclusive Pixel4 window for sizing and the remaining compact
-save/normal-Stop/fresh-process game-menu reload on its exact build.
+manifest's theme ID resolves to platform Theme.Material.NoActionBar. Its actual
+Pixel4 check ended at2026-10-22 19:06:29UTC: bars hid, existing world/one-rupee marker
+rendered, aligned Pause and title-free dialog worked, and normal Stop joined with
+clean metadata/no emulation workers. The owner rejected the inset picture and
+clarified edge-to-edge like PSX. Save completion was confirmed; final actual card
+backup matched protected progress, app retirement followed joinedStop, and
+screen-off/keyguard/lease release were verified. No remaining lifecycle or
+post-Stop cold-reload acceptance was attempted after the sizing rejection.
+
+The new correction adapts the reviewed public PSX picture/control viewport split:
+the picture uses the full taken drawable, including gesture-reserved pixels,
+while controls retain their safe geometry. A centered clear-picture calculation
+maximizes Dolphin's reported aspect around actual touch rectangles instead of
+reserving entire side rails. Transient OS bars can overlay the stable picture;
+they do not shrink it. Input and drawing still share one measured mapping. MIT
+source/revision/coupling are in docs/PSX_TRANSFER.md; no fixed PS1 aspect or sibling
+data/core is copied. Twenty-three host tests and host/ARM64 warnings-denied Clippy
+pass, including full-height1.25 fixture, variable-aspect/non-overlap and bar-reveal
+stability. The actual geometry placeholder was generated/opened, without game
+artwork. Package/source checks and a new exclusive Pixel4 sizing/remaining
+save→normalStop→fresh-process game-menu reload window are still required.
 
 ## Source and reproduction
 

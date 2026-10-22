@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 //! One presentation and input coordinate owner. Platform measurements are in
 //! screen pixels; native input is in window pixels and drawing in buffer pixels.
+//! Picture placement adapts public PSX MIT PlayerViewport/clear_picture policy;
+//! see docs/PSX_TRANSFER.md. The engine supplies the GameCube aspect.
 use crate::{
     Pad,
     touch::{Area, Layout, TouchPad},
@@ -24,8 +26,8 @@ pub struct WindowGeometry {
     pub content: Area,
     /// Screen position of native input's window-local (0,0).
     pub input_origin: (f32, f32),
-    /// Maximum of stable bars, cutout and mandatory gesture clearance. Keeping
-    /// stable bar clearance also protects controls during transient bar reveal.
+    /// Control clearance only: stable bars, cutout and mandatory gestures.
+    /// The picture independently uses the complete taken drawable, as in PSX.
     pub clearance: Insets,
     pub density: f32,
 }
@@ -112,6 +114,16 @@ impl Geometry {
         for zone in &mut layout.zones {
             map(&mut zone.area);
         }
+        // Picture pixels do not share the controls' gesture/content margins.
+        // The OS can transiently draw its bars over this stable picture. Actual
+        // touch targets remain clear and share the same buffer/input mapping.
+        let picture = intersection(window.surface, window.window);
+        layout.game = Area {
+            left: (picture.left - window.surface.left) * sx,
+            top: (picture.top - window.surface.top) * sy,
+            right: (picture.right - window.surface.left) * sx,
+            bottom: (picture.bottom - window.surface.top) * sy,
+        };
         Some(Self {
             layout,
             density: window.density * sx.min(sy),
@@ -134,14 +146,40 @@ impl Geometry {
         } else {
             1.0
         };
-        let width = (a.right - a.left).min((a.bottom - a.top) * aspect);
-        let left = a.left + (a.right - a.left - width) * 0.5;
-        Area {
-            left,
+        // Adapted from PSX's clear_picture: maximize the complete centered
+        // picture around real targets, rather than excluding entire side rails.
+        // Keep the engine's aspect instead of copying PSX's fixed 4:3 ratio.
+        let center = (a.left + a.right) * 0.5;
+        let mut best = Area {
+            left: center,
             top: a.top,
-            right: left + width,
-            bottom: a.top + width / aspect,
+            right: center,
+            bottom: a.top,
+        };
+        for top in std::iter::once(a.top)
+            .chain(self.layout.zones.iter().map(|z| z.area.bottom))
+            .filter(|y| *y >= a.top && *y <= a.bottom)
+        {
+            let mut width = (a.right - a.left).min((a.bottom - top) * aspect).max(0.0);
+            for zone in &self.layout.zones {
+                let r = zone.area;
+                if r.bottom <= top + 0.01 {
+                    continue;
+                }
+                let beside = (center - r.right).max(r.left - center).max(0.0) * 2.0;
+                let above = (r.top - top).max(0.0) * aspect;
+                width = width.min(beside.max(above));
+            }
+            if width > best.right - best.left {
+                best = Area {
+                    left: center - width * 0.5,
+                    top,
+                    right: center + width * 0.5,
+                    bottom: top + width / aspect,
+                };
+            }
         }
+        best
     }
 }
 
@@ -249,7 +287,7 @@ mod tests {
             assert_eq!(a.area.left, b.area.left);
             assert!((a.area.top - b.area.top - 66.0).abs() < 0.001);
         }
-        assert_eq!(full.layout.game.top, 66.0);
+        assert_eq!(full.layout.game.top, 0.0);
         assert_eq!(fitted.layout.game.top, 0.0);
     }
     #[test]
@@ -383,22 +421,53 @@ mod tests {
         }
     }
     #[test]
-    fn title_free_content_reclaims_picture_height_without_spending_clearance_twice() {
-        // A native window may cover framework chrome while its content view
-        // still reserves that chrome. The app selects NoActionBar before window
-        // creation; geometry must then use the newly measured full content.
+    fn content_clearance_applies_to_controls_while_picture_uses_the_drawable() {
         let mut w = window();
         w.content.top = 354.0;
-        let chrome = Geometry::new(w, 2280.0, 1080.0).unwrap().picture(4.0 / 3.0);
+        let chrome = Geometry::new(w, 2280.0, 1080.0).unwrap();
         w.content = w.surface;
         let g = Geometry::new(w, 2280.0, 1080.0).unwrap();
-        let picture = g.picture(4.0 / 3.0);
-        assert_eq!(picture.top, 66.0);
-        assert!((picture.bottom - 1014.0).abs() < 0.001);
-        assert!(picture.bottom - picture.top > chrome.bottom - chrome.top);
-        assert!((picture.right - picture.left) / (picture.bottom - picture.top) > 1.3332);
+        assert_eq!(g.layout.game, rect(0.0, 0.0, 2280.0, 1080.0));
+        assert_eq!(g.layout.game, chrome.layout.game);
+        assert!(g.layout.zones[0].area.top < chrome.layout.zones[0].area.top);
         for zone in g.layout.zones {
             assert!(zone.area.top >= 66.0 && zone.area.bottom <= 1014.01);
+        }
+    }
+    #[test]
+    fn edge_to_edge_picture_uses_full_height_and_actual_engine_aspect_clear_of_targets() {
+        let g = Geometry::new(window(), 2280.0, 1080.0).unwrap();
+        for aspect in [1.25, 4.0 / 3.0, 16.0 / 9.0] {
+            let p = g.picture(aspect);
+            assert_eq!(p.top, 0.0);
+            assert!(((p.right - p.left) / (p.bottom - p.top) - aspect).abs() < 0.0001);
+            assert!(p.bottom <= 1080.01 && p.left >= 0.0 && p.right <= 2280.01);
+            for z in &g.layout.zones {
+                let a = z.area;
+                assert!(
+                    p.right <= a.left + 0.01
+                        || p.left >= a.right - 0.01
+                        || p.bottom <= a.top + 0.01
+                        || p.top >= a.bottom - 0.01
+                );
+            }
+        }
+        let p = g.picture(1.25);
+        assert_eq!(p.bottom, 1080.0);
+        assert!((p.right - p.left - 1350.0).abs() < 0.01);
+    }
+    #[test]
+    fn revealing_bars_does_not_shrink_or_offset_the_picture_or_break_touch_mapping() {
+        let w = window();
+        let hidden = Geometry::new(w, 2280.0, 1080.0).unwrap();
+        let mut revealed = w;
+        revealed.content = rect(100.0, 266.0, 2380.0, 1214.0);
+        let shown = Geometry::new(revealed, 2280.0, 1080.0).unwrap();
+        assert_eq!(hidden.picture(1.25), shown.picture(1.25));
+        for (a, b) in hidden.layout.zones.iter().zip(&shown.layout.zones) {
+            assert_eq!(a.area, b.area);
+            let (x, y) = a.area.center();
+            assert_eq!(shown.input_to_buffer(x, y), (x, y));
         }
     }
 }

@@ -21,7 +21,10 @@ compatibility/features, not silent requirements for ordinary GameCube play.
 ## Native feel, not an emulator control panel
 
 The first desired device is the stock Android ARM64 Fold. Fit the complete
-aspect-correct game picture around camera/system insets and comfortable controls.
+aspect-correct game picture using the complete drawable and comfortable controls.
+Owner clarified the target as edge-to-edge like PSX: do not shrink the picture to
+the control-safe inset rectangle. Controls avoid camera/system-gesture space;
+the picture can use those pixels and stays stable while transient bars overlay it.
 Keep controls off the picture by default. Do not stretch or crop game-written
 borders without explicit player choice. Use the actual reported game geometry,
 not a permanent 4:3 or 60-game-FPS assumption.
