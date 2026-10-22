@@ -76,6 +76,7 @@ impl StopRuntime for LiveRuntime {
             if let Ok(mut error) = self.events.teardown_error.lock() {
                 *error = None;
             }
+            platform::diagnostic("Native shutdown begin; profile writer still owned");
             // SAFETY: same serialized native owner. Keep all Rust fields/profile
             // alive until the stop caller has durably published its result.
             unsafe {
@@ -83,6 +84,11 @@ impl StopRuntime for LiveRuntime {
                 gcx_engine_shutdown();
             }
             self.native_alive = false;
+            platform::diagnostic("Native shutdown joined; profile writer still owned");
+            // SAFETY: shutdown has joined native workers; this only reads core state.
+            if unsafe { gcx_engine_state() } != 0 {
+                return Err("Native shutdown did not reach the unloaded state.".into());
+            }
         }
         if let Some(error) = gcx::storage::last_card_error().or_else(|| {
             self.events
