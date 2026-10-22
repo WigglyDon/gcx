@@ -260,23 +260,9 @@ pub fn menu(app: &AndroidApp, show: bool, message: Option<String>) {
             return;
         }
         let result = with_env(|env, activity| {
-            if let Some(view) = MENU.lock().map_err(|_| "menu lock poisoned")?.take() {
-                let parent = env
-                    .call_method(
-                        view.as_obj(),
-                        "getParent",
-                        "()Landroid/view/ViewParent;",
-                        &[],
-                    )?
-                    .l()?;
-                if !parent.is_null() {
-                    env.call_method(
-                        parent,
-                        "removeView",
-                        "(Landroid/view/View;)V",
-                        &[JValue::Object(view.as_obj())],
-                    )?;
-                }
+            let old = MENU.lock().map_err(|_| "menu lock poisoned")?.take();
+            if let Some(dialog) = old {
+                env.call_method(dialog.as_obj(), "dismiss", "()V", &[])?;
             }
             if show {
                 let view = env.new_object(
@@ -369,18 +355,33 @@ pub fn menu(app: &AndroidApp, show: bool, message: Option<String>) {
                         &[JValue::Object(&button)],
                     )?;
                 }
-                let params = env.new_object(
-                    "android/view/ViewGroup$LayoutParams",
+                // NativeActivity owns the root drawing surface. Views added to
+                // that hierarchy can receive input while remaining unpainted.
+                // This app-owned dialog has a framework-rendered window; the
+                // Rust-built content and all actions/policy remain here.
+                let dialog = env.new_object(
+                    "android/app/Dialog",
+                    "(Landroid/content/Context;)V",
+                    &[JValue::Object(activity)],
+                )?;
+                env.call_method(&dialog, "setCancelable", "(Z)V", &[JValue::Bool(0)])?;
+                env.call_method(
+                    &dialog,
+                    "setContentView",
+                    "(Landroid/view/View;)V",
+                    &[JValue::Object(&view)],
+                )?;
+                env.call_method(&dialog, "show", "()V", &[])?;
+                let window = env
+                    .call_method(&dialog, "getWindow", "()Landroid/view/Window;", &[])?
+                    .l()?;
+                env.call_method(
+                    window,
+                    "setLayout",
                     "(II)V",
                     &[JValue::Int(-1), JValue::Int(-1)],
                 )?;
-                env.call_method(
-                    activity,
-                    "addContentView",
-                    "(Landroid/view/View;Landroid/view/ViewGroup$LayoutParams;)V",
-                    &[JValue::Object(&view), JValue::Object(&params)],
-                )?;
-                *MENU.lock().map_err(|_| "menu lock poisoned")? = Some(env.new_global_ref(view)?);
+                *MENU.lock().map_err(|_| "menu lock poisoned")? = Some(env.new_global_ref(dialog)?);
             }
             Ok(())
         });
@@ -392,6 +393,25 @@ pub fn menu(app: &AndroidApp, show: bool, message: Option<String>) {
             push(Command::MenuHidden);
         }
     }));
+}
+
+#[unsafe(no_mangle)]
+extern "system" fn Java_com_machinerhythm_gcx_GcxActivity_beforeDestroy(
+    mut env: JNIEnv<'_>,
+    activity: JObject<'_>,
+) {
+    if !current_activity(&env, &activity) {
+        return;
+    }
+    EPOCH.fetch_add(1, Ordering::AcqRel);
+    let dialog = MENU.lock().ok().and_then(|mut menu| menu.take());
+    if let Some(dialog) = dialog
+        && let Err(error) = env.call_method(dialog.as_obj(), "dismiss", "()V", &[])
+    {
+        diagnostic(&format!("Dialog retirement failed: {error}"));
+        let _ = env.exception_describe();
+        let _ = env.exception_clear();
+    }
 }
 
 #[unsafe(no_mangle)]

@@ -455,6 +455,7 @@ pub fn package(root: &Path, source: &Path) -> Result<()> {
         "ANativeActivity_onCreate",
         "Java_com_machinerhythm_gcx_GcxActivity_documentResult",
         "Java_com_machinerhythm_gcx_GcxActivity_uiAction",
+        "Java_com_machinerhythm_gcx_GcxActivity_beforeDestroy",
     ] {
         if !symbols.lines().any(|line| {
             line.split_whitespace().last() == Some(symbol)

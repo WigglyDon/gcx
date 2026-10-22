@@ -6,6 +6,7 @@ package com.machinerhythm.gcx;
 public final class GcxActivity extends android.app.NativeActivity {
     private native void documentResult(int request, int result, android.content.Intent data);
     private native void uiAction(int action);
+    private native void beforeDestroy();
 
     public static final class Action implements android.view.View.OnClickListener {
         private final int action;
@@ -18,5 +19,11 @@ public final class GcxActivity extends android.app.NativeActivity {
     protected void onActivityResult(int request, int result, android.content.Intent data) {
         super.onActivityResult(request, result, data);
         documentResult(request, result, data);
+    }
+
+    @Override
+    protected void onDestroy() {
+        beforeDestroy();
+        super.onDestroy();
     }
 }
