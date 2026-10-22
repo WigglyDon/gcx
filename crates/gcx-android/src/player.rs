@@ -283,6 +283,7 @@ pub fn run(app: AndroidApp) {
     }
     let result = run_owned(&app);
     if let Err(error) = result {
+        platform::diagnostic(&format!("Player startup/host failure: {error}"));
         platform::notice(&app, format!("gcx: {error}"));
     }
     platform::shutdown();
@@ -296,6 +297,7 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
         .join("gcx");
     std::fs::create_dir_all(&root)?;
     let sys = resources(app, &root)?;
+    platform::diagnostic("Resources ready; loading collection");
     let mut collection = load_collection(&root)?;
     let mut selected = collection
         .selected

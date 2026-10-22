@@ -18,6 +18,19 @@ use std::{
 };
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+#[link(name = "log")]
+unsafe extern "C" {
+    fn __android_log_write(priority: i32, tag: *const c_char, text: *const c_char) -> i32;
+}
+pub fn diagnostic(message: &str) {
+    let message: String = message.chars().filter(|c| *c != '\0').take(4096).collect();
+    if let Ok(message) = std::ffi::CString::new(message) {
+        // SAFETY: Android copies these borrowed NUL-terminated strings.
+        unsafe {
+            __android_log_write(6, c"gcx".as_ptr(), message.as_ptr());
+        }
+    }
+}
 static VM: OnceLock<JavaVM> = OnceLock::new();
 static ACTIVITY: Mutex<Option<GlobalRef>> = Mutex::new(None);
 static MENU: Mutex<Option<GlobalRef>> = Mutex::new(None);
@@ -88,7 +101,13 @@ fn with_env<T>(f: impl FnOnce(&mut JNIEnv<'_>, &JObject<'_>) -> Result<T>) -> Re
     // main thread stays attached, so temporary JNI references need a frame.
     let result = env.with_local_frame(64, |env| f(env, activity.as_obj()));
     if env.exception_check()? {
+        // Preserve the actual app-local Java failure before clearing it. Raw
+        // diagnostics stay private; UI errors still use the recovery policy.
+        env.exception_describe()?;
         env.exception_clear()?;
+    }
+    if let Err(error) = &result {
+        diagnostic(&format!("Android UI/provider failure: {error}"));
     }
     result
 }
