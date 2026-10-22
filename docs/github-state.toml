@@ -1,7 +1,31 @@
 schema_version = 1
 repository = "WigglyDon/gcx"
 repository_url = "https://github.com/WigglyDon/gcx"
-publication_status = "not_created_by_seed_author"
+publication_status = "published_and_verified_by_local_bootstrap"
 seed_id = "gcx-foundation-2026-10-21-v1"
-# The local bootstrap replaces this file only after actual remote/issue readback.
-# Prepared GCX-1..4 labels do not assert actual GitHub issue numbers.
+seed_root_commit = "398e522a0c59a3d53ec1e26bcae960d94b76fc35"
+# Records source publication and issue identities, not worker execution or gameplay.
+
+[[issues]]
+key = "GCX-1"
+number = 1
+title = "GCX-1: Qualify Dolphin and run a Rust-hosted GameCube slice"
+url = "https://github.com/WigglyDon/gcx/issues/1"
+
+[[issues]]
+key = "GCX-2"
+number = 2
+title = "GCX-2: Game-first library, safe resume and Home Screen games"
+url = "https://github.com/WigglyDon/gcx/issues/2"
+
+[[issues]]
+key = "GCX-3"
+number = 3
+title = "GCX-3: Complete installation, source delivery and mobile release gates"
+url = "https://github.com/WigglyDon/gcx/issues/3"
+
+[[issues]]
+key = "GCX-4"
+number = 4
+title = "GCX-4: Optional paused-resident games after measured single-runtime success"
+url = "https://github.com/WigglyDon/gcx/issues/4"
