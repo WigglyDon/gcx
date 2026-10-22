@@ -382,4 +382,23 @@ mod tests {
             assert!(valid(z.area) && z.area.right <= 200.01 && z.area.bottom <= 84.01);
         }
     }
+    #[test]
+    fn title_free_content_reclaims_picture_height_without_spending_clearance_twice() {
+        // A native window may cover framework chrome while its content view
+        // still reserves that chrome. The app selects NoActionBar before window
+        // creation; geometry must then use the newly measured full content.
+        let mut w = window();
+        w.content.top = 354.0;
+        let chrome = Geometry::new(w, 2280.0, 1080.0).unwrap().picture(4.0 / 3.0);
+        w.content = w.surface;
+        let g = Geometry::new(w, 2280.0, 1080.0).unwrap();
+        let picture = g.picture(4.0 / 3.0);
+        assert_eq!(picture.top, 66.0);
+        assert!((picture.bottom - 1014.0).abs() < 0.001);
+        assert!(picture.bottom - picture.top > chrome.bottom - chrome.top);
+        assert!((picture.right - picture.left) / (picture.bottom - picture.top) > 1.3332);
+        for zone in g.layout.zones {
+            assert!(zone.area.top >= 66.0 && zone.area.bottom <= 1014.01);
+        }
+    }
 }

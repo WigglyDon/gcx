@@ -780,6 +780,9 @@ fn render_menu(
                     "(Landroid/content/Context;)V",
                     &[JValue::Object(activity)],
                 )?;
+                // This Rust-built menu supplies its own heading. A framework
+                // title reserves unused content space on default dialog themes.
+                env.call_method(&dialog, "requestWindowFeature", "(I)Z", &[JValue::Int(1)])?;
                 env.call_method(&dialog, "setCancelable", "(Z)V", &[JValue::Bool(0)])?;
                 env.call_method(
                     &dialog,

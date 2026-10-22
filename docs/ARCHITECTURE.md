@@ -78,8 +78,12 @@ remains during immersive play so transient bar reveal cannot cover controls.
 App-local API30+ WindowInsetsController (API28/29 immersive-sticky fallback) hides
 bars only while playing; menus/picker restore ordinary navigation. Main-thread
 callbacks are checked against the bound Activity; posted work also checks its
-epoch. This fullscreen/inset continuation is prepared off-device; its new Android
-behavior still needs the next separately authorized Pixel4 window.
+epoch. Candidate52e240d passed hidden bars, world rendering and the aligned Pause
+target on Pixel4; its picture was too small for owner acceptance. The pass ended
+with normal joined Stop, matching protected card backups and verified return.
+The Activity now selects a title-free theme before window creation and the Rust
+menu removes the unused dialog title. That correction and the remaining bar,
+rotation, repeated-return and fresh-reload checks need a new authorized window.
 
 ## Stable identities, ephemeral execution
 

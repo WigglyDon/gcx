@@ -128,8 +128,22 @@ private APK SHA256 `053ad7f653c062c9107206ed04f5f3fd627c997f34aa78265a276fe24b04
 (15,409,094 bytes). Package ABI/defined JNI exports, native dependency closure,
 16 KiB ELF/ZIP alignment, unchanged signer, resource/native bytes and all 65
 corresponding-source checksums pass. The exact Rust symbol image is retained.
-This behavior still needs a fresh exclusive Pixel4 window, including both
-landscape orientations and a compact
+Its Pixel4 window ended early at2026-10-22 18:54:56UTC on a concrete picture-size
+usability failure. Hidden bars, the world/one-rupee marker, aligned Pause target,
+visible menu navigation and normal joined Stop were observed; owner feedback
+rejected the reduced picture. The actual final card backup matches protected
+saved-progress bytes. Four captures were inspected; no crash or pending recovery.
+The already-unloaded app was retired, screen-off/keyguard verified and lease
+released before repair. Repeated Home/return, deliberate bar reveal, reverse
+landscape and post-Stop cold reload were not continued on that candidate.
+
+The correction selects the platform's title-free NoActionBar Activity theme before
+window creation; the default application chrome had reduced the measured content
+inside the taken native window. Rust also removes the dialog's empty title area.
+Geometry still honors actual measured safe bounds and game aspect. Twenty-one
+host tests, including content-height reclamation without repeated clearance,
+and host/ARM64 warnings-denied Clippy pass. The correction still needs packaging
+and a new exclusive Pixel4 window for sizing and the remaining compact
 save/normal-Stop/fresh-process game-menu reload on its exact build.
 
 ## Source and reproduction
