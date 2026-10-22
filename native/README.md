@@ -166,8 +166,13 @@ source/revision/coupling are in docs/PSX_TRANSFER.md; no fixed PS1 aspect or sib
 data/core is copied. Twenty-three host tests and host/ARM64 warnings-denied Clippy
 pass, including full-height1.25 fixture, variable-aspect/non-overlap and bar-reveal
 stability. The actual geometry placeholder was generated/opened, without game
-artwork. Package/source checks and a new exclusive Pixel4 sizing/remaining
-save→normalStop→fresh-process game-menu reload window are still required.
+artwork. Implementation `58335ffe726178d6346f69305af1772c32a3eb1e` produced
+private APK SHA256 `f4f60fa0dfecaa13e1bf1d9852ccafb81f5f7d6b26b343c556025abb5eec178a`
+(15,409,094bytes). Package/signature/ABI/defined JNI exports/dependency closure,
+resource/native bytes, 16KiB ELF/ZIP alignment and all65 corresponding-source
+checksums pass. Matching Rust image is retained; native engine remains unchanged.
+Owner requested off-device continuation; a new exclusive Pixel4 sizing/remaining
+save→normalStop→fresh-process game-menu reload window remains pending.
 
 ## Source and reproduction
 
