@@ -195,6 +195,14 @@ BEHAVIOR_DEFAULT choice, keeping navigation gestures active while bars are hidde
 API30 retains transient-bars behavior. Shared geometry, native ABI5 and engine
 objects remain unchanged. This policy adjustment is not a proven cause/fix of the
 handle artifact and needs a new authorized device window after package checks.
+Implementation `0176fa894e095d0bf230e3fa0a36c12c2869ccc2` produces private APK
+SHA256 `50a7430407b54d095e06ba1b8483894f2b595c515982483fef1fb1f5ed698231`
+(15,409,094bytes). The23 existing host tests, host/all-target and ARM64 warnings-denied
+Clippy, formatting/diff, actual package ABI/defined exports/dependency closure,
+signature/resource-native bytes/16KiB alignment and all65 corresponding-source
+checksums pass. Matching Rust image SHA256
+`d0e0813c336edc0a9f1e5781d112a2d7c91e370c93e69f022dea0f34f8f6fcd2`
+is retained. No native rebuild and no device test of this candidate yet.
 
 ## Source and reproduction
 
