@@ -142,8 +142,13 @@ window creation; the default application chrome had reduced the measured content
 inside the taken native window. Rust also removes the dialog's empty title area.
 Geometry still honors actual measured safe bounds and game aspect. Twenty-one
 host tests, including content-height reclamation without repeated clearance,
-and host/ARM64 warnings-denied Clippy pass. The correction still needs packaging
-and a new exclusive Pixel4 window for sizing and the remaining compact
+and host/ARM64 warnings-denied Clippy pass. Implementation
+`74b2ac4b938486ea6f1937b9f1b41c4ca6065096` produced private APK SHA256
+`5aa4ee8082ee3682c78e1f029b00fd029277c7039c5805df2019a161018ecc69`;
+package, unchanged signer, ABI/export/dependency, resource/native byte, 16KiB
+alignment and all65 corresponding-source checksums pass. The actual compiled
+manifest's theme ID resolves to platform Theme.Material.NoActionBar. This needs
+a new exclusive Pixel4 window for sizing and the remaining compact
 save/normal-Stop/fresh-process game-menu reload on its exact build.
 
 ## Source and reproduction
