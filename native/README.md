@@ -79,9 +79,16 @@ pass. Android native SHA256
 `d1280e0f9d06a903b8fd4e3111e01af125a1d273ce8f145edb64e8adc0270026`, BuildID
 `2bca4a72879e25e8276bbb0dd46ddc3a19216e23`; maintained patch SHA256
 `85ec2d66b365c3a77e6e7e52fc41d13d34d343e4ab63bf12853c7d99178af963`.
-Packaging/source preservation is the next off-device step. No Android
-responsiveness, layout-feel, gameplay, card-save or resume result transfers from
-ABI7 to this new native/Rust build.
+Checked source `0e5417e328383e0ba7ff0d3b0d5cf01bb3f5b744` produces private APK
+SHA256 `c7194951d9420e45622c7eefb29baaa5365fec694e6cefa015a7049dc724e5c9`
+(15,672,967bytes), Rust image
+`f2abe46ac27927c92e171eda761b65442aff6b3f1c5ce13508fad38caa490282`.
+Actual ABI/defined exports/JNI/dependency closure, separate unchanged signer,
+zero permissions, resources/notices and16KiB ELF/ZIP alignment pass. The complete
+private binary/source pair is preserved and all65 source checksums pass, with92
+public source inputs. This candidate is not installed. No Android responsiveness,
+layout-feel, gameplay, card-save or resume result transfers from ABI7 to this new
+native/Rust build. Later documentation bindings do not require an unchanged rebuild.
 
 ## Checked native save reads, 2026-10-22
 
