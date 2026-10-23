@@ -125,3 +125,16 @@ platform owner (exact blob in PSX_TRANSFER.md). Android documents that mode as
 allowing navigation gestures while bars are hidden. API30 retains transient mode.
 This is a supported policy adjustment pending device verification, not an
 established explanation or repair of the handle artifact.
+
+## S12 — GameId launch and pinned shortcut contract
+
+- https://developer.android.com/reference/android/content/pm/ShortcutManager
+- https://developer.android.com/develop/ui/compose/system/shortcuts/creating-shortcuts
+- Pinned Android37.0 SDK android.jar: ShortcutManager/ShortcutInfo.Builder JVM signatures inspected using the existing JDK.
+
+The foreground app can request launcher confirmation; the API's positive return
+is not a confirmed pin. Own-app pinned-shortcut observations are separate, run on
+the Rust worker because the query can block, and never delete progress. New-intent
+forwarding is mechanical; URI parsing, identity lookup, pin policy and persistence
+are original Rust. No AndroidX frontend, service or proprietary icon is added.
+This is source/API preparation; physical launcher results remain unqualified.

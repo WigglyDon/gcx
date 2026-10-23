@@ -25,6 +25,11 @@ pub struct SavedSession {
     /// Immutable complete generation; never a native handle or ordinary card image.
     #[serde(default)]
     pub checkpoint: Option<String>,
+    #[serde(default)]
+    pub shortcut_requested: bool,
+    /// Last OS observation, separate from accepting a pin request.
+    #[serde(default)]
+    pub shortcut_pinned: Option<bool>,
 }
 impl SavedSession {
     pub fn fail(&mut self, error: String) {
@@ -83,6 +88,20 @@ pub enum GameOpen {
     ResumeCurrent,
     Select(usize),
 }
+const PLAY_URI_PREFIX: &str = "machinerhythm-gcx://play/";
+pub fn play_uri(id: &str) -> Result<String, &'static str> {
+    if !valid_id(id) {
+        return Err("Invalid game identity.");
+    }
+    Ok(format!("{PLAY_URI_PREFIX}{id}"))
+}
+pub fn parse_play_uri(uri: &str) -> Result<String, &'static str> {
+    let id = uri
+        .strip_prefix(PLAY_URI_PREFIX)
+        .filter(|id| valid_id(id))
+        .ok_or("Invalid gcx game link. Open a game from the library.")?;
+    Ok(id.to_owned())
+}
 impl Collection {
     /// A launch/UI request names an existing entry, never a document or profile
     /// path. Unknown, removed and malformed IDs leave the live owner untouched.
@@ -93,7 +112,7 @@ impl Collection {
         self.entries
             .iter()
             .position(|entry| entry.game_id.0 == id)
-            .ok_or("This game is no longer in the library. Import or relink it explicitly.")
+            .ok_or("This game is no longer in the library. Open the library to choose a game.")
     }
     pub fn open_game(&self, id: &str, live_game: Option<&str>) -> Result<GameOpen, &'static str> {
         let target = self.resolve_game(id)?;
@@ -109,6 +128,17 @@ impl Collection {
             }
         }
         Ok(GameOpen::Select(target))
+    }
+    /// A gcx-only OS shortcut observation never removes a game or its saves.
+    pub fn observe_shortcuts(&mut self, pinned_games: &[String]) -> bool {
+        let pinned: BTreeSet<_> = pinned_games.iter().map(String::as_str).collect();
+        let mut changed = false;
+        for entry in &mut self.entries {
+            let value = Some(pinned.contains(entry.game_id.0.as_str()));
+            changed |= entry.shortcut_pinned != value;
+            entry.shortcut_pinned = value;
+        }
+        changed
     }
     pub fn validate(&self) -> Result<(), &'static str> {
         if self.schema_version != 1 {
@@ -165,6 +195,8 @@ mod tests {
             runtime_incomplete: false,
             stopped: false,
             checkpoint: None,
+            shortcut_requested: false,
+            shortcut_pinned: None,
         }
     }
     #[test]
@@ -248,6 +280,8 @@ mod tests {
         assert!(c.open_game(&"c".repeat(32), Some(&"a".repeat(32))).is_err());
         assert!(c.open_game(&"a".repeat(32), Some(&"a".repeat(32))).is_err());
         c.entries[0].request_restart();
+        assert!(c.open_game(&"e".repeat(32), None).is_err());
+        assert!(c.open_game(&"e".repeat(32), Some(&"a".repeat(32))).is_err());
         for id in [
             "../profiles/card",
             "content://fixture/game",
@@ -264,6 +298,44 @@ mod tests {
             Ok(0),
             "identity survives row reordering"
         );
+    }
+    #[test]
+    fn links_carry_only_canonical_game_ids_and_pin_requests_are_not_confirmations() {
+        let id = "a".repeat(32);
+        let uri = play_uri(&id).unwrap();
+        assert_eq!(parse_play_uri(&uri).unwrap(), id);
+        let mut legacy = serde_json::to_value(entry()).unwrap();
+        for name in ["checkpoint", "shortcut_requested", "shortcut_pinned"] {
+            legacy.as_object_mut().unwrap().remove(name);
+        }
+        let legacy: SavedSession = serde_json::from_value(legacy).unwrap();
+        assert!(!legacy.shortcut_requested && legacy.shortcut_pinned.is_none());
+        assert!(legacy.checkpoint.is_none());
+        for value in [
+            "content://fixture/game",
+            "machinerhythm-gcx://play/../card",
+            &format!("{uri}?path=card"),
+            &format!("{uri}#other"),
+            &format!("{uri}/extra"),
+            "machinerhythm-gcx://play/%61",
+        ] {
+            assert!(parse_play_uri(value).is_err());
+        }
+        let mut c = Collection {
+            entries: vec![entry()],
+            ..Default::default()
+        };
+        c.entries[0].shortcut_requested = true;
+        let mut restored: Collection =
+            serde_json::from_slice(&serde_json::to_vec(&c).unwrap()).unwrap();
+        assert_eq!(restored.entries[0].shortcut_pinned, None);
+        assert!(restored.observe_shortcuts(std::slice::from_ref(&id)));
+        assert_eq!(restored.entries[0].shortcut_pinned, Some(true));
+        assert!(!restored.observe_shortcuts(std::slice::from_ref(&id)));
+        assert!(restored.observe_shortcuts(&[]));
+        assert_eq!(restored.entries.len(), 1);
+        assert_eq!(restored.entries[0].profile_id.0, "b".repeat(32));
+        assert!(restored.entries[0].shortcut_requested);
     }
     #[test]
     fn interrupted_runtime_requires_explicit_restart_without_changing_save_identity() {

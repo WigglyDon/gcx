@@ -135,8 +135,24 @@ owner, and another entry uses the existing coherent checkpoint/join path. A live
 recovery error blocks switching until explicit Stop/restart. Opening a saved game
 expresses Resume intent; no new profile is allocated. Duplicate profile identities
 are rejected in this initial isolated-profile policy. Import still uses scoped
-document grants. Library display/switching remains Android-unqualified; this does
-not implement pinned launcher shortcuts or relink/multi-disc support.
+document grants. Library display/switching remains Android-unqualified; relink/multi-disc support
+is not implemented by this slice.
+
+The next Rust launch adapter accepts only canonical
+`machinerhythm-gcx://play/<GameId>` links. The exported singleTask activity forwards
+new intents mechanically; Rust handles cold/warm requests through the same GameId
+resolver. Cold invalid/unknown links leave the player unloaded, and warm requests
+cannot create a second runtime or discard recovery RAM. Pending game requests
+coalesce. No paths, media grants, native handles or save identities are supplied
+by a link. Home screen pin requests are explicit from the game menu and target
+this activity/package. Labels use the local title; no private artwork is copied.
+Accepted requests and later own-app OS pin observations are separate saved fields;
+unknown/failed observations retain prior status. OS reads occur on the Rust worker
+while the guest is paused/unloaded, with no service or legacy install broadcast.
+Unpin observations never remove a game/profile/save. This implementation follows
+[Android's pin contract](https://developer.android.com/reference/android/content/pm/ShortcutManager#requestPinShortcut(android.content.pm.ShortcutInfo,%20android.content.IntentSender));
+request acceptance is not confirmation. URI/policy/metadata host tests pass;
+launcher confirmation, cold/warm/repeated taps and Android switching remain unrun.
 
 ## GameCube storage, not a PS1 card copy or Xbox disk overlay
 

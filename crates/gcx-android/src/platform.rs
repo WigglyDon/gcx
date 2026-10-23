@@ -52,6 +52,7 @@ pub enum Command {
     Open,
     Library,
     Game(String),
+    PinCurrent,
     Selected(String),
     Canceled,
     MenuHidden(u64),
@@ -60,6 +61,9 @@ pub enum Command {
 }
 pub fn push(command: Command) {
     if let Ok(mut queue) = COMMANDS.lock() {
+        if matches!(command, Command::Game(_)) {
+            queue.retain(|c| !matches!(c, Command::Game(_)));
+        }
         if queue.len() >= 16 {
             // Preserve at least the first actionable failure through an alert burst.
             let redundant = match &command {
@@ -652,6 +656,7 @@ pub fn unloaded_menu(app: &AndroidApp, title: &str, error: Option<String>) {
                     format!("Open {title}")
                 },
             ),
+            (7, "Add game to Home screen".into()),
             (6, "Library".into()),
             (1, "Import a GameCube game".into()),
         ],
@@ -662,7 +667,7 @@ pub fn player_menu(app: &AndroidApp, runtime: u64, can_resume: bool, error: Opti
     let mut text = error
         .map(|s| format!("gcx paused\n\n{s}"))
         .unwrap_or_else(|| "gcx paused".into());
-    text.push_str("\n\nStop game preserves card saves. Play since the game's own last save is not preserved. No scene snapshot is saved.");
+    text.push_str("\n\nStop game keeps in-game saves and discards the resume point. Save inside the game first to keep progress.");
     let mut actions = Vec::new();
     if can_resume {
         actions.push((3, "Resume".into()));
@@ -670,6 +675,7 @@ pub fn player_menu(app: &AndroidApp, runtime: u64, can_resume: bool, error: Opti
         actions.push((2, "Restart with current saves".into()));
     }
     actions.push((4, "Stop game".into()));
+    actions.push((7, "Add game to Home screen".into()));
     actions.push((6, "Library".into()));
     render_menu(app, true, text, actions, runtime);
 }
@@ -937,6 +943,7 @@ extern "system" fn Java_com_machinerhythm_gcx_GcxActivity_uiAction(
         4 => push(Command::Stop(runtime as u64)),
         5 => push(Command::Open),
         6 => push(Command::Library),
+        7 => push(Command::PinCurrent),
         _ => {}
     }
 }
@@ -958,6 +965,176 @@ extern "system" fn Java_com_machinerhythm_gcx_GcxActivity_gameAction(
             push(Command::Notice("Invalid library game.".into()));
         }
     }
+}
+fn intent_game(env: &mut JNIEnv<'_>, intent: &JObject<'_>) -> Result<Option<String>> {
+    if intent.is_null() {
+        return Ok(None);
+    }
+    let data = env
+        .call_method(intent, "getDataString", "()Ljava/lang/String;", &[])?
+        .l()?;
+    if data.is_null() {
+        return Ok(None);
+    }
+    let data = JString::from(data);
+    let uri: String = env.get_string(&data)?.into();
+    Ok(Some(gcx::library::parse_play_uri(&uri)?))
+}
+pub fn initial_game_request() -> Result<Option<String>> {
+    with_env(|env, activity| {
+        let intent = env
+            .call_method(activity, "getIntent", "()Landroid/content/Intent;", &[])?
+            .l()?;
+        intent_game(env, &intent)
+    })
+}
+#[unsafe(no_mangle)]
+extern "system" fn Java_com_machinerhythm_gcx_GcxActivity_launchIntent(
+    mut env: JNIEnv<'_>,
+    activity: JObject<'_>,
+    intent: JObject<'_>,
+) {
+    if !current_activity(&env, &activity) {
+        return;
+    }
+    match intent_game(&mut env, &intent) {
+        Ok(Some(id)) => push(Command::Game(id)),
+        Ok(None) => {}
+        Err(_) => {
+            let _ = env.exception_clear();
+            push(Command::Notice(
+                "Invalid gcx game link. Open a game from the library.".into(),
+            ));
+        }
+    }
+}
+fn shortcut_manager<'a>(env: &mut JNIEnv<'a>, activity: &JObject<'_>) -> Result<JObject<'a>> {
+    let name = env.new_string("shortcut")?;
+    let manager = env
+        .call_method(
+            activity,
+            "getSystemService",
+            "(Ljava/lang/String;)Ljava/lang/Object;",
+            &[JValue::Object(&name)],
+        )?
+        .l()?;
+    if manager.is_null() {
+        return Err("Home screen shortcuts are unavailable.".into());
+    }
+    Ok(manager)
+}
+/// Called on the Rust owner thread, not the Java UI thread. No service or legacy
+/// INSTALL_SHORTCUT broadcast; the launcher owns its confirmation dialog.
+pub fn pin_game(id: &str, title: &str) -> Result<bool> {
+    let link = gcx::library::play_uri(id)?;
+    let shortcut_id = format!("gcx-{id}");
+    let title: String = title.chars().filter(|c| !c.is_control()).take(64).collect();
+    let title = if title.trim().is_empty() {
+        "GameCube game"
+    } else {
+        title.trim()
+    };
+    with_env(|env, activity| {
+        let manager = shortcut_manager(env, activity)?;
+        if !env
+            .call_method(&manager, "isRequestPinShortcutSupported", "()Z", &[])?
+            .z()?
+        {
+            return Ok(false);
+        }
+        let action = env.new_string("android.intent.action.VIEW")?;
+        let intent = env.new_object(
+            "android/content/Intent",
+            "(Ljava/lang/String;)V",
+            &[JValue::Object(&action)],
+        )?;
+        let link = uri(env, &link)?;
+        env.call_method(
+            &intent,
+            "setData",
+            "(Landroid/net/Uri;)Landroid/content/Intent;",
+            &[JValue::Object(&link)],
+        )?;
+        let class = env
+            .call_method(activity, "getClass", "()Ljava/lang/Class;", &[])?
+            .l()?;
+        env.call_method(
+            &intent,
+            "setClass",
+            "(Landroid/content/Context;Ljava/lang/Class;)Landroid/content/Intent;",
+            &[JValue::Object(activity), JValue::Object(&class)],
+        )?;
+        let id = env.new_string(&shortcut_id)?;
+        let builder = env.new_object(
+            "android/content/pm/ShortcutInfo$Builder",
+            "(Landroid/content/Context;Ljava/lang/String;)V",
+            &[JValue::Object(activity), JValue::Object(&id)],
+        )?;
+        let label = env.new_string(title)?;
+        env.call_method(
+            &builder,
+            "setShortLabel",
+            "(Ljava/lang/CharSequence;)Landroid/content/pm/ShortcutInfo$Builder;",
+            &[JValue::Object(&label)],
+        )?;
+        env.call_method(
+            &builder,
+            "setIntent",
+            "(Landroid/content/Intent;)Landroid/content/pm/ShortcutInfo$Builder;",
+            &[JValue::Object(&intent)],
+        )?;
+        let info = env
+            .call_method(
+                &builder,
+                "build",
+                "()Landroid/content/pm/ShortcutInfo;",
+                &[],
+            )?
+            .l()?;
+        Ok(env
+            .call_method(
+                &manager,
+                "requestPinShortcut",
+                "(Landroid/content/pm/ShortcutInfo;Landroid/content/IntentSender;)Z",
+                &[JValue::Object(&info), JValue::Object(&JObject::null())],
+            )?
+            .z()?)
+    })
+}
+/// A slow Binder query belongs on the Rust worker, never Java's UI thread.
+/// This service returns only this app's pins; no other app/library is inspected.
+pub fn pinned_games() -> Result<Vec<String>> {
+    with_env(|env, activity| {
+        let manager = shortcut_manager(env, activity)?;
+        let list = env
+            .call_method(&manager, "getPinnedShortcuts", "()Ljava/util/List;", &[])?
+            .l()?;
+        let count = env.call_method(&list, "size", "()I", &[])?.i()?;
+        if !(0..=4096).contains(&count) {
+            return Err("Unexpected shortcut count.".into());
+        }
+        let mut games = Vec::new();
+        for index in 0..count {
+            let id = env.with_local_frame(8, |env| -> Result<Option<String>> {
+                let info = env
+                    .call_method(&list, "get", "(I)Ljava/lang/Object;", &[JValue::Int(index)])?
+                    .l()?;
+                let id = JString::from(
+                    env.call_method(info, "getId", "()Ljava/lang/String;", &[])?
+                        .l()?,
+                );
+                let id: String = env.get_string(&id)?.into();
+                Ok(id
+                    .strip_prefix("gcx-")
+                    .filter(|id| gcx::library::valid_id(id))
+                    .map(str::to_owned))
+            })?;
+            if let Some(id) = id {
+                games.push(id);
+            }
+        }
+        Ok(games)
+    })
 }
 pub fn notice(app: &AndroidApp, message: String) {
     let epoch = EPOCH.load(Ordering::Acquire);

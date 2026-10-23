@@ -138,6 +138,8 @@ mod tests {
                 runtime_incomplete: true,
                 stopped: false,
                 checkpoint: Some("c".repeat(64)),
+                shortcut_requested: false,
+                shortcut_pinned: None,
             }],
             selected: Some("a".repeat(32)),
             ..Collection::default()

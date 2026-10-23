@@ -577,6 +577,18 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
         .selected
         .as_ref()
         .and_then(|id| collection.entries.iter().position(|e| e.game_id.0 == *id));
+    // A supplied link must resolve explicitly. Invalid/unknown cold links must
+    // never fall through into the previously selected game's automatic boot.
+    let launch = platform::initial_game_request();
+    let explicit_launch = !matches!(launch, Ok(None));
+    match launch {
+        Ok(Some(id)) => platform::push(Command::Game(id)),
+        Ok(None) => {}
+        Err(_) => platform::notice(
+            app,
+            "Invalid gcx game link. Open a game from the library.".into(),
+        ),
+    }
     let mut runtime: Option<LiveRuntime> = None;
     let mut window: Option<NativeWindow> = None;
     let mut foreground = false;
@@ -586,7 +598,10 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
     let mut native_paused = None;
     let mut surface_pending = false;
     let mut restart_requested = false;
-    if let Some(index) = selected.filter(|i| collection.entries[*i].restart_required) {
+    let mut refresh_pins = true;
+    if explicit_launch {
+        platform::menu(app, true, None);
+    } else if let Some(index) = selected.filter(|i| collection.entries[*i].restart_required) {
         platform::menu(
             app,
             true,
@@ -809,6 +824,23 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                         selected.is_some_and(|i| !collection.entries[i].restart_required),
                     );
                 }
+                Command::PinCurrent => {
+                    if let Some(index) = selected {
+                        let entry = &collection.entries[index];
+                        match platform::pin_game(&entry.game_id.0, &entry.title) {
+                            Ok(true) => {
+                                collection.entries[index].shortcut_requested = true;
+                                let message = if save_collection(&root, &collection).is_ok() {
+                                    "Home screen request sent. Confirm it in your launcher."
+                                } else { "Home screen request sent, but its status could not be recorded." };
+                                platform::notice(app, message.into());
+                                refresh_pins = true;
+                            }
+                            Ok(false) => platform::notice(app, "This launcher cannot add a game shortcut right now.".into()),
+                            Err(_) => platform::notice(app, "Could not request the game shortcut. Your game and saves are unchanged.".into()),
+                        }
+                    }
+                }
                 Command::Choose => {
                     if !picker_pending {
                         platform::picker(app);
@@ -945,6 +977,8 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                                 runtime_incomplete: false,
                                 stopped: false,
                                 checkpoint: None,
+                                shortcut_requested: false,
+                                shortcut_pinned: None,
                             });
                             collection.entries.len() - 1
                         };
@@ -1007,6 +1041,26 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                     }
                 }
                 Command::Notice(message) => platform::notice(app, message),
+            }
+        }
+        // Android documents this Binder query as potentially slow. Run it on
+        // Rust's owner worker while the guest is paused/unloaded, never Java UI.
+        if refresh_pins && foreground && (runtime.is_none() || native_paused == Some(true)) {
+            refresh_pins = false;
+            match platform::pinned_games() {
+                Ok(ids) => {
+                    if collection.observe_shortcuts(&ids)
+                        && save_collection(&root, &collection).is_err()
+                    {
+                        platform::notice(
+                            app,
+                            "Could not record Home screen status; the game is retained.".into(),
+                        );
+                    }
+                }
+                Err(_) => platform::diagnostic(
+                    "Own-app pinned shortcut observation unavailable; prior status retained",
+                ),
             }
         }
         if restart_requested {
