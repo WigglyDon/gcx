@@ -1,5 +1,41 @@
 # Direct Dolphin integration
 
+## Library and launcher follow-up, 2026-10-22
+
+Latest prepared Rust UI/launch implementation:
+`1a00fdcabd03ec488176661d9f0e363d0f72b251`. Private APK SHA256
+`8764ee5d140980db9b4e4db91611e000a03b7738d77dbd43b333559ad56fedb9`
+(15,640,199 bytes), matching Rust image
+`76daff8293cf363f64537aca76dda42babca62662067c32e7517f97e60fdd7c7`
+retained with corresponding source. ABI6 native image/BuildID and resources remain
+unchanged from the checkpoint candidate below; no native rebuild was needed.
+The library-only5d71213/407ee928 and checkpoint-only0e534b7/ce092d5e candidates
+also remain preserved independently alongside working ABI5 builds and actual saves.
+
+Original Rust builds the scrollable saved-game list, validates opaque GameIds,
+returns to the current runtime and uses coherent checkpoint/join for another game.
+A live recovery error keeps its RAM until explicit Stop/restart. The same path
+handles canonical `machinerhythm-gcx://play/<GameId>` links, with cold malformed or
+unknown links refusing fallback boot and pending game requests coalescing. The
+singleTask Java activity forwards new intents mechanically; it supplies no game,
+profile, core or path policy. Pin requests explicitly target this activity with
+only an ID link and local label. No private game artwork is copied. Accepted
+requests and later own-app OS pin observations are stored separately. Slow Binder
+queries run on the Rust worker while paused/unloaded; no service or legacy install
+broadcast is added. Unpin observations cannot remove games/saves. Physical UI,
+launcher pin/confirmation/taps, switching and Android checkpoint resume are UNRUN.
+
+All34 focused host tests, host/all-target native-feature and ARM64 warnings-denied
+Clippy, formatting/diff/TOML/source checks pass. Actual mechanical Java compilation
+and packaged JNI definitions match; Android omits the host-only fixture exports.
+Native ABI/export/dependency closure, unchanged signer, zero permissions,
+resource/native bytes and16KiB ELF/ZIP alignment checks pass. All65 preserved
+corresponding-source checksums pass, with92 public source inputs. No phone queries,
+lease polling, install or public binary release. Fold/siblings remain untouched.
+The accepted picture and prepared API31 navigation policy are unchanged; the
+Home-handle cause/fix remains unproven. Existing gameplay/card evidence stays bound
+to the actual earlier device builds, never inferred from this package success.
+
 ## Rust-owned checkpoint candidate, 2026-10-22
 
 New off-device work uses native ABI6 and private state ABI1 over the same pinned

@@ -29,7 +29,9 @@ after bar reveal remains open. The full control matrix, extended surface transit
 Fold play and automatic resume remain unqualified. The new off-device checkpoint
 slice preserves machine/card generations in Rust and passes actual native
 fresh-process CPU/card-protocol restore and failure tests; its Android lifecycle
-is implemented but has not run on a phone. See
+is implemented but has not run on a phone. A Rust saved-game list, validated
+GameId launcher links and system pin-request code are also built off-device;
+physical library and launcher tests remain due. See
 [native reproduction and limits](native/README.md).
 
 GameCube is the initial scope. Dolphin's Wii capability is not a promise of Wii
