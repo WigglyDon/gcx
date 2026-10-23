@@ -10,6 +10,19 @@ fallback bytes. A later forced write could replace existing data. The earlier
 ABI6 candidates remain preserved as source-bound development artifacts; they are
 not acceptance of this read-failure case.
 
+Prepared ABI7 source: `dae7e3f1326fb320a231efa5ffd89c853482f417`.
+Private APK SHA256 `261a4976606117c29b70df2a7485f48188a64067d6224c5d1721b546c3763b75`
+(15,656,583 bytes). Native image SHA256
+`b90d3326263efb0caa6bd04be9d0c2953fa878a5329db52fba0a3f7af91b767c`,
+BuildID `005a1402fe042ba004d2c71b56b6f1319a678b3a`, and Rust image
+`64108b716eb09cbf599ab316ca02d58f241a38c17612136e760b2878141b8479`
+are retained with matching source. Patch SHA256
+`4f176ac4aae74b3f4356db3b5dcb2dcfae10f99a70d2874743d5313549c3fbf9`.
+Actual ABI/defined exports/JNI/dependencies, unchanged signer, zero permissions,
+resource/native bytes and16KiB ELF/ZIP alignment checks pass. All65 preserved
+corresponding-source checksums pass, with92 public source inputs. The ABI6 artifacts
+below remain immutable; this candidate is not installed or hardware-qualified.
+
 An optional native image-read callback now delegates existing card/SRAM reads to
 Rust. Rust distinguishes genuine absence from errors, owns path/canonical-profile
 checks and verifies exact length/hash against the admitted generation. Supported
