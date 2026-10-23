@@ -7,6 +7,20 @@ Dolphin source. Prior ABI5 APK/source/symbol pairs, the accepted Wind Waker
 candidate and all private card backups remain protected. This candidate has not
 run on Android; earlier gameplay/audio/ordinary-save evidence does not qualify it.
 
+Prepared checkpoint source: `0e534b7e087a0389ba744c71af620064f0ed298f`.
+Private APK SHA256 `ce092d5e4dfee6c8a37872f7b6084e0b9ecc4cffb0aadb77139cb7a6ba0c8a80`
+(15,591,047 bytes). Package/defined-export/dependency/signature/resource checks and
+16 KiB ELF/ZIP alignment pass; unchanged separate signer and zero permissions.
+All 65 preserved corresponding-source checksums pass, with 92 public source
+inputs in the receipt. Matching ARM64 native image SHA256
+`883d49b9cfc75629dc372aa916b986ce0c11a3139b374176be4042fbbddf9e74`,
+BuildID `c337dd1497d506d1ba8d5e38d66ae0d4c82b6904`, and Rust image
+`ef8d2cdca79f656f1a65acb35a558671b76737d71be1d790284022ff6545163d`
+are retained. Maintained patch SHA256
+`da8e8ee045be36030365435d4ae8223a511d4ba85e94d1ab72e06c014863be7f`.
+The prepared API31 navigation policy is included; its Home-handle fix remains
+unproven. Both older ABI5 candidates and actual newer card backups remain intact.
+
 The targeted GPL changes add synchronous paused capture/load, paused boot and a
 private serialization scope. The scope always preserves card command, status,
 address, staged programming bytes and interrupt state, validates card/device
@@ -59,7 +73,12 @@ rejected a newer save before startup. Truncated and card-image-restoring native
 payloads failed closed, with card/SRAM unchanged through teardown and checkpoint
 files retained. The second pass uses the same Rust synchronous capture/publish
 callback as the Android app. Host/ARM64 native builds and warnings-denied Rust
-checks pass. Null video/audio are deliberate fixture choices: real Vulkan/audio
+checks pass. A subsequent optimized host-only fixture also passes same-process
+A→B→A→B exact CPU/register checkpoint reentry using two distinct original programs,
+GameIds, profiles and native card markers. Each resume checks the matching paused
+scene before execution; other-profile card bytes stay unchanged. The real host
+writer locks exclude another open through teardown and release afterward. This
+adds native reentry evidence, not gameplay or Android continuity acceptance. Null video/audio are deliberate fixture choices: real Vulkan/audio
 state, Android interruption timing, process-restart gameplay, A→B→A gameplay,
 update retention, shortcuts and Fold remain unqualified. No phone queries/actions
 are authorized while the owner asks for off-device continuation.
@@ -71,6 +90,9 @@ cargo xtask source-check
 cargo xtask build-host
 GCX_ENGINE_LIB_DIR="$PWD/build/host/gcx" cargo build -p gcx --features native-engine --bin gcx-checkpoint-probe
 LD_LIBRARY_PATH="$PWD/build/host/gcx" timeout 180 target/debug/gcx-checkpoint-probe NEW_PRIVATE_FIXTURE .local/source/dolphin/Data/Sys
+# Separate bounded same-process reentry coverage (original fixtures only):
+GCX_ENGINE_LIB_DIR="$PWD/build/host/gcx" cargo build --release -p gcx --features native-engine --bin gcx-checkpoint-probe
+LD_LIBRARY_PATH="$PWD/build/host/gcx" timeout 90 target/release/gcx-checkpoint-probe ANOTHER_NEW_PRIVATE_FIXTURE .local/source/dolphin/Data/Sys --reentry
 ```
 
 The host JIT test needs ordinary native execution; the restricted agent sandbox

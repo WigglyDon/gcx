@@ -353,6 +353,115 @@ mod host {
         }
         Ok(())
     }
+    fn scene(
+        profile: &Path,
+        sys: &Path,
+        second: bool,
+        previous: Option<&Reference>,
+    ) -> Result<Reference> {
+        let lock = ProfileLock::acquire(profile)?;
+        let store = storage::CardStore::bind(profile)?;
+        let mut expected = binding(profile)?;
+        if second {
+            expected.game_id = "c".repeat(32);
+            expected.profile_id = "d".repeat(32);
+        }
+        let mut state = previous
+            .map(|r| checkpoint::load(profile, &r.id, &expected))
+            .transpose()?;
+        let native = start(profile, sys, state.is_some())?;
+        if let (Some(state), Some(previous)) = (&mut state, previous) {
+            assert_eq!(
+                unsafe { gcx_engine_probe_word() },
+                0,
+                "reentry boot executes no guest before restore"
+            );
+            state.verify_current_saves(profile)?;
+            assert_eq!(
+                unsafe {
+                    gcx_engine_checkpoint_load(state.payload.as_mut_ptr(), state.payload.len())
+                },
+                1
+            );
+            assert_eq!(
+                unsafe { gcx_engine_probe_word() },
+                previous.counter,
+                "the selected scene, not another runtime"
+            );
+            assert_eq!(unsafe { gcx_fixture_gpr4() }, previous.gpr4);
+        }
+        drop(state);
+        let marker = if second { 0xb2 } else { 0xa1 };
+        if previous.is_none() {
+            command(&[0xf2, 1, 0, 0, 0, marker], true)?;
+            assert_eq!(unsafe { gcx_engine_flush_cards() }, 1);
+        }
+        assert_eq!(
+            fs::read(raw_card(profile)?)?[0x20000],
+            marker,
+            "isolated native card marker"
+        );
+        let before = unsafe { gcx_engine_probe_word() };
+        unsafe {
+            gcx_engine_pause(0);
+        }
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while unsafe { gcx_engine_probe_word() } == before && Instant::now() < deadline {
+            unsafe {
+                gcx_engine_dispatch();
+            }
+            std::thread::sleep(Duration::from_millis(2));
+        }
+        unsafe {
+            gcx_engine_pause(1);
+        }
+        assert_ne!(
+            unsafe { gcx_engine_probe_word() },
+            before,
+            "resumed selected CPU advances"
+        );
+        save_reference(profile, "latest.json", &expected)?;
+        let reference = reference(profile, "latest.json")?;
+        assert!(
+            matches!(ProfileLock::acquire(profile), Err(e) if e.kind() == io::ErrorKind::WouldBlock)
+        );
+        drop(native);
+        checkpoint::load(profile, &reference.id, &expected)?.verify_current_saves(profile)?;
+        assert!(
+            matches!(ProfileLock::acquire(profile), Err(e) if e.kind() == io::ErrorKind::WouldBlock)
+        );
+        drop(store);
+        drop(lock);
+        drop(ProfileLock::acquire(profile)?);
+        Ok(reference)
+    }
+    fn reentry(root: &Path, sys: &Path) -> Result {
+        let a = root.join("A");
+        let b = root.join("B");
+        fs::create_dir(&a)?;
+        fs::create_dir(&b)?;
+        fs::write(a.join("counter-probe.dol"), counter_dol())?;
+        let mut other = counter_dol();
+        // Distinct original media: counter increments by17 instead of1.
+        other[0x108..0x10c].copy_from_slice(&0x3884_0011_u32.to_be_bytes());
+        fs::write(b.join("counter-probe.dol"), other)?;
+        let saved_a = scene(&a, sys, false, None)?;
+        let a_card = fs::read(raw_card(&a)?)?;
+        let saved_b = scene(&b, sys, true, None)?;
+        assert_ne!(saved_a.binding.media_sha256, saved_b.binding.media_sha256);
+        assert_eq!(fs::read(raw_card(&a)?)?, a_card, "B never writes A's card");
+        let b_card = fs::read(raw_card(&b)?)?;
+        let resumed_a = scene(&a, sys, false, Some(&saved_a))?;
+        assert_ne!(resumed_a.counter, saved_a.counter);
+        assert_eq!(fs::read(raw_card(&b)?)?, b_card, "A never writes B's card");
+        let resumed_b = scene(&b, sys, true, Some(&saved_b))?;
+        assert_ne!(resumed_b.counter, saved_b.counter);
+        assert_eq!(fs::read(raw_card(&a)?)?, a_card);
+        println!(
+            "PASS: same-process A/B/A/B exact CPU checkpoint reentry; distinct media/IDs/profiles, isolated native cards and locks retained through teardown. No gameplay or Android acceptance."
+        );
+        Ok(())
+    }
     pub fn run() -> Result {
         let args: Vec<_> = std::env::args_os().skip(1).collect();
         if args.len() == 4 && args[0] == "--phase" {
@@ -362,14 +471,16 @@ mod host {
                 args[1].to_str().ok_or("phase encoding")?,
             );
         }
-        if args.len() != 2 {
-            return Err("usage: gcx-checkpoint-probe <NEW-private-root> <Dolphin-Data/Sys>".into());
+        let reentry_requested = args.len() == 3 && args[2] == "--reentry";
+        if args.len() != 2 && !reentry_requested {
+            return Err(
+                "usage: gcx-checkpoint-probe <NEW-private-root> <Dolphin-Data/Sys> [--reentry]"
+                    .into(),
+            );
         }
         let root = PathBuf::from(&args[0]);
         fs::create_dir(&root)?;
-        let profile = root.canonicalize()?.join("profile");
-        fs::create_dir(&profile)?;
-        fs::write(profile.join("counter-probe.dol"), counter_dol())?;
+        let root = root.canonicalize()?;
         let sys = PathBuf::from(&args[1]).canonicalize()?;
         let exe = std::env::current_exe()?;
         let local_sys = exe.parent().ok_or("executable parent")?.join("Sys");
@@ -379,6 +490,12 @@ mod host {
         if local_sys.canonicalize()? != sys {
             return Err("host Sys has another owner".into());
         }
+        if reentry_requested {
+            return reentry(&root, &sys);
+        }
+        let profile = root.join("profile");
+        fs::create_dir(&profile)?;
+        fs::write(profile.join("counter-probe.dol"), counter_dol())?;
         for step in [
             "capture",
             "restore",
