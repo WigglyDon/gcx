@@ -22,6 +22,9 @@ pub struct SavedSession {
     pub runtime_incomplete: bool,
     #[serde(default)]
     pub stopped: bool,
+    /// Immutable complete generation; never a native handle or ordinary card image.
+    #[serde(default)]
+    pub checkpoint: Option<String>,
 }
 impl SavedSession {
     pub fn fail(&mut self, error: String) {
@@ -35,12 +38,14 @@ impl SavedSession {
         self.restart_required = false;
         self.runtime_incomplete = false;
         self.stopped = false;
+        // The rejected file remains available; explicit restart uses current saves.
+        self.checkpoint = None;
     }
     pub fn boot_allowed(&self) -> bool {
         !self.stopped && !self.restart_required
     }
     pub fn recover_interrupted(&mut self) -> bool {
-        if !self.runtime_incomplete || self.restart_required {
+        if !self.runtime_incomplete || self.restart_required || self.checkpoint.is_some() {
             return false;
         }
         let mut message = "The previous runtime ended without a completed card barrier and teardown. Restart explicitly with current saves.".to_owned();
@@ -90,6 +95,9 @@ impl Collection {
                 || e.uri.len() > 65536
                 || e.title.len() > 16384
                 || e.last_error.as_ref().is_some_and(|s| s.len() > 32768)
+                || e.checkpoint
+                    .as_ref()
+                    .is_some_and(|s| !crate::storage::valid_digest(s))
             {
                 return Err("invalid collection metadata; original retained");
             }
@@ -121,16 +129,20 @@ mod tests {
             restart_required: false,
             runtime_incomplete: false,
             stopped: false,
+            checkpoint: None,
         }
     }
     #[test]
     fn failure_survives_relaunch_and_explicit_restart_keeps_identity_and_error() {
         let mut session = entry();
+        session.checkpoint = Some("c".repeat(64));
         session.fail("write failed".into());
         let mut restored: SavedSession =
             serde_json::from_slice(&serde_json::to_vec(&session).unwrap()).unwrap();
         assert!(restored.paused && restored.restart_required);
+        assert_eq!(restored.checkpoint, session.checkpoint);
         restored.request_restart();
+        assert!(restored.checkpoint.is_none());
         assert!(!restored.paused && !restored.restart_required);
         assert_eq!(restored.last_error.as_deref(), Some("write failed"));
         assert_eq!(restored.profile_id.0, session.profile_id.0);
@@ -155,6 +167,23 @@ mod tests {
         c.entries[0] = entry();
         c.selected = Some("c".repeat(32));
         assert!(c.validate().is_err());
+    }
+    #[test]
+    fn checkpoint_defers_interruption_recovery_to_pre_native_generation_validation() {
+        let mut original = entry();
+        original.runtime_incomplete = true;
+        original.checkpoint = Some("d".repeat(64));
+        let mut loaded: SavedSession =
+            serde_json::from_slice(&serde_json::to_vec(&original).unwrap()).unwrap();
+        assert!(!loaded.recover_interrupted());
+        assert!(loaded.boot_allowed());
+        assert_eq!(loaded.checkpoint, original.checkpoint);
+        loaded.fail("Current card generation differs".into());
+        assert!(!loaded.boot_allowed());
+        assert_eq!(loaded.checkpoint, original.checkpoint);
+        loaded.request_restart();
+        assert!(loaded.boot_allowed() && loaded.checkpoint.is_none());
+        assert_eq!(loaded.profile_id.0, original.profile_id.0);
     }
     #[test]
     fn interrupted_runtime_requires_explicit_restart_without_changing_save_identity() {

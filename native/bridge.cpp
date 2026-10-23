@@ -9,6 +9,7 @@
 #include "Core/Boot/Boot.h"
 #include "Core/BootManager.h"
 #include "Core/Config/MainSettings.h"
+#include "Core/ConfigManager.h"
 #include "Core/Core.h"
 #include "Core/Host.h"
 #include "Core/HW/Memmap.h"
@@ -18,6 +19,7 @@
 #include "Core/HW/EXI/EXI_DeviceMemoryCard.h"
 #include "InputCommon/GCPadStatus.h"
 #include "Core/System.h"
+#include "Core/State.h"
 #include "InputCommon/ControllerInterface/Touch/InputOverrider.h"
 #include "InputCommon/ControllerEmu/ControllerEmu.h"
 #include "UICommon/UICommon.h"
@@ -27,6 +29,7 @@
 #include <imgui.h>
 #include <cstring>
 #include <algorithm>
+#include <atomic>
 
 static gcx_card_write_fn s_card_writer = nullptr;
 static gcx_event_fn s_event = nullptr;
@@ -35,6 +38,8 @@ static gcx_platform_fn s_platform = nullptr;
 static gcx_ui_fn s_ui = nullptr;
 static Common::EventHook s_overlay_hook;
 static Common::EventHook s_present_hook;
+static std::atomic<bool> s_checkpoint_failed = false;
+static std::atomic<bool> s_persistence_blocked = false;
 static void Event(uint32_t id, const char* message) { if (s_event) s_event(s_event_context, id, message); }
 std::vector<std::string> Host_GetPreferredLocales() { return {}; }
 void Host_PPCSymbolsChanged() {}
@@ -59,7 +64,7 @@ bool Host_UpdateDiscordPresenceRaw(const std::string& details, const std::string
     int64_t start_timestamp, int64_t end_timestamp, int party_size, int party_max) { return false; }
 std::unique_ptr<GBAHostInterface> Host_CreateGBAHost(std::weak_ptr<HW::GBA::Core> core) { return nullptr; }
 
-uint32_t gcx_engine_abi() { return 5; }
+uint32_t gcx_engine_abi() { return 6; }
 void gcx_engine_card_writer(gcx_card_write_fn writer) { s_card_writer = writer; }
 void gcx_engine_platform(gcx_platform_fn platform) { s_platform = platform; }
 void gcx_engine_ui(gcx_ui_fn ui) { s_ui = ui; }
@@ -70,6 +75,8 @@ extern "C" int64_t gcx_platform_dispatch(uint32_t op, const char* path, const ch
 int gcx_engine_init(const char* user, const char* sys, gcx_event_fn event, void* event_context, const char* video, const char* audio)
 {
   s_event = event;
+  s_checkpoint_failed = false;
+  s_persistence_blocked = false;
   s_event_context = event_context;
   Common::RegisterMsgAlertHandler([](const char* caption, const char* text, bool, Common::MsgType style) {
     Event(style == Common::MsgType::Critical ? 2 : 3, text);
@@ -97,9 +104,19 @@ int gcx_engine_init(const char* user, const char* sys, gcx_event_fn event, void*
   Config::SetBaseOrCurrent(Config::MAIN_SLOT_A, ExpansionInterface::EXIDeviceType::MemoryCard);
   Config::SetBaseOrCurrent(Config::MAIN_SLOT_B, ExpansionInterface::EXIDeviceType::None);
   MemoryCard::SetWriteHandler([](const std::string& path, std::span<const u8> data) {
+    if (s_persistence_blocked)
+      return false;
     const bool ok = s_card_writer && s_card_writer(path.c_str(), data.data(), data.size()) != 0;
     if (!ok)
       Event(20, "Could not durably write the memory card. The runtime must be retained until retry succeeds.");
+    return ok;
+  });
+  ExpansionInterface::SetSramWriteHandler([](const std::string& path, std::span<const u8> data) {
+    if (s_persistence_blocked)
+      return false;
+    const bool ok = s_card_writer && s_card_writer(path.c_str(), data.data(), data.size()) != 0;
+    if (!ok)
+      Event(20, "Could not durably write console data. Retain the paused runtime for retry.");
     return ok;
   });
   Config::SetBaseOrCurrent(Config::MAIN_SKIP_IPL, true);
@@ -125,7 +142,7 @@ int gcx_engine_init(const char* user, const char* sys, gcx_event_fn event, void*
   });
   return 1;
 }
-int gcx_engine_boot(const char* media, void* native_window)
+static int Boot(const char* media, void* native_window, bool paused)
 {
   auto boot = BootParameters::GenerateFromFile(media);
   if (!boot)
@@ -140,8 +157,11 @@ int gcx_engine_boot(const char* media, void* native_window)
   if (native_window)
     wsi = WindowSystemInfo(WindowSystemType::Android, nullptr, native_window, native_window);
 #endif
-  return boot && BootManager::BootCore(Core::System::GetInstance(), std::move(boot), wsi);
+  SConfig::GetInstance().bBootToPause = paused;
+  return BootManager::BootCore(Core::System::GetInstance(), std::move(boot), wsi);
 }
+int gcx_engine_boot(const char* media, void* native_window) { return Boot(media, native_window, false); }
+int gcx_engine_boot_paused(const char* media, void* native_window) { return Boot(media, native_window, true); }
 int gcx_engine_inspect(const char* media, gcx_media_info* info)
 {
   if (!info)
@@ -170,6 +190,8 @@ uint32_t gcx_engine_probe_word()
 }
 void gcx_engine_pause(int paused)
 {
+  if (!paused && s_checkpoint_failed)
+    return;
   Core::SetState(Core::System::GetInstance(), paused ? Core::State::Paused : Core::State::Running);
   if (paused && Core::IsRunning(Core::System::GetInstance()))
   {
@@ -202,19 +224,54 @@ void gcx_engine_pad_status(gcx_pad_status* status)
 int gcx_engine_flush_cards()
 {
   auto& system = Core::System::GetInstance();
-  if (!Core::IsRunning(system))
+  if (!Core::IsRunning(system) || s_persistence_blocked)
     return 0;
   const Core::CPUThreadGuard guard(system);
   auto* device = system.GetExpansionInterface().GetDevice(ExpansionInterface::Slot::A);
   if (!device || device->m_device_type != ExpansionInterface::EXIDeviceType::MemoryCard)
     return 0;
-  return static_cast<ExpansionInterface::CEXIMemoryCard*>(device)->FlushToStorage();
+  return static_cast<ExpansionInterface::CEXIMemoryCard*>(device)->FlushToStorage() &&
+         system.GetExpansionInterface().FlushSRAM();
+}
+uint32_t gcx_engine_checkpoint_abi() { return 1; }
+int gcx_engine_checkpoint_failed() { return s_checkpoint_failed; }
+int gcx_engine_checkpoint_capture(uintptr_t limit, gcx_checkpoint_write_fn writer, void* context)
+{
+  auto& system = Core::System::GetInstance();
+  if (!writer || !limit || Core::GetState(system) != Core::State::Paused || s_checkpoint_failed)
+    return 0;
+  const Core::CPUThreadGuard guard(system);
+  if (!gcx_engine_flush_cards())
+    return 0;
+  // Dolphin is built without C++ exceptions. No exception can unwind over the
+  // ABI; allocation is bounded before the engine buffer grows.
+  return State::CaptureGcx(system, limit, [writer, context](std::span<const u8> bytes) {
+    return writer(context, bytes.data(), bytes.size()) != 0;
+  });
+}
+int gcx_engine_checkpoint_load(uint8_t* bytes, uintptr_t length)
+{
+  auto& system = Core::System::GetInstance();
+  if (!bytes || !length || Core::GetState(system) != Core::State::Paused || s_checkpoint_failed)
+    return 0;
+  const Core::CPUThreadGuard guard(system);
+  s_persistence_blocked = true;
+  const bool loaded = State::LoadGcx(system, {bytes, length});
+  if (!loaded)
+  {
+    s_checkpoint_failed = true;
+    Event(2, "Checkpoint load failed. Restart explicitly with current saves; persistence is blocked until shutdown.");
+    return 0;
+  }
+  s_persistence_blocked = false;
+  return 1;
 }
 void gcx_engine_stop() { Core::Stop(Core::System::GetInstance()); }
 void gcx_engine_shutdown()
 {
   Core::Shutdown(Core::System::GetInstance());
   MemoryCard::SetWriteHandler(nullptr);
+  ExpansionInterface::SetSramWriteHandler(nullptr);
   s_card_writer = nullptr;
   s_overlay_hook = {};
   s_present_hook = {};

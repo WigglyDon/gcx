@@ -87,3 +87,15 @@ Maintain separate app IDs, signers, storage and release/source history. A small
 port can reuse source without a studio-wide framework extraction. Do not modify
 PSX/xbx/FN64/Kitten or share mutable cards/caches without the respective authority.
 The new Master owns gcx decisions and consults actual source when transfer helps.
+
+## Checkpoint concepts, 2026-10-22
+
+Reviewed only the public MIT source at4277d4ca651a4c9c2e8e88113a0ef092e330f01c:
+`crates/player/src/resume.rs` blob2fddaeab016e25f51770bb7bd92ea4f333071194 and
+`saves.rs` blob4038b2dd4eaf1737cba0f5af071f7ef1f003add6. The reviewed ideas were
+complete validated state envelopes, atomic publication and retained recovery.
+No checkpoint code was copied. gcx's original Rust implementation uses the
+inspected Dolphin protocol, pending events and separate card/SRAM generation.
+PSX's128KiB card, RAM-restore order,64MiB snapshot ceiling, PS2 sealing and firmware
+branches were rejected as coupled assumptions. MIT attribution for earlier
+selected adaptations remains intact; all targeted Dolphin changes remain GPL.

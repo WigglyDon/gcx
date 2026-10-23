@@ -2,6 +2,7 @@
 add_library(gcx_engine SHARED bridge.cpp)
 if(NOT ANDROID)
   target_sources(gcx_engine PRIVATE "${PROJECT_SOURCE_DIR}/Source/Core/InputCommon/ControllerInterface/Touch/InputOverrider.cpp")
+  target_sources(gcx_engine PRIVATE host_fixture.cpp)
 endif()
 target_compile_features(gcx_engine PRIVATE cxx_std_23)
 target_include_directories(gcx_engine PRIVATE "${PROJECT_SOURCE_DIR}/Source/Core")

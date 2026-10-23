@@ -11,6 +11,7 @@
 extern "C" {
 #endif
 typedef int (*gcx_card_write_fn)(const char* path, const uint8_t* bytes, uintptr_t length);
+typedef int (*gcx_checkpoint_write_fn)(void* context, const uint8_t* bytes, uintptr_t length);
 typedef void (*gcx_event_fn)(void* context, uint32_t event, const char* message);
 typedef int64_t (*gcx_platform_fn)(uint32_t operation, const char* path, const char* argument, char* output, uintptr_t capacity);
 // ABI 5 additionally requires platform operation 10: attach the calling native
@@ -27,6 +28,14 @@ GCX_EXPORT void gcx_engine_platform(gcx_platform_fn platform);
 GCX_EXPORT void gcx_engine_ui(gcx_ui_fn ui);
 GCX_EXPORT int gcx_engine_init(const char* user, const char* sys, gcx_event_fn event, void* event_context, const char* video, const char* audio);
 GCX_EXPORT int gcx_engine_boot(const char* media, void* native_window);
+GCX_EXPORT int gcx_engine_boot_paused(const char* media, void* native_window);
+// Private GCX state ABI 1; requires a paused runtime and host generation checks.
+// Synchronous borrowed-buffer callback; success is not host-file durability.
+GCX_EXPORT uint32_t gcx_engine_checkpoint_abi(void);
+GCX_EXPORT int gcx_engine_checkpoint_capture(uintptr_t limit, gcx_checkpoint_write_fn writer, void* context);
+GCX_EXPORT int gcx_engine_checkpoint_load(uint8_t* bytes, uintptr_t length);
+// Failed deserialization blocks all persistence until joined shutdown/new init.
+GCX_EXPORT int gcx_engine_checkpoint_failed(void);
 GCX_EXPORT int gcx_engine_inspect(const char* media, gcx_media_info* info);
 GCX_EXPORT void gcx_engine_dispatch(void);
 GCX_EXPORT int gcx_engine_state(void);

@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
-//! Unsafe declarations for native/bridge.h, ABI 5. One Rust host thread owns
+//! Unsafe declarations for native/bridge.h, ABI 6. One Rust host thread owns
 //! lifecycle calls. Callbacks must not unwind and remain valid through teardown.
 use std::ffi::{c_char, c_void};
+pub const BUILD_ENGINE_SHA256: &str = env!("GCX_ENGINE_SHA256");
+pub const BUILD_RESOURCE_ID: &str = env!("GCX_RESOURCE_ID");
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
@@ -32,6 +34,7 @@ pub struct PadStatus {
 pub type Event = unsafe extern "C" fn(*mut c_void, u32, *const c_char);
 pub type Platform = extern "C" fn(u32, *const c_char, *const c_char, *mut c_char, usize) -> i64;
 pub type Ui = extern "C" fn(u32, f32, f32, f32) -> Rect;
+pub type CheckpointWriter = unsafe extern "C" fn(*mut c_void, *const u8, usize) -> i32;
 unsafe extern "C" {
     pub fn gcx_engine_abi() -> u32;
     pub fn gcx_engine_card_writer(
@@ -50,6 +53,15 @@ unsafe extern "C" {
     ) -> i32;
     pub fn gcx_engine_inspect(media: *const c_char, info: *mut MediaInfo) -> i32;
     pub fn gcx_engine_boot(media: *const c_char, window: *mut c_void) -> i32;
+    pub fn gcx_engine_boot_paused(media: *const c_char, window: *mut c_void) -> i32;
+    pub fn gcx_engine_checkpoint_abi() -> u32;
+    pub fn gcx_engine_checkpoint_capture(
+        limit: usize,
+        writer: CheckpointWriter,
+        context: *mut c_void,
+    ) -> i32;
+    pub fn gcx_engine_checkpoint_load(bytes: *mut u8, length: usize) -> i32;
+    pub fn gcx_engine_checkpoint_failed() -> i32;
     pub fn gcx_engine_dispatch();
     pub fn gcx_engine_state() -> i32;
     pub fn gcx_engine_probe_word() -> u32;

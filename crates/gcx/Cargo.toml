@@ -13,8 +13,15 @@ name = "gcx-probe"
 path = "src/main.rs"
 required-features = ["native-engine"]
 
+[[bin]]
+name = "gcx-checkpoint-probe"
+path = "src/bin/gcx-checkpoint-probe.rs"
+required-features = ["native-engine"]
+
 [dependencies]
 serde = { version = "=1.0.228", features = ["derive"] }
-
-[dev-dependencies]
 serde_json = "=1.0.151"
+sha2 = "=0.10.9"
+
+[build-dependencies]
+sha2 = "=0.10.9"

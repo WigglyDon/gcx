@@ -9,7 +9,7 @@ use std::{
     collections::VecDeque,
     ffi::{CStr, c_char},
     fs::File,
-    io::Seek,
+    io::{Seek, SeekFrom},
     os::fd::{FromRawFd, IntoRawFd},
     sync::{
         Mutex, OnceLock,
@@ -525,7 +525,7 @@ pub fn open_document(text: &str) -> Result<File> {
         }
         // SAFETY: detachFd transfers exclusive ownership to us.
         let mut file = unsafe { File::from_raw_fd(fd) };
-        file.stream_position()?;
+        file.seek(SeekFrom::Start(0))?;
         Ok(file)
     })
 }

@@ -1,5 +1,86 @@
 # Direct Dolphin integration
 
+## Rust-owned checkpoint candidate, 2026-10-22
+
+New off-device work uses native ABI6 and private state ABI1 over the same pinned
+Dolphin source. Prior ABI5 APK/source/symbol pairs, the accepted Wind Waker
+candidate and all private card backups remain protected. This candidate has not
+run on Android; earlier gameplay/audio/ordinary-save evidence does not qualify it.
+
+The targeted GPL changes add synchronous paused capture/load, paused boot and a
+private serialization scope. The scope always preserves card command, status,
+address, staged programming bytes and interrupt state, validates card/device
+identity, and never restores card-image bytes. Its cookie/format is separate from
+upstream state files; movie-active payloads are refused. CoreTiming events remain
+native. Card completion callbacks complete interrupts/status rather than repeat
+the original write. Rust validates the bound ordinary files before any guest
+execution and again immediately before load. Failed partial deserialization
+blocks all card/SRAM callbacks and resume through joined teardown. SRAM now uses
+the same Rust atomic writer, including native shutdown, rather than a separate
+truncating path. The upstream non-gcx SRAM path remains available.
+
+Original Rust `checkpoint.rs` publishes an immutable content-addressed envelope,
+with exact game/profile/media/disc, linked engine bytes, selected resources/config,
+state ABI, payload length/hash and complete durable save-generation metadata.
+Media is streamed from the selected descriptor without copying the image. The
+256MiB payload ceiling is a gcx allocation bound; the actual original host fixture
+payload is90,108,466bytes. This is not the PSX64MiB limit. Readback must pass before
+atomic session-reference publication. Only a known previous successful generation
+may be retired after acknowledgment; rejected files and errors remain retained.
+
+`storage.rs` journals a monotonically increasing generation before changing card
+or SRAM, then atomically writes/syncs the image and publishes clean metadata.
+Interrupted intent is reconciled against actual files before a new native boot;
+no rollback occurs. Existing ABI5 card/SRAM files are admitted before startup.
+While native RAM is live, a callback cannot adopt and overwrite unexpected newer
+files, including during pending-write retry. Even A→B→A identical image bytes
+invalidate the earlier generation. The existing Android-proven ProfileLock stays
+held through capture, publication, native join and final metadata. Successful
+checkpoint departure rechecks the generation after teardown.
+
+The Rust player captures on explicit Pause, focus/background/window departure,
+selected-game departure and Activity destruction. It starts a restored runtime
+paused, waits for startup/surface readiness, revalidates, loads, and only then
+permits input/execution or displays the paused menu according to the latest
+durable SavedSession intent. A failed or
+incompatible restore retains the checkpoint/current saves and offers explicit
+restart. Explicit Stop remains an ordinary-save unload; Open cold boots using
+current saves. After durable explicit Stop, a known successful scene file may be
+retired while the profile remains locked; rejected/unacknowledged files stay.
+Process death before a successful checkpoint is not claimed safe
+scene recovery: absent/stale state requires explicit restart. No periodic capture,
+background game execution, service, second resident game or launcher shortcut is
+added by this slice.
+
+Focused host results:32 Rust tests pass. The actual native fixture, across five
+fresh processes, restored CPU/register state and a pending completion event,
+continued a partly staged card program into the expected11/22/33/44 bytes, and
+rejected a newer save before startup. Truncated and card-image-restoring native
+payloads failed closed, with card/SRAM unchanged through teardown and checkpoint
+files retained. The second pass uses the same Rust synchronous capture/publish
+callback as the Android app. Host/ARM64 native builds and warnings-denied Rust
+checks pass. Null video/audio are deliberate fixture choices: real Vulkan/audio
+state, Android interruption timing, process-restart gameplay, A→B→A gameplay,
+update retention, shortcuts and Fold remain unqualified. No phone queries/actions
+are authorized while the owner asks for off-device continuation.
+
+Reproduce using a NEW private fixture directory, never an owner profile:
+
+```sh
+cargo xtask source-check
+cargo xtask build-host
+GCX_ENGINE_LIB_DIR="$PWD/build/host/gcx" cargo build -p gcx --features native-engine --bin gcx-checkpoint-probe
+LD_LIBRARY_PATH="$PWD/build/host/gcx" timeout 180 target/debug/gcx-checkpoint-probe NEW_PRIVATE_FIXTURE .local/source/dolphin/Data/Sys
+```
+
+The host JIT test needs ordinary native execution; the restricted agent sandbox
+traps it. No device/game/firmware input is used. `native/host_fixture.cpp` exposes
+only CPU/card fixture operations and is excluded from Android. Application policy
+and container/generation logic are Rust; native changes retain GPL provenance.
+RustCrypto SHA-2560.10.9 and its exact transitive graph are pinned in Cargo.lock;
+the packaging tool includes their supplied licenses and corresponding sources.
+
+
 The off-device Rust CPU/lifecycle probe has passed with normal process exit on
 Linux, both with null audio and an intentionally unavailable audio backend. It
 boots an original 20-byte PowerPC program in a correctly padded DOL, observes its
@@ -302,7 +383,8 @@ The isolated host checks alone do not prove Android filesystem behavior or real
 game saving; the separately recorded Pixel 4 ordinary-save/Stop/cold-reload and
 live lock observations above provide their bounded device evidence. The
 GCI implementation's early dirty clearing and direct truncation are not selected.
-Ordinary saves and machine checkpoints remain separate: no snapshot API is exposed.
+Ordinary saves and machine checkpoints remain separate. The earlier ABI5 candidate
+exposes no snapshot API; the new ABI6 candidate above adds a private format.
 Movie states can restore card bytes/metadata and normal states omit card protocol;
 restored CoreTiming events and pending transactions still require qualification.
 Future restore must verify profile generation and exact core/resource/media binding

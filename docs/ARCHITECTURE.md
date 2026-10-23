@@ -142,8 +142,8 @@ the native CPU guard and serializes with that worker. GCI-directory mode is not
 selected: its inspected write path clears dirty status before confirming a write
 and truncates the target. Native movie states may restore card bytes and normal
 states omit card protocol/data; pending native events also need qualification.
-The adapter exposes no snapshot restore. A card barrier alone does not establish
-a coherent machine checkpoint or Android durability.
+The earlier ABI5 adapter exposes no snapshot restore. A card barrier alone does
+not establish a coherent machine checkpoint or Android durability.
 
 The pinned off-device [checkpoint audit](../native/README.md#off-device-checkpoint-audit-2026-10-22)
 confirms that normal states omit staged card commands while restoring timing
@@ -156,6 +156,21 @@ after-load callback do not provide that contract. Rust must validate the complet
 generation before native mutation; failed partial loads must not flush mutated
 card/SRAM during recovery. No state API or automatic resume is implemented by this
 audit. Existing ordinary card save/Stop/reload evidence is unchanged.
+
+The subsequent ABI6 candidate implements this contract with original Rust
+checkpoint envelopes and save generations, plus targeted private native state
+serialization. Card protocol is always included; card contents and movie-active
+payloads are refused. Raw card and SRAM use one atomic Rust writer. The paused
+machine, complete durable files and exact media/core/resource identities form one
+generation, published before SavedSession references it. Interrupted writes never
+roll ordinary files back. Restore validates before paused boot and again before
+mutation; failed partial loads block persistence/resume through shutdown. Joined
+checkpoint departures recheck ordinary generations. Rust captures on pause and
+departure and restores after a fresh process; explicit Stop still requests an
+ordinary-save cold Open. Files/errors survive rejection and explicit restart uses
+current saves. The original native fresh-process CPU/staged-command/event and
+failure fixtures pass; Android gameplay automatic resume remains unqualified.
+See [implementation and reproduction](../native/README.md#rust-owned-checkpoint-candidate-2026-10-22).
 
 Prefer isolated per-game save profiles for safe A -> B -> A continuity. Keep
 multi-disc games together. Shared cards can enable cross-title interactions, but

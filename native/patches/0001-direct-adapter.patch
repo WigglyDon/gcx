@@ -2,7 +2,8 @@ gcx maintained Dolphin changes, 2026-10-22
 Upstream revision: cf5cb7ef81c3e8e7af5c9d566334219ffda9f68b
 All modifications represented below were made for gcx on 2026-10-21/22.
 Purpose: Rust-hosted Android/native boundary, surface ownership, durable raw-card
-writer, optional Android metadata and audio-init cleanup. Upstream authorship and
+writer, console-data persistence, private checkpoint protocol/completion, optional
+Android metadata and audio-init cleanup. Upstream authorship and
 GPL/dependency terms remain intact. This patch is not an upstream Dolphin release.
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
@@ -202,11 +203,113 @@ index 8ae3bf6..3271440 100644
  #elif defined(__APPLE__)
    builder.AddData("os-type", "osx");
  
+diff --git a/Source/Core/Core/HW/EXI/EXI.cpp b/Source/Core/Core/HW/EXI/EXI.cpp
+index 144fdd5..f86ef07 100644
+--- a/Source/Core/Core/HW/EXI/EXI.cpp
++++ b/Source/Core/Core/HW/EXI/EXI.cpp
+@@ -27,6 +27,8 @@
+ 
+ namespace ExpansionInterface
+ {
++static SramWriteHandler s_sram_write_handler = nullptr;
++void SetSramWriteHandler(SramWriteHandler handler) { s_sram_write_handler = handler; }
+ ExpansionInterfaceManager::ExpansionInterfaceManager(Core::System& system) : m_system(system)
+ {
+ }
+@@ -169,12 +171,21 @@ void ExpansionInterfaceManager::Shutdown()
+ 
+   CEXIMemoryCard::Shutdown();
+ 
++  FlushSRAM();
++}
++
++bool ExpansionInterfaceManager::FlushSRAM()
++{
+   if (!m_using_overridden_sram)
+   {
+-    File::IOFile file(SConfig::GetInstance().m_strSRAM, "wb");
+     auto& sram = m_system.GetSRAM();
+-    file.WriteArray(&sram, 1);
++    if (s_sram_write_handler)
++      return s_sram_write_handler(SConfig::GetInstance().m_strSRAM,
++                                 {reinterpret_cast<const u8*>(&sram), sizeof(sram)});
++    File::IOFile file(SConfig::GetInstance().m_strSRAM, "wb");
++    return file.WriteArray(&sram, 1) && file.Close();
+   }
++  return true;
+ }
+ 
+ void ExpansionInterfaceManager::DoState(PointerWrap& p)
+diff --git a/Source/Core/Core/HW/EXI/EXI.h b/Source/Core/Core/HW/EXI/EXI.h
+index 7ded905..bd82b18 100644
+--- a/Source/Core/Core/HW/EXI/EXI.h
++++ b/Source/Core/Core/HW/EXI/EXI.h
+@@ -6,6 +6,8 @@
+ #include <array>
+ #include <initializer_list>
+ #include <memory>
++#include <span>
++#include <string>
+ 
+ #include "Common/CommonTypes.h"
+ #include "Common/EnumFormatter.h"
+@@ -30,6 +32,9 @@ class Mapping;
+ 
+ namespace ExpansionInterface
+ {
++// gcx: ordinary console data shares the host's durable profile writer.
++using SramWriteHandler = bool (*)(const std::string&, std::span<const u8>);
++void SetSramWriteHandler(SramWriteHandler handler);
+ class CEXIChannel;
+ class IEXIDevice;
+ enum class EXIDeviceType : int;
+@@ -72,6 +77,7 @@ public:
+ 
+   void Init(const Sram* override_sram);
+   void Shutdown();
++  bool FlushSRAM();
+   void DoState(PointerWrap& p);
+ 
+   void RegisterMMIO(MMIO::Mapping* mmio, u32 base);
+diff --git a/Source/Core/Core/HW/EXI/EXI_Channel.cpp b/Source/Core/Core/HW/EXI/EXI_Channel.cpp
+index 8d47a81..91f37f3 100644
+--- a/Source/Core/Core/HW/EXI/EXI_Channel.cpp
++++ b/Source/Core/Core/HW/EXI/EXI_Channel.cpp
+@@ -16,6 +16,7 @@
+ #include "Core/HW/MMIO.h"
+ #include "Core/Movie.h"
+ #include "Core/System.h"
++#include "Core/State.h"
+ 
+ namespace ExpansionInterface
+ {
+@@ -251,6 +252,13 @@ void CEXIChannel::DoState(PointerWrap& p)
+     EXIDeviceType type = device->m_device_type;
+     p.Do(type);
+ 
++    // gcx never hot-swaps storage devices while deserializing a checkpoint.
++    // Such a replacement could flush the old device before load failure is known.
++    if (State::IsGcxCheckpoint() && type != device->m_device_type)
++    {
++      p.SetMeasureMode();
++      return;
++    }
+     if (type == device->m_device_type)
+     {
+       device->DoState(p);
 diff --git a/Source/Core/Core/HW/EXI/EXI_DeviceMemoryCard.cpp b/Source/Core/Core/HW/EXI/EXI_DeviceMemoryCard.cpp
-index 73ff1d6..9465fd2 100644
+index 73ff1d6..4644c8d 100644
 --- a/Source/Core/Core/HW/EXI/EXI_DeviceMemoryCard.cpp
 +++ b/Source/Core/Core/HW/EXI/EXI_DeviceMemoryCard.cpp
-@@ -495,6 +495,9 @@ void CEXIMemoryCard::TransferByte(u8& byte)
+@@ -33,6 +33,7 @@
+ #include "Core/HW/SystemTimers.h"
+ #include "Core/Movie.h"
+ #include "Core/System.h"
++#include "Core/State.h"
+ #include "DiscIO/Enums.h"
+ 
+ namespace ExpansionInterface
+@@ -495,8 +496,41 @@ void CEXIMemoryCard::TransferByte(u8& byte)
    DEBUG_LOG_FMT(EXPANSIONINTERFACE, "EXI MEMCARD: < {:02x}", byte);
  }
  
@@ -215,7 +318,39 @@ index 73ff1d6..9465fd2 100644
 +
  void CEXIMemoryCard::DoState(PointerWrap& p)
  {
++  if (State::IsGcxCheckpoint())
++  {
++    // gcx private format: protocol always belongs to the machine, card bytes
++    // remain authoritative in the independently validated durable generation.
++    constexpr u64 gcx_card_cookie = 0x315243584347ULL;  // GCXCR1.
++    u64 cookie = gcx_card_cookie;
++    p.Do(cookie);
++    bool store_contents = false;
++    p.Do(store_contents);
++    auto slot = m_card_slot;
++    auto size = m_memory_card_size;
++    auto id = m_card_id;
++    p.Do(slot);
++    p.Do(size);
++    p.Do(id);
++    if (cookie != gcx_card_cookie || store_contents || slot != m_card_slot ||
++        size != m_memory_card_size || id != m_card_id)
++    {
++      p.SetMeasureMode();
++      return;
++    }
++    p.Do(m_interrupt_switch);
++    p.Do(m_interrupt_set);
++    p.Do(m_command);
++    p.Do(m_status);
++    p.Do(m_position);
++    p.Do(m_programming_buffer);
++    p.Do(m_address);
++    return;
++  }
    // for movie sync, we need to save/load memory card contents (and other data) in savestates.
+   // otherwise, we'll assume the user wants to keep their memcards and saves separate,
+   // unless we're loading (in which case we let the savestate contents decide, in order to stay
 diff --git a/Source/Core/Core/HW/EXI/EXI_DeviceMemoryCard.h b/Source/Core/Core/HW/EXI/EXI_DeviceMemoryCard.h
 index db9c013..3c3f446 100644
 --- a/Source/Core/Core/HW/EXI/EXI_DeviceMemoryCard.h
@@ -365,6 +500,158 @@ index fe0363c..cf3c32d 100644
      JNIEnv* env = IDCache::GetEnvForThread();
      if (jboolean result = env->CallStaticBooleanMethod(
              IDCache::GetPermissionHandlerClass(),
+diff --git a/Source/Core/Core/State.cpp b/Source/Core/Core/State.cpp
+index cecda5f..a002e28 100644
+--- a/Source/Core/Core/State.cpp
++++ b/Source/Core/Core/State.cpp
+@@ -6,6 +6,7 @@
+ #include <algorithm>
+ #include <filesystem>
+ #include <map>
++#include <limits>
+ #include <mutex>
+ #include <shared_mutex>
+ #include <string>
+@@ -28,6 +29,7 @@
+ #include "Common/LocaleUtil.h"
+ #include "Common/Logging/Log.h"
+ #include "Common/MsgHandler.h"
++#include "Common/ScopeGuard.h"
+ #include "Common/StringUtil.h"
+ #include "Common/Thread.h"
+ #include "Common/TimeUtil.h"
+@@ -56,6 +58,10 @@
+ 
+ namespace State
+ {
++// A private format scope; upstream SaveAs/LoadAs retain their original format.
++// The guarded synchronous owner invokes every DoState on this same thread.
++static thread_local bool s_gcx_checkpoint = false;
++bool IsGcxCheckpoint() { return s_gcx_checkpoint; }
+ #if defined(__LZO_STRICT_16BIT)
+ static const u32 IN_LEN = 8 * 1024u;
+ #elif defined(LZO_ARCH_I086) && !defined(LZO_HAVE_MM_HUGE_ARRAY)
+@@ -137,6 +143,17 @@ static bool ReadHeader(const std::string& filename, StateHeader& header);
+ 
+ static void DoState(Core::System& system, PointerWrap& p)
+ {
++  if (s_gcx_checkpoint)
++  {
++    constexpr u64 gcx_cookie = 0x315453584347ULL;  // GCXST1, private format ABI1.
++    u64 cookie = gcx_cookie;
++    p.Do(cookie);
++    if (cookie != gcx_cookie)
++    {
++      p.SetMeasureMode();
++      return;
++    }
++  }
+   bool is_wii = system.IsWii() || system.IsMIOS();
+   const bool is_wii_currently = is_wii;
+   p.Do(is_wii);
+@@ -171,6 +188,11 @@ static void DoState(Core::System& system, PointerWrap& p)
+   // Movie must be done before the video backend, because the window is redrawn in the video backend
+   // state load, and the frame number must be up-to-date.
+   system.GetMovie().DoState(p);
++  if (s_gcx_checkpoint && system.GetMovie().IsMovieActive())
++  {
++    p.SetMeasureMode();
++    return;
++  }
+   p.DoMarker("Movie");
+ 
+   // Begin with video backend, so that it gets a chance to clear its caches and writeback modified
+@@ -221,16 +243,17 @@ static bool CheckIfStateLoadIsAllowed(Core::System& system)
+   return true;
+ }
+ 
+-static bool LoadFromBuffer(Core::System& system, std::span<u8> buffer)
++static bool LoadFromBuffer(Core::System& system, std::span<u8> buffer, bool exact = false)
+ {
+   u8* ptr = buffer.data();
+   PointerWrap p(&ptr, buffer.size(), PointerWrap::Mode::Read);
+   DoState(system, p);
+-  return p.IsReadMode();
++  return p.IsReadMode() && (!exact || p.GetOffsetFromPreviousPosition(buffer.data()) == buffer.size());
+ }
+ 
+ // Returns the required size, or 0 on failure.
+-static std::size_t SaveToBuffer(Core::System& system, Common::UniqueBuffer<u8>& buffer)
++static std::size_t SaveToBuffer(Core::System& system, Common::UniqueBuffer<u8>& buffer,
++                              std::size_t limit = std::numeric_limits<std::size_t>::max())
+ {
+   // Attempt to save to our provided buffer as-is.
+   // If buffer isn't large enough, PointerWrap transitions to MeasureMode,
+@@ -248,16 +271,41 @@ static std::size_t SaveToBuffer(Core::System& system, Common::UniqueBuffer<u8>&
+ 
+   if (measured_size > buffer.size())
+   {
++    if (measured_size > limit)
++      return 0;
+     DEBUG_LOG_FMT(CORE, "SaveToBuffer: Growing buffer from size {} to measured size {}",
+                   buffer.size(), measured_size);
+     buffer.reset(measured_size);
+-    return SaveToBuffer(system, buffer);
++    return SaveToBuffer(system, buffer, limit);
+   }
+ 
+   // Buffer was large enough but we still failed for some other reason.
+   return 0;
+ }
+ 
++bool CaptureGcx(Core::System& system, size_t limit,
++                const std::function<bool(std::span<const u8>)>& writer)
++{
++  if (s_gcx_checkpoint || system.IsWii() || system.IsMIOS() ||
++      system.GetMovie().IsMovieActive() || !writer)
++    return false;
++  s_gcx_checkpoint = true;
++  Common::ScopeGuard clear_scope([] { s_gcx_checkpoint = false; });
++  Common::UniqueBuffer<u8> buffer;
++  const auto length = SaveToBuffer(system, buffer, limit);
++  return length != 0 && writer({buffer.data(), length});
++}
++
++bool LoadGcx(Core::System& system, std::span<u8> buffer)
++{
++  if (s_gcx_checkpoint || system.IsWii() || system.IsMIOS() ||
++      system.GetMovie().IsMovieActive() || buffer.empty())
++    return false;
++  s_gcx_checkpoint = true;
++  Common::ScopeGuard clear_scope([] { s_gcx_checkpoint = false; });
++  return LoadFromBuffer(system, buffer, true);
++}
++
+ namespace
+ {
+ struct SlotWithTimestamp
+diff --git a/Source/Core/Core/State.h b/Source/Core/Core/State.h
+index cd35ea1..96ae36f 100644
+--- a/Source/Core/Core/State.h
++++ b/Source/Core/Core/State.h
+@@ -7,6 +7,7 @@
+ 
+ #include <cstddef>
+ #include <functional>
++#include <span>
+ #include <string>
+ #include <type_traits>
+ 
+@@ -82,6 +83,14 @@ struct StateExtendedHeader
+ void Init(Core::System& system);
+ void Shutdown();
+ 
++// gcx, 2026-10-22: synchronous private checkpoints, distinct from state files.
++// Caller holds the CPU guard and keeps execution paused through host publication.
++// A false load result may have mutated the machine: retire without persistence.
++bool IsGcxCheckpoint();
++bool CaptureGcx(Core::System& system, size_t limit,
++                const std::function<bool(std::span<const u8>)>& writer);
++bool LoadGcx(Core::System& system, std::span<u8> buffer);
++
+ // Returns a string containing information of the savestate in the given slot
+ // which can be presented to the user for identification purposes
+ std::string GetInfoStringOfSlot(u32 slot, bool translate = true);
 diff --git a/Source/Core/InputCommon/CMakeLists.txt b/Source/Core/InputCommon/CMakeLists.txt
 index 5cc6b66..df46e78 100644
 --- a/Source/Core/InputCommon/CMakeLists.txt

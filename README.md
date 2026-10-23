@@ -26,7 +26,10 @@ the owner reports it works. Pause/Resume, one Home/return and clean Stop passed.
 The owner accepted the edge-to-edge picture correction, and a fresh-process reload
 of the earlier card save passed on that build. A misplaced system Home handle
 after bar reveal remains open. The full control matrix, extended surface transitions,
-Fold play and automatic resume remain unqualified. See
+Fold play and automatic resume remain unqualified. The new off-device checkpoint
+slice preserves machine/card generations in Rust and passes actual native
+fresh-process CPU/card-protocol restore and failure tests; its Android lifecycle
+is implemented but has not run on a phone. See
 [native reproduction and limits](native/README.md).
 
 GameCube is the initial scope. Dolphin's Wii capability is not a promise of Wii

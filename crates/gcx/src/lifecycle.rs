@@ -7,6 +7,9 @@ pub trait StopRuntime {
     fn pause_commit(&mut self) -> Result<(), String>;
     /// Join every native worker, retaining the profile/card binding until Drop.
     fn join(&mut self) -> Result<(), String>;
+    /// Optional cleanup of a known successful scene after durable explicit Stop.
+    /// Rejected/unacknowledged checkpoints must remain retained.
+    fn discard_checkpoint(&mut self) {}
 }
 #[derive(Debug, PartialEq, Eq)]
 pub enum StopResult {
@@ -42,6 +45,9 @@ pub fn stop_game<R: StopRuntime>(
     let joined = active.join();
     let entry = &mut collection.entries[index];
     entry.stopped = true;
+    // Explicit Stop requests an ordinary-save cold boot on the next Open.
+    // Keep immutable files, including any previously rejected generation.
+    entry.checkpoint = None;
     entry.runtime_incomplete = joined.is_err();
     entry.restart_required = joined.is_err();
     let mut error = joined.err();
@@ -63,6 +69,9 @@ pub fn stop_game<R: StopRuntime>(
         // retain truthful recovery metadata; never claim the failed publication.
         let _ = publish(collection);
         error = Some(message);
+    }
+    if error.is_none() {
+        active.discard_checkpoint();
     }
     drop(runtime.take());
     StopResult::Unloaded { error }
@@ -93,6 +102,9 @@ mod tests {
             } else {
                 Ok(())
             }
+        }
+        fn discard_checkpoint(&mut self) {
+            self.trace.borrow_mut().push("discard-checkpoint");
         }
         fn join(&mut self) -> Result<(), String> {
             self.trace.borrow_mut().push("join");
@@ -125,6 +137,7 @@ mod tests {
                 restart_required: false,
                 runtime_incomplete: true,
                 stopped: false,
+                checkpoint: Some("c".repeat(64)),
             }],
             selected: Some("a".repeat(32)),
             ..Collection::default()
@@ -148,12 +161,22 @@ mod tests {
         assert_eq!(
             stop_game(&mut live, 7, &mut c, 0, |c| {
                 assert!(c.entries[0].stopped && !c.entries[0].runtime_incomplete);
+                assert!(c.entries[0].checkpoint.is_none());
                 trace.borrow_mut().push("publish");
                 Ok(())
             }),
             StopResult::Unloaded { error: None }
         );
-        assert_eq!(*trace.borrow(), ["barrier", "join", "publish", "release"]);
+        assert_eq!(
+            *trace.borrow(),
+            [
+                "barrier",
+                "join",
+                "publish",
+                "discard-checkpoint",
+                "release"
+            ]
+        );
         assert!(live.is_none());
         assert!(!c.entries[0].boot_allowed());
         let loaded: Collection = serde_json::from_slice(&serde_json::to_vec(&c).unwrap()).unwrap();
@@ -219,6 +242,7 @@ mod tests {
             assert!(c.entries[0].last_error.is_some());
             assert!(!c.entries[0].boot_allowed());
             assert_eq!(trace.borrow().last(), Some(&"release"));
+            assert!(!trace.borrow().contains(&"discard-checkpoint"));
         }
     }
     #[test]

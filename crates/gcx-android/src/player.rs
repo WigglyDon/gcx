@@ -4,6 +4,7 @@ use android_activity::{
     AndroidApp, InputStatus, MainEvent, PollEvent,
     input::{InputEvent, MotionAction},
 };
+use gcx::checkpoint::{self, Binding, Checkpoint};
 use gcx::library::{Collection, GameId, SaveProfileId, SavedSession, valid_id};
 use gcx::lifecycle::{StopResult, StopRuntime, stop_game};
 use gcx::{
@@ -45,6 +46,11 @@ struct LiveRuntime {
     _cards: gcx::storage::CardStore,
     _profile: SaveProfile,
     _boot_window: NativeWindow,
+    binding: Binding,
+    pending_restore: Option<Checkpoint>,
+    accepted_checkpoint: Option<String>,
+    accepted_generation: Option<gcx::storage::SaveGeneration>,
+    failed_restore: bool,
 }
 struct RuntimeEvents {
     game_id: String,
@@ -62,9 +68,117 @@ impl LiveRuntime {
         unsafe {
             gcx_engine_pause(1);
             gcx_engine_input(Pad::default().values().as_ptr());
-            gcx_engine_flush_cards() != 0
+            // A partially loaded machine is quarantined through teardown.
+            gcx_engine_checkpoint_failed() != 0 || gcx_engine_flush_cards() != 0
         }
     }
+}
+/// Publish the immutable complete generation before changing its durable session
+/// reference. The profile lock is still owned, including across metadata sync.
+fn save_checkpoint(
+    active: &mut LiveRuntime,
+    root: &Path,
+    collection: &mut Collection,
+    index: usize,
+) -> Result<()> {
+    if active.pending_restore.is_some() {
+        return Err("Checkpoint restore is still starting.".into());
+    }
+    if !active.native_alive {
+        return Err("The native runtime is already unloaded.".into());
+    }
+    if let Ok(mut touch) = UI.lock() {
+        touch.cancel();
+    }
+    unsafe {
+        gcx_engine_pause(1);
+        gcx_engine_input(Pad::default().values().as_ptr());
+    }
+    let id = unsafe {
+        checkpoint::capture(
+            &active._profile.path,
+            &active.binding,
+            collection.entries[index].paused,
+        )?
+    };
+    let generation = gcx::storage::save_generation(&active._profile.path)?;
+    let earlier = collection.entries[index].checkpoint.replace(id.clone());
+    if let Err(error) = save_collection(root, collection) {
+        // Even if rename preceded the sync error, both possible references still
+        // reach complete files. Never retire either on unacknowledged metadata.
+        collection.entries[index].checkpoint = earlier;
+        return Err(error);
+    }
+    active.accepted_generation = Some(generation);
+    if let Some(old) = active.accepted_checkpoint.replace(id.clone())
+        && let Err(error) = checkpoint::retire_previous(&active._profile.path, &old, &id)
+    {
+        platform::diagnostic(&format!("Prior successful checkpoint retained: {error}"));
+    }
+    platform::diagnostic("Checkpoint complete: native paused, saves and session reference durable");
+    Ok(())
+}
+impl LiveRuntime {
+    fn verify_departure(&self) -> std::result::Result<(), String> {
+        self.accepted_generation
+            .as_ref()
+            .ok_or_else(|| "No acknowledged checkpoint generation.".to_owned())?
+            .verify(&self._profile.path)
+            .map_err(|e| e.to_string())
+    }
+    fn restore(&mut self) -> Result<Option<()>> {
+        if unsafe { gcx_engine_state() } != 1 {
+            return Ok(None);
+        }
+        let Some(mut state) = self.pending_restore.take() else {
+            return Ok(None);
+        };
+        state.verify_current_saves(&self._profile.path)?;
+        if unsafe { gcx_engine_checkpoint_load(state.payload.as_mut_ptr(), state.payload.len()) }
+            == 0
+        {
+            self.failed_restore = true;
+            return Err("Checkpoint restore failed. Its file and current saves are retained; restart explicitly with current saves.".into());
+        }
+        self.accepted_generation = Some(gcx::storage::save_generation(&self._profile.path)?);
+        platform::diagnostic(
+            "Checkpoint restored into paused native runtime; current saves validated",
+        );
+        Ok(Some(()))
+    }
+}
+fn pause_for_background(
+    root: &Path,
+    runtime: &mut Option<LiveRuntime>,
+    collection: &mut Collection,
+    selected: Option<usize>,
+    native_paused: &mut Option<bool>,
+) {
+    if let Ok(mut touch) = UI.lock() {
+        touch.cancel();
+    }
+    let Some(active) = runtime.as_mut() else {
+        return;
+    };
+    unsafe {
+        gcx_engine_pause(1);
+        gcx_engine_input(Pad::default().values().as_ptr());
+        if !matches!(gcx_engine_state(), 1 | 2) {
+            *native_paused = None;
+            return;
+        }
+    }
+    if *native_paused != Some(true)
+        && active.pending_restore.is_none()
+        && let Some(index) = selected
+        && !collection.entries[index].restart_required
+        && let Err(error) = save_checkpoint(active, root, collection, index)
+    {
+        platform::push(Command::Error(format!(
+            "Could not checkpoint the game: {error}. Current saves and paused runtime retained."
+        )));
+    }
+    *native_paused = Some(true);
 }
 impl StopRuntime for LiveRuntime {
     fn epoch(&self) -> u64 {
@@ -77,6 +191,15 @@ impl StopRuntime for LiveRuntime {
             Err("Could not durably commit the card. The paused game is retained; Stop game can be retried.".into())
         }
     }
+    fn discard_checkpoint(&mut self) {
+        if let Some(id) = &self.accepted_checkpoint
+            && let Err(error) = checkpoint::discard_successful(&self._profile.path, id)
+        {
+            platform::diagnostic(&format!(
+                "Stopped checkpoint retained after cleanup error: {error}"
+            ));
+        }
+    }
     fn join(&mut self) -> std::result::Result<(), String> {
         if self.native_alive {
             if let Ok(mut error) = self.events.teardown_error.lock() {
@@ -86,6 +209,7 @@ impl StopRuntime for LiveRuntime {
             // SAFETY: same serialized native owner. Keep all Rust fields/profile
             // alive until the stop caller has durably published its result.
             unsafe {
+                self.failed_restore |= gcx_engine_checkpoint_failed() != 0;
                 gcx_engine_stop();
                 gcx_engine_shutdown();
             }
@@ -95,6 +219,9 @@ impl StopRuntime for LiveRuntime {
             if unsafe { gcx_engine_state() } != 0 {
                 return Err("Native shutdown did not reach the unloaded state.".into());
             }
+        }
+        if self.failed_restore {
+            return Err("Failed checkpoint machine discarded without writing card or console data; current saves retained.".into());
         }
         if let Some(error) = gcx::storage::last_card_error().or_else(|| {
             self.events
@@ -348,7 +475,7 @@ fn boot(
     });
     // SAFETY: serialized owner, valid strings and stable process-long callbacks.
     unsafe {
-        if gcx_engine_abi() != 5 {
+        if gcx_engine_abi() != 6 {
             return Err("engine ABI mismatch".into());
         }
         let cards = gcx::storage::CardStore::bind(&profile.path)?;
@@ -366,18 +493,47 @@ fn boot(
         {
             return Err("engine initialization rejected".into());
         }
-        let runtime = LiveRuntime {
+        let mut runtime = LiveRuntime {
             native_alive: true,
             events,
             _cards: cards,
             _profile: profile,
             _boot_window: window.clone(),
+            binding: Binding {
+                game_id: entry.game_id.0.clone(),
+                profile_id: entry.profile_id.0.clone(),
+                engine: BUILD_ENGINE_SHA256.into(),
+                state_abi: gcx_engine_checkpoint_abi(),
+                resources: BUILD_RESOURCE_ID.into(),
+                media_sha256: String::new(),
+                disc: 0,
+            },
+            pending_restore: None,
+            accepted_checkpoint: None,
+            accepted_generation: None,
+            failed_restore: false,
         };
         let mut info = MediaInfo::default();
         if gcx_engine_inspect(uri.as_ptr(), &mut info) == 0 {
             return Err("Choose a supported GameCube disc image (ISO/GCM or RVZ).".into());
         }
-        if gcx_engine_boot(uri.as_ptr(), window.ptr().as_ptr().cast()) == 0 {
+        runtime.binding.disc = info.disc;
+        runtime.binding.media_sha256 =
+            checkpoint::media_digest(platform::open_document(&entry.uri)?)?;
+        if let Some(id) = &entry.checkpoint {
+            // No guest has started. Reject mismatches before paused native boot.
+            runtime.pending_restore = Some(checkpoint::load(
+                &runtime._profile.path,
+                id,
+                &runtime.binding,
+            )?);
+        }
+        let admitted = if runtime.pending_restore.is_some() {
+            gcx_engine_boot_paused(uri.as_ptr(), window.ptr().as_ptr().cast())
+        } else {
+            gcx_engine_boot(uri.as_ptr(), window.ptr().as_ptr().cast())
+        };
+        if admitted == 0 {
             return Err("The native engine could not boot this GameCube game.".into());
         }
         Ok(runtime)
@@ -460,33 +616,42 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                         surface_pending = runtime.is_some();
                     }
                     MainEvent::TerminateWindow { .. } => {
-                        if runtime.is_some() {
-                            unsafe {
-                                gcx_engine_pause(1);
-                                gcx_engine_input(Pad::default().values().as_ptr());
-                                if matches!(gcx_engine_state(), 1 | 2)
-                                    && gcx_engine_flush_cards() == 0
-                                {
-                                    platform::push(Command::Error("Could not commit the card when the window closed. The runtime is retained; retry before restarting.".into()));
-                                }
-                            }
-                            native_paused = Some(true);
-                        }
+                        // Complete pause/checkpoint while the old drawable is still
+                        // retained; surface loss never requests a fresh boot.
+                        pause_for_background(
+                            &root,
+                            &mut runtime,
+                            &mut collection,
+                            selected,
+                            &mut native_paused,
+                        );
                         window = None;
                         measure_window(None);
                         if let Ok(mut touch) = UI.lock() {
                             touch.cancel();
                         }
                     }
-                    MainEvent::GainedFocus => { foreground = true; platform::refresh_window(app); },
+                    MainEvent::GainedFocus => {
+                        foreground = true;
+                        platform::refresh_window(app);
+                    }
                     MainEvent::LostFocus | MainEvent::Pause | MainEvent::Stop => {
                         foreground = false;
+                        pause_for_background(
+                            &root,
+                            &mut runtime,
+                            &mut collection,
+                            selected,
+                            &mut native_paused,
+                        );
                         if let Ok(mut touch) = UI.lock() {
                             touch.cancel();
                         }
                     }
                     MainEvent::Destroy => destroyed = true,
-                    MainEvent::WindowResized { .. } | MainEvent::ContentRectChanged { .. } | MainEvent::ConfigChanged { .. } => {
+                    MainEvent::WindowResized { .. }
+                    | MainEvent::ContentRectChanged { .. }
+                    | MainEvent::ConfigChanged { .. } => {
                         measure_window(None);
                         platform::refresh_window(app);
                         if let Ok(mut touch) = UI.lock() {
@@ -509,8 +674,8 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                                     {
                                         match motion.action() {
                                             MotionAction::Down | MotionAction::PointerDown => {
-                                                let pointer = motion
-                                                    .pointer_at_index(motion.pointer_index());
+                                                let pointer =
+                                                    motion.pointer_at_index(motion.pointer_index());
                                                 if touch.down(
                                                     pointer.pointer_id(),
                                                     pointer.x(),
@@ -521,8 +686,13 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                                                     touch.cancel();
                                                     hidden = false;
                                                     if let Some(active) = &runtime {
-                                                        platform::player_menu(app, active.events.epoch,
-                                                            !collection.entries[index].restart_required, None);
+                                                        platform::player_menu(
+                                                            app,
+                                                            active.events.epoch,
+                                                            !collection.entries[index]
+                                                                .restart_required,
+                                                            None,
+                                                        );
                                                     }
                                                 }
                                             }
@@ -536,8 +706,8 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                                                 }
                                             }
                                             MotionAction::Up | MotionAction::PointerUp => {
-                                                let pointer = motion
-                                                    .pointer_at_index(motion.pointer_index());
+                                                let pointer =
+                                                    motion.pointer_at_index(motion.pointer_index());
                                                 touch.up(pointer.pointer_id());
                                             }
                                             MotionAction::Cancel => touch.cancel(),
@@ -680,20 +850,45 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                             continue;
                         }
                     }
-                    // Retain the old writer and its RAM on failed card durability.
-                    if runtime
-                        .as_ref()
-                        .is_some_and(|active| !active.commit_for_departure())
-                    {
-                        native_paused = Some(true);
-                        platform::push(Command::Error("The current memory card could not be committed; its runtime is retained. Retry after resolving storage.".into()));
-                        continue;
+                    // Save the departing scene and join while its profile remains
+                    // exclusively owned. A failed checkpoint keeps its live RAM.
+                    if let (Some(active), Some(index)) = (runtime.as_mut(), selected) {
+                        let saved = if collection.entries[index].restart_required {
+                            active.pause_commit().map_err(|e| e.into())
+                        } else {
+                            save_checkpoint(active, &root, &mut collection, index)
+                        };
+                        if let Err(error) = saved {
+                            native_paused = Some(true);
+                            platform::push(Command::Error(format!(
+                                "Could not leave the current game: {error}"
+                            )));
+                            continue;
+                        }
+                        let joined = active.join().and_then(|()| {
+                            if collection.entries[index].restart_required {
+                                Ok(())
+                            } else {
+                                active.verify_departure()
+                            }
+                        });
+                        collection.entries[index].runtime_incomplete = joined.is_err();
+                        if let Err(error) = joined {
+                            collection.entries[index].fail(error);
+                        }
+                        if let Err(error) = save_collection(&root, &collection) {
+                            collection.entries[index].runtime_incomplete = true;
+                            collection.entries[index]
+                                .fail(format!("Could not preserve the departing session: {error}"));
+                            let _ = save_collection(&root, &collection);
+                            hidden = false;
+                            platform::menu(app, true, collection.entries[index].last_error.clone());
+                            drop(runtime.take());
+                            native_paused = None;
+                            continue;
+                        }
                     }
                     drop(runtime.take());
-                    if let Some(index) = selected {
-                        collection.entries[index].runtime_incomplete =
-                            gcx::storage::last_card_error().is_some();
-                    }
                     native_paused = None;
                     let index =
                         if let Some(index) = collection.entries.iter().position(|e| e.uri == uri) {
@@ -711,6 +906,7 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                                 restart_required: false,
                                 runtime_incomplete: false,
                                 stopped: false,
+                                checkpoint: None,
                             });
                             collection.entries.len() - 1
                         };
@@ -783,30 +979,42 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                     platform::push(Command::Error("The memory card could not be committed. The current runtime is retained; restart has not occurred.".into()));
                     continue;
                 }
-                drop(runtime.take());
-                if let Some(error) = gcx::storage::last_card_error() {
+                let mut teardown_error = None;
+                if let Some(active) = runtime.as_mut() {
+                    let quarantined =
+                        active.failed_restore || unsafe { gcx_engine_checkpoint_failed() != 0 };
+                    let joined = active.join();
+                    if !quarantined {
+                        teardown_error = joined.err();
+                    }
+                    // A failed-load quarantine has protected durable ordinary
+                    // files through shutdown; only this explicit action cold boots.
+                }
+                if let Some(error) = teardown_error {
                     collection.entries[index].fail(format!(
-                        "Card persistence failed during restart teardown: {error}"
+                        "Persistence failed during restart teardown: {error}"
                     ));
                     hidden = false;
                     platform::menu(app, true, collection.entries[index].last_error.clone());
-                    if save_collection(&root, &collection).is_err() {
-                        platform::diagnostic(
-                            "Could not preserve restart teardown failure on disk.",
-                        );
-                    }
+                    let _ = save_collection(&root, &collection);
+                    drop(runtime.take());
                     continue;
                 }
+                // Preserve the lock until restart intent is durably recorded.
+                let earlier = collection.entries[index].clone();
                 collection.entries[index].request_restart();
-                if save_collection(&root, &collection).is_err() {
-                    platform::notice(
-                        app,
-                        "Could not preserve restart settings; retry when storage is available."
-                            .into(),
-                    );
+                if let Err(error) = save_collection(&root, &collection) {
+                    collection.entries[index] = earlier;
+                    collection.entries[index]
+                        .fail(format!("Could not preserve restart intent: {error}"));
+                    let _ = save_collection(&root, &collection);
+                    hidden = false;
+                    platform::menu(app, true, collection.entries[index].last_error.clone());
                 } else {
                     platform::menu(app, false, None);
                 }
+                drop(runtime.take());
+                native_paused = None;
             }
         }
         if runtime.is_none()
@@ -858,16 +1066,56 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                 if surface_pending && let Some(window) = &window {
                     surface_pending = gcx_engine_surface(window.ptr().as_ptr().cast()) == 0;
                 }
+                if foreground
+                    && window.is_some()
+                    && !surface_pending
+                    && let (Some(active), Some(index)) = (runtime.as_mut(), selected)
+                    && active.pending_restore.is_some()
+                    && !collection.entries[index].restart_required
+                {
+                    match active.restore() {
+                        Ok(Some(())) => {
+                            // SavedSession owns the latest durable UI intent;
+                            // Resume after the capture may have changed it.
+                            let paused = collection.entries[index].paused;
+                            active.accepted_checkpoint =
+                                collection.entries[index].checkpoint.clone();
+                            native_paused = Some(true);
+                            if paused {
+                                hidden = false;
+                                platform::player_menu(app, active.events.epoch, true, None);
+                            }
+                        }
+                        Ok(None) => {}
+                        Err(error) => {
+                            collection.entries[index].fail(error.to_string());
+                            platform::push(Command::Error(error.to_string()));
+                            native_paused = Some(true);
+                        }
+                    }
+                }
                 if matches!(gcx_engine_state(), 1 | 2) {
-                    let paused = !hidden
+                    let restoring = runtime
+                        .as_ref()
+                        .is_some_and(|r| r.pending_restore.is_some());
+                    let paused = restoring
+                        || !hidden
                         || !foreground
                         || window.is_none()
                         || selected.is_some_and(|i| collection.entries[i].paused);
                     if native_paused != Some(paused) {
                         gcx_engine_pause(i32::from(paused));
                         native_paused = Some(paused);
-                        if paused && gcx_engine_flush_cards() == 0 {
-                            platform::push(Command::Error("Could not commit the card while pausing. The runtime is retained; retry before restarting.".into()));
+                        if paused
+                            && !restoring
+                            && let (Some(active), Some(index)) = (runtime.as_mut(), selected)
+                            && !collection.entries[index].restart_required
+                            && let Err(error) =
+                                save_checkpoint(active, &root, &mut collection, index)
+                        {
+                            platform::push(Command::Error(format!(
+                                "Could not checkpoint the paused game: {error}"
+                            )));
                         }
                         if save_collection(&root, &collection).is_err() {
                             if let Some(index) = selected {
@@ -875,7 +1123,7 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                             }
                             gcx_engine_pause(1);
                             native_paused = Some(true);
-                            platform::notice(app,"Could not save session settings. The game is retained and paused; tap Pause to retry.".into());
+                            platform::push(Command::Error("Could not preserve session settings. The paused game and previous checkpoint are retained.".into()));
                         }
                     }
                     let pad = if paused {
@@ -932,15 +1180,35 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
             }
         }
     }
-    if let Some(active) = runtime.as_mut() {
+    if let (Some(active), Some(index)) = (runtime.as_mut(), selected) {
+        let checkpoint = if collection.entries[index].restart_required {
+            Err("The runtime already requires explicit recovery.".into())
+        } else if let Some(state) = &active.pending_restore {
+            state
+                .verify_current_saves(&active._profile.path)
+                .map_err(Into::into)
+        } else {
+            save_checkpoint(active, &root, &mut collection, index)
+        };
         let barrier = active.pause_commit();
-        let joined = active.join();
-        if let Some(index) = selected {
-            collection.entries[index].stopped = true;
-            collection.entries[index].runtime_incomplete = barrier.is_err() || joined.is_err();
-            if let Some(error) = barrier.err().or_else(|| joined.err()) {
-                collection.entries[index].fail(format!("Interrupted departure: {error}"));
+        let joined = active.join().and_then(|()| {
+            if let Some(state) = &active.pending_restore {
+                state
+                    .verify_current_saves(&active._profile.path)
+                    .map_err(|e| e.to_string())
+            } else {
+                active.verify_departure()
             }
+        });
+        collection.entries[index].runtime_incomplete =
+            checkpoint.is_err() || barrier.is_err() || joined.is_err();
+        // Activity destruction is a resumable departure, never explicit Stop.
+        if let Some(error) = checkpoint
+            .err()
+            .or_else(|| barrier.err().map(Into::into))
+            .or_else(|| joined.err().map(Into::into))
+        {
+            collection.entries[index].fail(format!("Interrupted departure: {error}"));
         }
     }
     let saved = save_collection(&root, &collection);

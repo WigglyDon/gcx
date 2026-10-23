@@ -5,6 +5,7 @@ use std::io;
 use std::os::fd::AsRawFd;
 use std::path::Path;
 
+pub mod checkpoint;
 #[cfg(feature = "native-engine")]
 pub mod engine;
 pub mod lifecycle;
