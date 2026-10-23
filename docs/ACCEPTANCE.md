@@ -50,6 +50,35 @@ No deliberate owner-disk exhaustion, damaged only-copy saves or kill during an
 unbacked in-game write. Observe platform behavior without assuming onStop/onDestroy
 will always run before process death. Preserve the last accepted checkpoint.
 
+## Next guarded Android qualification
+
+[Master review6356548750](https://github.com/WigglyDon/gcx/issues/2#issuecomment-6356548750)
+accepts the preserved ABI7 increment for qualification, not completed GCX-2
+acceptance or phone custody. Keep the existing prepared runtime and backups;
+unchanged binaries and completed host campaigns need no rerun.
+
+After a fresh owner Pixel4 offer and successful exclusive admission, prioritize
+Wind Waker's checkpoint → genuinely new process → exact controllable scene return.
+Verify completed payload and durable session-reference publication, then back up
+the quiescent generation before controlled process retirement. Confirm actual
+Vulkan picture, usable input, restored sound and pause intent. An intentionally
+paused scene must stay paused until Resume. Never use Stop game to prepare this
+test: it clears the scene reference. Game-menu card loading is separate evidence.
+
+Only after single-game scene return succeeds, use the remaining admitted window
+for Wind Waker → Twilight Princess → Wind Waker and actual game shortcuts. Keep
+pin request, OS pin observation and real cold/warm/repeated taps distinct. A
+second-title failure preserves the first checkpoint and leaves switching unqualified.
+Retain ordinary in-game-save/clean-Stop/reload as a separate resulting-build check.
+
+Record actual phone checkpoint bytes, capture/publication and restore timing
+intervals, observed process memory and audio interruptions. Label observation
+bounds where unchanged diagnostics cannot separate internal phases. Observe the
+Home handle during relevant transitions without repeating broad layout approval.
+Protect cleanup time: a single-game return is a useful handback, with later rows
+left unrun. Retain a failing checkpoint/error and symbols; return the device before
+heavy repair. Fold/siblings stay untouched; no public binary release is admitted.
+
 ## Release gates distinct from playable acceptance
 
 App Bundle delivery, current target requirements, 4/16 KiB native runtime support,
