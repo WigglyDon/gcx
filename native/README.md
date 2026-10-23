@@ -180,10 +180,9 @@ Reproduce using a NEW private fixture directory, never an owner profile:
 ```sh
 cargo xtask source-check
 cargo xtask build-host
-GCX_ENGINE_LIB_DIR="$PWD/build/host/gcx" cargo build -p gcx --features native-engine --bin gcx-checkpoint-probe
-LD_LIBRARY_PATH="$PWD/build/host/gcx" timeout 180 target/debug/gcx-checkpoint-probe NEW_PRIVATE_FIXTURE .local/source/dolphin/Data/Sys
-# Separate bounded same-process reentry coverage (original fixtures only):
 GCX_ENGINE_LIB_DIR="$PWD/build/host/gcx" cargo build --release -p gcx --features native-engine --bin gcx-checkpoint-probe
+LD_LIBRARY_PATH="$PWD/build/host/gcx" timeout 120 target/release/gcx-checkpoint-probe NEW_PRIVATE_FIXTURE .local/source/dolphin/Data/Sys
+# Separate bounded same-process reentry coverage (original fixtures only):
 LD_LIBRARY_PATH="$PWD/build/host/gcx" timeout 90 target/release/gcx-checkpoint-probe ANOTHER_NEW_PRIVATE_FIXTURE .local/source/dolphin/Data/Sys --reentry
 ```
 
