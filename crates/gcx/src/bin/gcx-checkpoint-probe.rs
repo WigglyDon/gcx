@@ -20,6 +20,7 @@ mod host {
         io::{self, Write},
         path::{Path, PathBuf},
         process::Command,
+        sync::atomic::{AtomicU32, Ordering},
         time::{Duration, Instant},
     };
     type Result<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
@@ -33,6 +34,27 @@ mod host {
         binding: Binding,
         counter: u32,
         gpr4: u32,
+    }
+    static READ_FAULT: AtomicU32 = AtomicU32::new(0);
+    unsafe extern "C" fn checked_read(
+        path: *const c_char,
+        data: *mut u8,
+        capacity: usize,
+        length: *mut usize,
+    ) -> i32 {
+        let name = unsafe { CStr::from_ptr(path) }.to_bytes();
+        let fault = READ_FAULT.load(Ordering::Acquire);
+        let selected = fault == 1 && name.windows(12).any(|x| x == b"MemoryCardA.")
+            || fault == 2 && name.ends_with(b"/SRAM.raw");
+        if selected && capacity > 0 {
+            if !length.is_null() {
+                unsafe {
+                    *length = 0;
+                }
+            }
+            return -1; // Original isolated failed-read acknowledgment; no file mutation.
+        }
+        unsafe { storage::read_image(path, data, capacity, length) }
     }
     struct Native;
     impl Drop for Native {
@@ -88,10 +110,11 @@ mod host {
         let sys = c_path(sys)?;
         let media = c_path(&profile.join("counter-probe.dol"))?;
         unsafe {
-            if gcx_engine_abi() != 6 {
+            if gcx_engine_abi() != 7 {
                 return Err("wrong native ABI".into());
             }
             gcx_engine_card_writer(storage::write_card);
+            gcx_engine_saved_reader(checked_read);
             if gcx_engine_init(
                 user.as_ptr(),
                 sys.as_ptr(),
@@ -298,6 +321,60 @@ mod host {
                     "PASS gate: newer durable saves refused before any native startup/mutation"
                 );
             }
+            "fail-read-card" | "fail-read-sram" => {
+                let generation = storage::save_generation(profile)?;
+                READ_FAULT.store(
+                    if phase == "fail-read-card" { 1 } else { 2 },
+                    Ordering::Release,
+                );
+                let native = start(profile, sys, true)?;
+                assert_eq!(unsafe { gcx_engine_recovery_required() }, 1);
+                assert_eq!(
+                    unsafe { gcx_engine_probe_word() },
+                    0,
+                    "failed read executes no guest"
+                );
+                unsafe {
+                    gcx_engine_pause(0);
+                }
+                assert_eq!(
+                    unsafe { gcx_engine_state() },
+                    1,
+                    "failed image cannot resume"
+                );
+                assert_eq!(unsafe { gcx_engine_flush_cards() }, 0);
+                assert!(capture(checkpoint::PAYLOAD_LIMIT).is_err());
+                drop(native);
+                generation.verify(profile)?;
+                READ_FAULT.store(0, Ordering::Release);
+                let native = start(profile, sys, true)?;
+                assert_eq!(unsafe { gcx_engine_recovery_required() }, 0);
+                assert_eq!(unsafe { gcx_engine_probe_word() }, 0);
+                unsafe {
+                    gcx_engine_pause(0);
+                }
+                let deadline = Instant::now() + Duration::from_secs(2);
+                while unsafe { gcx_engine_probe_word() } == 0 && Instant::now() < deadline {
+                    unsafe {
+                        gcx_engine_dispatch();
+                    }
+                    std::thread::sleep(Duration::from_millis(2));
+                }
+                unsafe {
+                    gcx_engine_pause(1);
+                }
+                assert_ne!(
+                    unsafe { gcx_engine_probe_word() },
+                    0,
+                    "fresh checked init can execute after fault removed"
+                );
+                assert_eq!(unsafe { gcx_engine_flush_cards() }, 1);
+                drop(native);
+                generation.verify(profile)?;
+                println!(
+                    "PASS {phase}: native read failure refused execution/persistence, retained card/SRAM through teardown, and fresh checked initialization recovered"
+                );
+            }
             "fail-truncated" | "fail-card-image" => {
                 let r = reference(profile, "latest.json")?;
                 let mut state = checkpoint::load(profile, &r.id, &expected)?;
@@ -323,7 +400,7 @@ mod host {
                     },
                     0
                 );
-                assert_eq!(unsafe { gcx_engine_checkpoint_failed() }, 1);
+                assert_eq!(unsafe { gcx_engine_recovery_required() }, 1);
                 unsafe {
                     gcx_engine_pause(0);
                 }
@@ -527,6 +604,8 @@ mod host {
             "reject-newer",
             "fail-truncated",
             "fail-card-image",
+            "fail-read-card",
+            "fail-read-sram",
         ] {
             let status = Command::new(&exe)
                 .arg("--phase")

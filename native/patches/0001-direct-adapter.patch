@@ -204,19 +204,57 @@ index 8ae3bf6..3271440 100644
    builder.AddData("os-type", "osx");
  
 diff --git a/Source/Core/Core/HW/EXI/EXI.cpp b/Source/Core/Core/HW/EXI/EXI.cpp
-index 144fdd5..f86ef07 100644
+index 144fdd5..6155cf0 100644
 --- a/Source/Core/Core/HW/EXI/EXI.cpp
 +++ b/Source/Core/Core/HW/EXI/EXI.cpp
-@@ -27,6 +27,8 @@
+@@ -4,11 +4,13 @@
+ #include "Core/HW/EXI/EXI.h"
+ 
+ #include <array>
++#include <atomic>
+ #include <memory>
+ 
+ #include "Common/ChunkFile.h"
+ #include "Common/CommonTypes.h"
+ #include "Common/IOFile.h"
++#include "Common/MsgHandler.h"
+ 
+ #include "Core/Config/MainSettings.h"
+ #include "Core/ConfigManager.h"
+@@ -27,6 +29,32 @@
  
  namespace ExpansionInterface
  {
 +static SramWriteHandler s_sram_write_handler = nullptr;
 +void SetSramWriteHandler(SramWriteHandler handler) { s_sram_write_handler = handler; }
++static ImageReadHandler s_image_read_handler = nullptr;
++static std::atomic<bool> s_image_read_failed = false;
++void SetImageReadHandler(ImageReadHandler handler)
++{
++  s_image_read_handler = handler;
++  s_image_read_failed = false;
++}
++bool ImageReadFailed() { return s_image_read_failed; }
++void FailImageRead()
++{
++  if (!s_image_read_failed.exchange(true))
++    CriticalAlertFmtT("Could not read a saved card or console image. Original files are retained. "
++                   "Restart after resolving the read error.");
++}
++int ReadImage(const std::string& path, std::span<u8> bytes, size_t* length)
++{
++  if (!s_image_read_handler)
++    return -2;
++  const int result = s_image_read_handler(path, bytes, length);
++  if (result < 0)
++    FailImageRead();
++  return result;
++}
++
  ExpansionInterfaceManager::ExpansionInterfaceManager(Core::System& system) : m_system(system)
  {
  }
-@@ -169,12 +171,21 @@ void ExpansionInterfaceManager::Shutdown()
+@@ -169,12 +197,21 @@ void ExpansionInterfaceManager::Shutdown()
  
    CEXIMemoryCard::Shutdown();
  
@@ -241,7 +279,7 @@ index 144fdd5..f86ef07 100644
  
  void ExpansionInterfaceManager::DoState(PointerWrap& p)
 diff --git a/Source/Core/Core/HW/EXI/EXI.h b/Source/Core/Core/HW/EXI/EXI.h
-index 7ded905..bd82b18 100644
+index 7ded905..e12db78 100644
 --- a/Source/Core/Core/HW/EXI/EXI.h
 +++ b/Source/Core/Core/HW/EXI/EXI.h
 @@ -6,6 +6,8 @@
@@ -253,17 +291,23 @@ index 7ded905..bd82b18 100644
  
  #include "Common/CommonTypes.h"
  #include "Common/EnumFormatter.h"
-@@ -30,6 +32,9 @@ class Mapping;
+@@ -30,6 +32,15 @@ class Mapping;
  
  namespace ExpansionInterface
  {
 +// gcx: ordinary console data shares the host's durable profile writer.
 +using SramWriteHandler = bool (*)(const std::string&, std::span<const u8>);
 +void SetSramWriteHandler(SramWriteHandler handler);
++// gcx optional checked profile reader: -2 no hook, -1 failure, 0 missing, 1 read.
++using ImageReadHandler = int (*)(const std::string&, std::span<u8>, size_t*);
++void SetImageReadHandler(ImageReadHandler handler);
++int ReadImage(const std::string& path, std::span<u8> bytes, size_t* length);
++void FailImageRead();
++bool ImageReadFailed();
  class CEXIChannel;
  class IEXIDevice;
  enum class EXIDeviceType : int;
-@@ -72,6 +77,7 @@ public:
+@@ -72,6 +83,7 @@ public:
  
    void Init(const Sram* override_sram);
    void Shutdown();
@@ -378,10 +422,10 @@ index 5805b90..ca4dee8 100644
  
  protected:
 diff --git a/Source/Core/Core/HW/GCMemcard/GCMemcardRaw.cpp b/Source/Core/Core/HW/GCMemcard/GCMemcardRaw.cpp
-index 1a8644b..94d0b03 100644
+index 1a8644b..624e580 100644
 --- a/Source/Core/Core/HW/GCMemcard/GCMemcardRaw.cpp
 +++ b/Source/Core/Core/HW/GCMemcard/GCMemcardRaw.cpp
-@@ -35,6 +35,36 @@
+@@ -35,22 +35,93 @@
  #define SIZE_TO_Mb (1024 * 8 * 16)
  #define MC_HDR_SIZE 0xA000
  
@@ -397,7 +441,7 @@ index 1a8644b..94d0b03 100644
 +bool MemoryCard::CommitSnapshot(bool force)
 +{
 +  std::lock_guard commit(m_commit_mutex);
-+  if (!s_write_handler)
++  if (!s_write_handler || m_read_failed || ExpansionInterface::ImageReadFailed())
 +    return false;
 +  if (!force && m_has_committed && !m_dirty.IsSet())
 +    return true;
@@ -418,7 +462,74 @@ index 1a8644b..94d0b03 100644
  MemoryCard::MemoryCard(std::string filename, ExpansionInterface::Slot card_slot, u16 size_mbits)
      : MemoryCardBase(card_slot, size_mbits), m_filename(std::move(filename))
  {
-@@ -107,6 +137,15 @@ void MemoryCard::FlushThread()
+-  File::IOFile file(m_filename, "rb");
+-  if (file)
++  size_t length = 0;
++  const int read_result = ExpansionInterface::ReadImage(m_filename, {}, &length);
++  bool create_new = false;
++  if (read_result != -2)
+   {
+-    // Measure size of the existing memcard file.
+-    m_memory_card_size = (u32)file.GetSize();
+-    m_nintendo_card_id = m_memory_card_size / SIZE_TO_Mb;
+-    m_memcard_data = std::make_unique<u8[]>(m_memory_card_size);
+-    memset(&m_memcard_data[0], 0xFF, m_memory_card_size);
+-
+-    INFO_LOG_FMT(EXPANSIONINTERFACE, "Reading memory card {}", m_filename);
+-    file.ReadBytes(&m_memcard_data[0], m_memory_card_size);
++    if (read_result == 1 && length >= MC_HDR_SIZE && length <= 16 * 1024 * 1024)
++    {
++      m_memory_card_size = static_cast<u32>(length);
++      m_nintendo_card_id = m_memory_card_size / SIZE_TO_Mb;
++      m_memcard_data = std::make_unique<u8[]>(m_memory_card_size);
++      size_t actual = length;
++      m_read_failed = ExpansionInterface::ReadImage(
++                          m_filename, {m_memcard_data.get(), m_memory_card_size}, &actual) != 1 ||
++                      actual != length;
++    }
++    else if (read_result == 0)
++    {
++      create_new = true;
++    }
++    else
++    {
++      m_read_failed = true;
++    }
++    if (m_read_failed)
++    {
++      ExpansionInterface::FailImageRead();
++      m_nintendo_card_id = size_mbits;
++      m_memory_card_size = size_mbits * SIZE_TO_Mb;
++      m_memcard_data = std::make_unique<u8[]>(m_memory_card_size);
++      std::memset(m_memcard_data.get(), 0xFF, m_memory_card_size);
++      // Safe inert device, with no formatter, writer or flush thread. The host
++      // refuses execution and all profile persistence after this read failure.
++      return;
++    }
+   }
+   else
++  {
++    File::IOFile file(m_filename, "rb");
++    if (file)
++    {
++      // Original standalone Dolphin path without the gcx read hook.
++      m_memory_card_size = (u32)file.GetSize();
++      m_nintendo_card_id = m_memory_card_size / SIZE_TO_Mb;
++      m_memcard_data = std::make_unique<u8[]>(m_memory_card_size);
++      memset(&m_memcard_data[0], 0xFF, m_memory_card_size);
++      INFO_LOG_FMT(EXPANSIONINTERFACE, "Reading memory card {}", m_filename);
++      file.ReadBytes(&m_memcard_data[0], m_memory_card_size);
++    }
++    else
++    {
++      create_new = true;
++    }
++  }
++  if (create_new)
+   {
+     // Create a new 128Mb memcard
+     m_nintendo_card_id = size_mbits;
+@@ -107,6 +178,15 @@ void MemoryCard::FlushThread()
      // If triggered, we're exiting.
      // If timed out, check if we need to flush.
      const bool do_exit = m_flush_trigger.WaitFor(flush_interval);
@@ -435,7 +546,7 @@ index 1a8644b..94d0b03 100644
      {
        const bool is_dirty = m_dirty.TestAndClear();
 diff --git a/Source/Core/Core/HW/GCMemcard/GCMemcardRaw.h b/Source/Core/Core/HW/GCMemcard/GCMemcardRaw.h
-index 96e7a29..6f3d9b4 100644
+index 96e7a29..48ae7fe 100644
 --- a/Source/Core/Core/HW/GCMemcard/GCMemcardRaw.h
 +++ b/Source/Core/Core/HW/GCMemcard/GCMemcardRaw.h
 @@ -7,6 +7,7 @@
@@ -465,15 +576,53 @@ index 96e7a29..6f3d9b4 100644
    bool IsAddressInBounds(u32 address, u32 length) const
    {
      const u64 end_address = static_cast<u64>(address) + static_cast<u64>(length);
-@@ -41,6 +47,8 @@ private:
+@@ -41,6 +47,9 @@ private:
    std::unique_ptr<u8[]> m_flush_buffer;
    std::thread m_flush_thread;
    std::mutex m_flush_mutex;
 +  std::mutex m_commit_mutex;
++  bool m_read_failed = false;  // gcx: a failed load can never publish fallback bytes.
 +  bool m_has_committed = false;  // Protected by m_commit_mutex; gcx, 2026-10-22.
    Common::Event m_flush_trigger;
    Common::Flag m_dirty;
    u32 m_memory_card_size;
+diff --git a/Source/Core/Core/HW/Sram.cpp b/Source/Core/Core/HW/Sram.cpp
+index db30134..d3f33b4 100644
+--- a/Source/Core/Core/HW/Sram.cpp
++++ b/Source/Core/Core/HW/Sram.cpp
+@@ -3,6 +3,8 @@
+ 
+ #include "Core/HW/Sram.h"
+ 
++#include <cstring>
++
+ #include "Common/CommonTypes.h"
+ #include "Common/IOFile.h"
+ #include "Common/Logging/Log.h"
+@@ -32,6 +34,23 @@ const Sram sram_dump = {Common::BigEndianValue<u32>{0},
+ 
+ void InitSRAM(Sram* sram, const std::string& filename)
+ {
++  std::array<u8, sizeof(Sram)> image{};
++  size_t length = image.size();
++  const int result = ExpansionInterface::ReadImage(filename, image, &length);
++  if (result != -2)
++  {
++    if (result == 1 && length == image.size())
++    {
++      std::memcpy(sram, image.data(), image.size());
++      return;
++    }
++    if (result == 1)
++      ExpansionInterface::FailImageRead();
++    // An absent file may use defaults. A failed read is quarantined by the
++    // host; these inert defaults must never replace an existing disk image.
++    *sram = sram_dump;
++    return;
++  }
+   File::IOFile file(filename, "rb");
+   if (file)
+   {
 diff --git a/Source/Core/Core/HW/WiimoteReal/IOAndroid.h b/Source/Core/Core/HW/WiimoteReal/IOAndroid.h
 index 4a79b90..db4b3b7 100644
 --- a/Source/Core/Core/HW/WiimoteReal/IOAndroid.h

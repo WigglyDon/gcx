@@ -10,6 +10,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+typedef int (*gcx_saved_read_fn)(const char* path, uint8_t* bytes, uintptr_t capacity, uintptr_t* length);
 typedef int (*gcx_card_write_fn)(const char* path, const uint8_t* bytes, uintptr_t length);
 typedef int (*gcx_checkpoint_write_fn)(void* context, const uint8_t* bytes, uintptr_t length);
 typedef void (*gcx_event_fn)(void* context, uint32_t event, const char* message);
@@ -23,6 +24,8 @@ typedef struct gcx_pad_status { uint16_t buttons; uint8_t axes[4]; uint8_t trigg
 typedef gcx_rect (*gcx_ui_fn)(uint32_t phase, float width, float height, float aspect);
 GCX_EXPORT uint32_t gcx_engine_abi(void);
 GCX_EXPORT void gcx_engine_card_writer(gcx_card_write_fn writer);
+// ABI7: 1 exact/query read, 0 genuinely absent, -1 failure. Null/zero queries size.
+GCX_EXPORT void gcx_engine_saved_reader(gcx_saved_read_fn reader);
 GCX_EXPORT int gcx_engine_flush_cards(void);
 GCX_EXPORT void gcx_engine_platform(gcx_platform_fn platform);
 GCX_EXPORT void gcx_engine_ui(gcx_ui_fn ui);
@@ -35,7 +38,7 @@ GCX_EXPORT uint32_t gcx_engine_checkpoint_abi(void);
 GCX_EXPORT int gcx_engine_checkpoint_capture(uintptr_t limit, gcx_checkpoint_write_fn writer, void* context);
 GCX_EXPORT int gcx_engine_checkpoint_load(uint8_t* bytes, uintptr_t length);
 // Failed deserialization blocks all persistence until joined shutdown/new init.
-GCX_EXPORT int gcx_engine_checkpoint_failed(void);
+GCX_EXPORT int gcx_engine_recovery_required(void);
 GCX_EXPORT int gcx_engine_inspect(const char* media, gcx_media_info* info);
 GCX_EXPORT void gcx_engine_dispatch(void);
 GCX_EXPORT int gcx_engine_state(void);

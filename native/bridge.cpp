@@ -32,6 +32,7 @@
 #include <atomic>
 
 static gcx_card_write_fn s_card_writer = nullptr;
+static gcx_saved_read_fn s_saved_reader = nullptr;
 static gcx_event_fn s_event = nullptr;
 static void* s_event_context = nullptr;
 static gcx_platform_fn s_platform = nullptr;
@@ -64,8 +65,9 @@ bool Host_UpdateDiscordPresenceRaw(const std::string& details, const std::string
     int64_t start_timestamp, int64_t end_timestamp, int party_size, int party_max) { return false; }
 std::unique_ptr<GBAHostInterface> Host_CreateGBAHost(std::weak_ptr<HW::GBA::Core> core) { return nullptr; }
 
-uint32_t gcx_engine_abi() { return 6; }
+uint32_t gcx_engine_abi() { return 7; }
 void gcx_engine_card_writer(gcx_card_write_fn writer) { s_card_writer = writer; }
+void gcx_engine_saved_reader(gcx_saved_read_fn reader) { s_saved_reader = reader; }
 void gcx_engine_platform(gcx_platform_fn platform) { s_platform = platform; }
 void gcx_engine_ui(gcx_ui_fn ui) { s_ui = ui; }
 extern "C" int64_t gcx_platform_dispatch(uint32_t op, const char* path, const char* argument, char* output, uintptr_t capacity)
@@ -98,13 +100,24 @@ int gcx_engine_init(const char* user, const char* sys, gcx_event_fn event, void*
     return 0;
   }
 #endif
+  if (!s_saved_reader)
+  {
+    Event(2, "A checked saved-image reader is required before initialization.");
+    Common::RegisterMsgAlertHandler(nullptr);
+    s_event = nullptr;
+    s_event_context = nullptr;
+    return 0;
+  }
+  ExpansionInterface::SetImageReadHandler([](const std::string& path, std::span<u8> bytes, size_t* length) {
+    return s_saved_reader ? s_saved_reader(path.c_str(), bytes.data(), bytes.size(), length) : -1;
+  });
   UICommon::SetUserDirectory(user);
   UICommon::CreateDirectories();
   UICommon::Init();
   Config::SetBaseOrCurrent(Config::MAIN_SLOT_A, ExpansionInterface::EXIDeviceType::MemoryCard);
   Config::SetBaseOrCurrent(Config::MAIN_SLOT_B, ExpansionInterface::EXIDeviceType::None);
   MemoryCard::SetWriteHandler([](const std::string& path, std::span<const u8> data) {
-    if (s_persistence_blocked)
+    if (s_persistence_blocked || ExpansionInterface::ImageReadFailed())
       return false;
     const bool ok = s_card_writer && s_card_writer(path.c_str(), data.data(), data.size()) != 0;
     if (!ok)
@@ -112,7 +125,7 @@ int gcx_engine_init(const char* user, const char* sys, gcx_event_fn event, void*
     return ok;
   });
   ExpansionInterface::SetSramWriteHandler([](const std::string& path, std::span<const u8> data) {
-    if (s_persistence_blocked)
+    if (s_persistence_blocked || ExpansionInterface::ImageReadFailed())
       return false;
     const bool ok = s_card_writer && s_card_writer(path.c_str(), data.data(), data.size()) != 0;
     if (!ok)
@@ -190,7 +203,7 @@ uint32_t gcx_engine_probe_word()
 }
 void gcx_engine_pause(int paused)
 {
-  if (!paused && s_checkpoint_failed)
+  if (!paused && gcx_engine_recovery_required())
     return;
   Core::SetState(Core::System::GetInstance(), paused ? Core::State::Paused : Core::State::Running);
   if (paused && Core::IsRunning(Core::System::GetInstance()))
@@ -224,7 +237,7 @@ void gcx_engine_pad_status(gcx_pad_status* status)
 int gcx_engine_flush_cards()
 {
   auto& system = Core::System::GetInstance();
-  if (!Core::IsRunning(system) || s_persistence_blocked)
+  if (!Core::IsRunning(system) || s_persistence_blocked || ExpansionInterface::ImageReadFailed())
     return 0;
   const Core::CPUThreadGuard guard(system);
   auto* device = system.GetExpansionInterface().GetDevice(ExpansionInterface::Slot::A);
@@ -234,11 +247,11 @@ int gcx_engine_flush_cards()
          system.GetExpansionInterface().FlushSRAM();
 }
 uint32_t gcx_engine_checkpoint_abi() { return 1; }
-int gcx_engine_checkpoint_failed() { return s_checkpoint_failed; }
+int gcx_engine_recovery_required() { return s_checkpoint_failed || ExpansionInterface::ImageReadFailed(); }
 int gcx_engine_checkpoint_capture(uintptr_t limit, gcx_checkpoint_write_fn writer, void* context)
 {
   auto& system = Core::System::GetInstance();
-  if (!writer || !limit || Core::GetState(system) != Core::State::Paused || s_checkpoint_failed)
+  if (!writer || !limit || Core::GetState(system) != Core::State::Paused || gcx_engine_recovery_required())
     return 0;
   const Core::CPUThreadGuard guard(system);
   if (!gcx_engine_flush_cards())
@@ -252,7 +265,7 @@ int gcx_engine_checkpoint_capture(uintptr_t limit, gcx_checkpoint_write_fn write
 int gcx_engine_checkpoint_load(uint8_t* bytes, uintptr_t length)
 {
   auto& system = Core::System::GetInstance();
-  if (!bytes || !length || Core::GetState(system) != Core::State::Paused || s_checkpoint_failed)
+  if (!bytes || !length || Core::GetState(system) != Core::State::Paused || gcx_engine_recovery_required())
     return 0;
   const Core::CPUThreadGuard guard(system);
   s_persistence_blocked = true;
@@ -272,7 +285,9 @@ void gcx_engine_shutdown()
   Core::Shutdown(Core::System::GetInstance());
   MemoryCard::SetWriteHandler(nullptr);
   ExpansionInterface::SetSramWriteHandler(nullptr);
+  ExpansionInterface::SetImageReadHandler(nullptr);
   s_card_writer = nullptr;
+  s_saved_reader = nullptr;
   s_overlay_hook = {};
   s_present_hook = {};
   ciface::Touch::UnregisterGameCubeInputOverrider(0);

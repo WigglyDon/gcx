@@ -110,7 +110,7 @@ pub fn write(root: &Path, source: &Path) -> Result<()> {
         }
     }
     let binding = serde_json::json!({
-        "schema":1,"native_abi":6,"checkpoint_abi":1,"first_party_head":output(Command::new("git").args(["rev-parse","HEAD"]).current_dir(root))?.trim(),
+        "schema":1,"native_abi":7,"checkpoint_abi":1,"first_party_head":output(Command::new("git").args(["rev-parse","HEAD"]).current_dir(root))?.trim(),
         "source_inventory_sha256":digest(&manifest)?,"source_files":paths.len(),
         "dolphin_commit":output(Command::new("git").arg("-C").arg(source).args(["rev-parse","HEAD"]))?.trim(),
         "dolphin_sys_tree":output(Command::new("git").arg("-C").arg(source).args(["rev-parse","HEAD:Data/Sys"]))?.trim(),

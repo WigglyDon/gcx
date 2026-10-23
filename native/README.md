@@ -1,5 +1,48 @@
 # Direct Dolphin integration
 
+## Checked native save reads, 2026-10-22
+
+ABI7 closes an additional coherence gap found after the ABI6 candidate: the native
+raw-card constructor treated a failed open as absence and ignored the full-read
+result; SRAM initialization fell back to defaults on read errors. Disk generation
+hashes alone could therefore match while newly initialized native RAM contained
+fallback bytes. A later forced write could replace existing data. The earlier
+ABI6 candidates remain preserved as source-bound development artifacts; they are
+not acceptance of this read-failure case.
+
+An optional native image-read callback now delegates existing card/SRAM reads to
+Rust. Rust distinguishes genuine absence from errors, owns path/canonical-profile
+checks and verifies exact length/hash against the admitted generation. Supported
+raw sizes are the GameCube powers of two from512KiB through16MiB, with68-byte SRAM;
+unsupported/truncated files are retained, never resized or reformatted. Missing
+read observations reject unexpected later file creation until a new admission.
+The donor raw-card formatter runs only for genuine absence. Checked read failure
+creates only an inert in-memory device, with no formatter or flush thread, and
+marks that runtime for recovery. All profile persistence stays blocked through
+shutdown, and the Rust host's paused-start protocol prevents guest execution.
+SRAM's initialized
+byte buffer avoids passing uninitialized native storage to Rust. Standalone
+upstream file-read behavior remains the fallback when no hook is installed.
+
+The existing native recovery getter is generalized as
+`gcx_engine_recovery_required`; ABI7 requires the saved-image reader before init.
+The Rust app uses paused boot for fresh starts as well as restore, then resumes a
+healthy ready runtime. This is the same emulated boot/DSP-HLE/native backend route,
+with an acknowledgment barrier before execution. Read causes remain visible and
+retained. No new firmware, frontend, profile, shared framework or second runtime.
+
+36 focused Rust tests pass. New read cases cover exact images, changed/truncated
+bytes, bad SRAM length, missing→unexpected creation and dangling links without
+replacing files. Actual native checkpoint tests now pass in seven fresh processes,
+including failed card/SRAM read acknowledgments: no guest execution, no resume or
+persistence, unchanged ordinary generations through teardown, and recovery after
+fresh checked init with the fault removed. State/card-protocol/event/newer-state/
+truncation/card-image cases pass again. Same-process A→B→A→B exact scene/card
+isolation and the original CPU/pad/card failure/retry/teardown regressions pass.
+These are original Null-video/audio fixtures, not gameplay or Android acceptance.
+Host/ARM64 native builds and warnings-denied Rust checks pass. Hardware remains
+unrun; all working/candidate APKs and actual card backups stay protected.
+
 ## Library and launcher follow-up, 2026-10-22
 
 Latest prepared Rust UI/launch implementation:

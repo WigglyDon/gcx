@@ -25,3 +25,8 @@ Git path arguments are literal: a local filename containing a wildcard cannot
 stand in for tracked inputs. Actual refusal tests injected an ordinary untracked
 INI and a literal wildcard filename, verified rejection, then removed only those
 owned fixtures and rechecked the source graph. No new packaged assets are admitted.
+
+The ABI7 host configuration identity additionally records checked-profile-read1;
+resource bytes remain the pinned selection. Native saved-image reads use Rust's
+owned profile paths and exact expected image bytes rather than an unacknowledged
+native fallback. This adds no packaged BIOS, firmware or startup artwork.

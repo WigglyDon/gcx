@@ -155,10 +155,11 @@ fn fixture(
     // SAFETY: one host thread owns all native entrypoints and borrowed C strings.
     // The callback uses atomics, never unwinds, and remains alive through shutdown.
     unsafe {
-        if gcx_engine_abi() != 6 {
+        if gcx_engine_abi() != 7 {
             return Err("incompatible engine ABI".into());
         }
         gcx_engine_card_writer(gcx::storage::write_card);
+        gcx_engine_saved_reader(gcx::storage::read_image);
         if gcx_engine_init(
             user.as_ptr(),
             sys.as_ptr(),

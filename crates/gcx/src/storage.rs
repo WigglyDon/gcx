@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     ffi::{CStr, c_char},
     fs::{File, OpenOptions},
     io::{self, Read, Write},
@@ -214,9 +214,10 @@ pub(crate) fn valid_digest(value: &str) -> bool {
 struct Store {
     root: PathBuf,
     generation: SaveGeneration,
+    missing_reads: BTreeSet<String>,
 }
 impl Store {
-    fn write(&mut self, path: &Path, bytes: &[u8]) -> io::Result<()> {
+    fn owned_image(&self, path: &Path) -> io::Result<(PathBuf, String)> {
         let normalized = path
             .parent()
             .ok_or_else(|| io::Error::other("missing save parent"))?
@@ -233,6 +234,11 @@ impl Store {
             .filter(|s| image_name(s))
             .ok_or_else(|| io::Error::other("unexpected native save path"))?
             .to_owned();
+        Ok((normalized, relative))
+    }
+    fn write(&mut self, path: &Path, bytes: &[u8]) -> io::Result<()> {
+        let (normalized, relative) = self.owned_image(path)?;
+        let path = normalized.as_path();
         // A failed earlier publication is reconciled from disk, never rolled back.
         if let Some(pending) = &self.generation.pending {
             // Only our acknowledged old bytes or our interrupted replacement are
@@ -269,6 +275,14 @@ impl Store {
                 "ordinary save changed outside this runtime; restart with current saves",
             ));
         }
+        if actual.is_some()
+            && !self.generation.images.contains_key(&relative)
+            && self.missing_reads.contains(&relative)
+        {
+            return Err(io::Error::other(
+                "a save appeared after the native missing-file read; current file retained",
+            ));
+        }
         let hash = digest(bytes);
         if self.generation.images.get(&relative) == Some(&hash) {
             // Still acknowledge real file/directory sync on an explicit barrier.
@@ -286,9 +300,10 @@ impl Store {
         atomic_replace(path, bytes)?;
         let mut committed = self.generation.clone();
         committed.pending = None;
-        committed.images.insert(relative, hash);
+        committed.images.insert(relative.clone(), hash);
         committed.publish(&self.root)?;
         self.generation = committed;
+        self.missing_reads.remove(&relative);
         Ok(())
     }
 }
@@ -329,6 +344,7 @@ impl CardStore {
         *active = Some(Store {
             root: profile,
             generation,
+            missing_reads: BTreeSet::new(),
         });
         Ok(Self)
     }
@@ -372,6 +388,110 @@ pub(crate) fn atomic_replace_parts(path: &Path, parts: &[&[u8]]) -> io::Result<(
     std::fs::rename(&temporary, path)?;
     File::open(parent)?.sync_all()?;
     Ok(())
+}
+/// Native saved-image reader. Query with a null buffer/capacity0, then fill the
+/// exact queried size. Return1present,0genuinely absent,-1error. Existing images
+/// must match the bound durable generation; an I/O error is never a new card.
+///
+/// # Safety
+/// `filename` is a NUL-terminated string, `length` is writable, and nonzero
+/// `capacity` lends a writable buffer of that size until this call returns.
+pub unsafe extern "C" fn read_image(
+    filename: *const c_char,
+    data: *mut u8,
+    capacity: usize,
+    length: *mut usize,
+) -> i32 {
+    if filename.is_null() || length.is_null() || capacity > 64 * 1024 * 1024 {
+        return -1;
+    }
+    unsafe {
+        *length = 0;
+    }
+    let result = (|| -> io::Result<i32> {
+        let path = Path::new(std::ffi::OsStr::from_bytes(
+            unsafe { CStr::from_ptr(filename) }.to_bytes(),
+        ));
+        let mut active = ROOT
+            .lock()
+            .map_err(|_| io::Error::other("save store poisoned"))?;
+        let store = active
+            .as_mut()
+            .ok_or_else(|| io::Error::other("no bound saved-image owner"))?;
+        let (path, relative) = store.owned_image(path)?;
+        if store.generation.pending.is_some()
+            || SaveGeneration::read(&store.root)? != store.generation
+        {
+            return Err(io::Error::other(
+                "save metadata changed or has a pending write; restart with current files",
+            ));
+        }
+        let metadata = match path.symlink_metadata() {
+            Ok(metadata) => metadata,
+            Err(e)
+                if e.kind() == io::ErrorKind::NotFound
+                    && !store.generation.images.contains_key(&relative) =>
+            {
+                store.missing_reads.insert(relative);
+                return Ok(0);
+            }
+            Err(e) => return Err(e),
+        };
+        if !metadata.is_file() || metadata.file_type().is_symlink() {
+            return Err(io::Error::other(
+                "saved image is not an ordinary file; original retained",
+            ));
+        }
+        // ENOENT here is an error: an admitted/present file disappeared between
+        // the existence check and open, rather than a genuinely new profile.
+        let mut file = File::open(&path)?;
+        let size = usize::try_from(file.metadata()?.len()).map_err(io::Error::other)?;
+        let valid_size = if relative == "GC/SRAM.raw" {
+            size == 68
+        } else {
+            (512 * 1024..=16 * 1024 * 1024).contains(&size) && size.is_power_of_two()
+        };
+        if !valid_size {
+            return Err(io::Error::other(
+                "unsupported or truncated saved image; original retained",
+            ));
+        }
+        let expected = store.generation.images.get(&relative).ok_or_else(|| {
+            io::Error::other("saved image appeared after writer admission; original retained")
+        })?;
+        if capacity == 0 {
+            unsafe {
+                *length = size;
+            }
+            return Ok(1);
+        }
+        if data.is_null() || capacity != size {
+            return Err(io::Error::other(
+                "saved image size changed during native load",
+            ));
+        }
+        let bytes = unsafe { std::slice::from_raw_parts_mut(data, capacity) };
+        file.read_exact(bytes)?;
+        let mut trailing = [0];
+        if file.read(&mut trailing)? != 0 || digest(bytes) != *expected {
+            return Err(io::Error::other(
+                "saved image changed or could not be read exactly; original retained",
+            ));
+        }
+        unsafe {
+            *length = size;
+        }
+        Ok(1)
+    })();
+    match result {
+        Ok(status) => status,
+        Err(error) => {
+            if let Ok(mut saved) = ERROR.lock() {
+                *saved = Some(error.to_string());
+            }
+            -1
+        }
+    }
 }
 /// Native lends the path and complete card bytes only for this synchronous call.
 /// Returns success only after file sync, atomic rename and directory sync.
@@ -444,6 +564,70 @@ mod tests {
     fn native_write(path: &Path, bytes: &[u8]) -> i32 {
         let path = std::ffi::CString::new(path.as_os_str().as_bytes()).unwrap();
         unsafe { write_card(path.as_ptr(), bytes.as_ptr(), bytes.len()) }
+    }
+    fn native_read(path: &Path, buffer: Option<&mut [u8]>) -> (i32, usize) {
+        let path = std::ffi::CString::new(path.as_os_str().as_bytes()).unwrap();
+        let (data, capacity) =
+            buffer.map_or((std::ptr::null_mut(), 0), |b| (b.as_mut_ptr(), b.len()));
+        let mut length = usize::MAX;
+        let result = unsafe { read_image(path.as_ptr(), data, capacity, &mut length) };
+        (result, length)
+    }
+    #[test]
+    fn checked_reader_loads_exact_card_and_console_but_refuses_changed_or_truncated_images() {
+        let _serial = STORE_TEST_LOCK.lock().unwrap();
+        let root = isolated("checked-read");
+        let writer = CardStore::bind(&root).unwrap();
+        let card = root.join("GC/MemoryCardA.fixture.raw");
+        let console = root.join("GC/SRAM.raw");
+        let card_bytes = vec![0x51; 512 * 1024];
+        assert_eq!(native_write(&card, &card_bytes), 1);
+        assert_eq!(native_write(&console, &[0x21; 68]), 1);
+        assert_eq!(native_read(&card, None), (1, card_bytes.len()));
+        let mut loaded = vec![0; card_bytes.len()];
+        assert_eq!(native_read(&card, Some(&mut loaded)), (1, card_bytes.len()));
+        assert_eq!(loaded, card_bytes);
+        let mut sram = [0; 68];
+        assert_eq!(native_read(&console, Some(&mut sram)), (1, 68));
+        assert_eq!(sram, [0x21; 68]);
+        // Same capacity but changed bytes cannot silently become native RAM.
+        atomic_replace(&card, &vec![0x52; card_bytes.len()]).unwrap();
+        assert_eq!(native_read(&card, Some(&mut loaded)), (-1, 0));
+        assert_eq!(std::fs::read(&card).unwrap(), vec![0x52; card_bytes.len()]);
+        // A truncate between query and fill never becomes a new card.
+        atomic_replace(&card, b"truncated original fixture").unwrap();
+        assert_eq!(native_read(&card, Some(&mut loaded)), (-1, 0));
+        assert_eq!(std::fs::read(&card).unwrap(), b"truncated original fixture");
+        atomic_replace(&console, &[0x31; 67]).unwrap();
+        assert_eq!(native_read(&console, Some(&mut sram)), (-1, 0));
+        assert_eq!(std::fs::read(&console).unwrap(), [0x31; 67]);
+        assert!(last_card_error().is_some());
+        drop(writer);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn checked_missing_read_refuses_external_creation_until_fresh_admission() {
+        let _serial = STORE_TEST_LOCK.lock().unwrap();
+        let root = isolated("checked-missing");
+        let writer = CardStore::bind(&root).unwrap();
+        let card = root.join("GC/MemoryCardA.fixture.raw");
+        assert_eq!(native_read(&card, None), (0, 0));
+        let current = vec![0x61; 512 * 1024];
+        std::fs::write(&card, &current).unwrap();
+        assert_eq!(native_read(&card, None), (-1, 0));
+        assert_eq!(native_write(&card, &vec![0x62; current.len()]), 0);
+        assert_eq!(std::fs::read(&card).unwrap(), current);
+        drop(writer);
+        let writer = CardStore::bind(&root).unwrap();
+        let mut loaded = vec![0; current.len()];
+        assert_eq!(native_read(&card, Some(&mut loaded)), (1, current.len()));
+        assert_eq!(loaded, current);
+        // Dangling links are errors, not absence/default creation.
+        let console = root.join("GC/SRAM.raw");
+        std::os::unix::fs::symlink(root.join("missing-target"), &console).unwrap();
+        assert_eq!(native_read(&console, None), (-1, 0));
+        drop(writer);
+        std::fs::remove_dir_all(root).unwrap();
     }
     #[test]
     fn legacy_card_and_sram_are_admitted_before_first_native_write() {

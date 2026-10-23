@@ -43,7 +43,7 @@ fn main() {
         names.dedup();
         let mut resources = Sha256::new();
         resources
-            .update(b"gcx:skip-ipl;dsp-hle;raw-card-a;no-card-b;gamecube-pad-p1;checkpoint-abi1\0");
+            .update(b"gcx:skip-ipl;dsp-hle;raw-card-a;no-card-b;gamecube-pad-p1;checkpoint-abi1;checked-profile-read1\0");
         for name in names {
             resources.update(name.as_bytes());
             resources.update([0]);

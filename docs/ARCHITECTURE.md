@@ -192,7 +192,9 @@ machine, complete durable files and exact media/core/resource identities form on
 generation, published before SavedSession references it. Interrupted writes never
 roll ordinary files back. Restore validates before paused boot and again before
 mutation; failed partial loads block persistence/resume through shutdown. Joined
-checkpoint departures recheck ordinary generations. Rust captures on pause and
+checkpoint departures recheck ordinary generations. ABI7 also checks exact native card/SRAM reads through Rust; failed reads cannot
+be treated as absence or publish fallback images. Every app boot waits paused
+until initialization/restore is healthy. Rust captures on pause and
 departure and restores after a fresh process; explicit Stop still requests an
 ordinary-save cold Open. Files/errors survive rejection and explicit restart uses
 current saves. The original native fresh-process CPU/staged-command/event and

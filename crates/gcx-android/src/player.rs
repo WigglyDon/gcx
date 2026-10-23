@@ -69,7 +69,7 @@ impl LiveRuntime {
             gcx_engine_pause(1);
             gcx_engine_input(Pad::default().values().as_ptr());
             // A partially loaded machine is quarantined through teardown.
-            gcx_engine_checkpoint_failed() != 0 || gcx_engine_flush_cards() != 0
+            gcx_engine_recovery_required() != 0 || gcx_engine_flush_cards() != 0
         }
     }
 }
@@ -209,7 +209,7 @@ impl StopRuntime for LiveRuntime {
             // SAFETY: same serialized native owner. Keep all Rust fields/profile
             // alive until the stop caller has durably published its result.
             unsafe {
-                self.failed_restore |= gcx_engine_checkpoint_failed() != 0;
+                self.failed_restore |= gcx_engine_recovery_required() != 0;
                 gcx_engine_stop();
                 gcx_engine_shutdown();
             }
@@ -221,7 +221,10 @@ impl StopRuntime for LiveRuntime {
             }
         }
         if self.failed_restore {
-            return Err("Failed checkpoint machine discarded without writing card or console data; current saves retained.".into());
+            return Err(format!(
+                "Failed saved-data initialization or checkpoint restore discarded without persistence; current saves retained. {}",
+                gcx::storage::last_card_error().unwrap_or_default()
+            ));
         }
         if let Some(error) = gcx::storage::last_card_error().or_else(|| {
             self.events
@@ -261,17 +264,19 @@ unsafe extern "C" fn event(context: *mut std::ffi::c_void, id: u32, message: *co
         let message = unsafe { CStr::from_ptr(message) }
             .to_string_lossy()
             .into_owned();
-        let message = if id == 20 {
+        let message = if id == 20 || unsafe { gcx_engine_recovery_required() } != 0 {
             format!(
                 "{message} {}",
                 gcx::storage::last_card_error().unwrap_or_default()
             )
         } else {
-            if let Ok(mut error) = context.teardown_error.lock() {
-                *error = Some(message.clone());
-            }
             message
         };
+        if id == 2
+            && let Ok(mut error) = context.teardown_error.lock()
+        {
+            *error = Some(message.clone());
+        }
         platform::push(Command::NativeError {
             game_id: context.game_id.clone(),
             epoch: context.epoch,
@@ -475,11 +480,12 @@ fn boot(
     });
     // SAFETY: serialized owner, valid strings and stable process-long callbacks.
     unsafe {
-        if gcx_engine_abi() != 6 {
+        if gcx_engine_abi() != 7 {
             return Err("engine ABI mismatch".into());
         }
         let cards = gcx::storage::CardStore::bind(&profile.path)?;
         gcx_engine_card_writer(gcx::storage::write_card);
+        gcx_engine_saved_reader(gcx::storage::read_image);
         gcx_engine_platform(platform::dispatch);
         gcx_engine_ui(draw);
         if gcx_engine_init(
@@ -528,11 +534,9 @@ fn boot(
                 &runtime.binding,
             )?);
         }
-        let admitted = if runtime.pending_restore.is_some() {
-            gcx_engine_boot_paused(uri.as_ptr(), window.ptr().as_ptr().cast())
-        } else {
-            gcx_engine_boot(uri.as_ptr(), window.ptr().as_ptr().cast())
-        };
+        // Initialize without guest execution. The owner loop resumes only a
+        // healthy ready runtime after checked image reads/optional state load.
+        let admitted = gcx_engine_boot_paused(uri.as_ptr(), window.ptr().as_ptr().cast());
         if admitted == 0 {
             return Err("The native engine could not boot this GameCube game.".into());
         }
@@ -1077,7 +1081,7 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                 let mut teardown_error = None;
                 if let Some(active) = runtime.as_mut() {
                     let quarantined =
-                        active.failed_restore || unsafe { gcx_engine_checkpoint_failed() != 0 };
+                        active.failed_restore || unsafe { gcx_engine_recovery_required() != 0 };
                     let joined = active.join();
                     if !quarantined {
                         teardown_error = joined.err();
@@ -1194,6 +1198,7 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                         .as_ref()
                         .is_some_and(|r| r.pending_restore.is_some());
                     let paused = restoring
+                        || gcx_engine_recovery_required() != 0
                         || !hidden
                         || !foreground
                         || window.is_none()
@@ -1277,7 +1282,11 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
     }
     if let (Some(active), Some(index)) = (runtime.as_mut(), selected) {
         let checkpoint = if collection.entries[index].restart_required {
-            Err("The runtime already requires explicit recovery.".into())
+            Err(collection.entries[index]
+                .last_error
+                .clone()
+                .unwrap_or_else(|| "The runtime already requires explicit recovery.".into())
+                .into())
         } else if let Some(state) = &active.pending_restore {
             state
                 .verify_current_saves(&active._profile.path)
