@@ -110,7 +110,7 @@ mod host {
         let sys = c_path(sys)?;
         let media = c_path(&profile.join("counter-probe.dol"))?;
         unsafe {
-            if gcx_engine_abi() != 7 {
+            if gcx_engine_abi() != 8 {
                 return Err("wrong native ABI".into());
             }
             gcx_engine_card_writer(storage::write_card);

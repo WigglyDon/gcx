@@ -65,7 +65,13 @@ bool Host_UpdateDiscordPresenceRaw(const std::string& details, const std::string
     int64_t start_timestamp, int64_t end_timestamp, int party_size, int party_max) { return false; }
 std::unique_ptr<GBAHostInterface> Host_CreateGBAHost(std::weak_ptr<HW::GBA::Core> core) { return nullptr; }
 
-uint32_t gcx_engine_abi() { return 7; }
+static gcx_input_fn s_input_sampler = nullptr;
+void gcx_engine_input_sampler(gcx_input_fn sampler)
+{
+  const auto lock = ControllerEmu::EmulatedController::GetStateLock();
+  s_input_sampler = sampler;
+}
+uint32_t gcx_engine_abi() { return 8; }
 void gcx_engine_card_writer(gcx_card_write_fn writer) { s_card_writer = writer; }
 void gcx_engine_saved_reader(gcx_saved_read_fn reader) { s_saved_reader = reader; }
 void gcx_engine_platform(gcx_platform_fn platform) { s_platform = platform; }
@@ -139,6 +145,13 @@ int gcx_engine_init(const char* user, const char* sys, gcx_event_fn event, void*
   VideoBackendBase::ActivateBackend(video);
   UICommon::InitControllers(WindowSystemInfo{});
   ciface::Touch::RegisterGameCubeInputOverrider(0);
+  Pad::SetInputPollCallback([](int index) {
+    if (index == 0 && s_input_sampler) {
+      double controls[18]{};
+      s_input_sampler(controls);
+      gcx_engine_input(controls);
+    }
+  });
   auto& events = GetVideoEvents();
   s_overlay_hook = events.draw_overlay_event.Register([] {
     if (s_ui) {
@@ -290,6 +303,8 @@ void gcx_engine_shutdown()
   s_saved_reader = nullptr;
   s_overlay_hook = {};
   s_present_hook = {};
+  Pad::SetInputPollCallback(nullptr);
+  s_input_sampler = nullptr;
   ciface::Touch::UnregisterGameCubeInputOverrider(0);
   UICommon::ShutdownControllers();
   UICommon::Shutdown();

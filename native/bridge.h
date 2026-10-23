@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Maintained direct adapter to Dolphin. Call only on one Rust host thread.
+// Maintained direct adapter to Dolphin. Lifecycle calls have one Rust host owner;
+// explicitly documented synchronous callbacks also run on native worker threads.
 #pragma once
 #include <stdint.h>
 #if defined(__GNUC__)
@@ -14,6 +15,10 @@ typedef int (*gcx_saved_read_fn)(const char* path, uint8_t* bytes, uintptr_t cap
 typedef int (*gcx_card_write_fn)(const char* path, const uint8_t* bytes, uintptr_t length);
 typedef int (*gcx_checkpoint_write_fn)(void* context, const uint8_t* bytes, uintptr_t length);
 typedef void (*gcx_event_fn)(void* context, uint32_t event, const char* message);
+// ABI8: called at the actual complete native pad poll. Fill exactly18 doubles;
+// synchronous CPU-thread callback, registered before init or while quiescent,
+// retained through join. Registration and reads share the controller state lock.
+typedef void (*gcx_input_fn)(double* controls);
 typedef int64_t (*gcx_platform_fn)(uint32_t operation, const char* path, const char* argument, char* output, uintptr_t capacity);
 // ABI 5 additionally requires platform operation 10: attach the calling native
 // thread to the JVM through thread exit, return 1 on success. Empty strings and
@@ -47,6 +52,7 @@ GCX_EXPORT void gcx_engine_pause(int paused);
 GCX_EXPORT int gcx_engine_surface(void* native_window);
 GCX_EXPORT void gcx_engine_resize(void);
 GCX_EXPORT void gcx_engine_input(const double* controls);
+GCX_EXPORT void gcx_engine_input_sampler(gcx_input_fn sampler);
 GCX_EXPORT void gcx_engine_pad_status(gcx_pad_status* status);
 GCX_EXPORT void gcx_engine_stop(void);
 GCX_EXPORT void gcx_engine_shutdown(void);

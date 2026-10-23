@@ -99,3 +99,32 @@ inspected Dolphin protocol, pending events and separate card/SRAM generation.
 PSX's128KiB card, RAM-restore order,64MiB snapshot ceiling, PS2 sealing and firmware
 branches were rejected as coupled assumptions. MIT attribution for earlier
 selected adaptations remains intact; all targeted Dolphin changes remain GPL.
+
+## Responsiveness and UI refinement, 2026-10-23
+
+Owner requested closer PSX quality after confirming ABI7's real checkpoint return,
+and separately reported weak layout, unsmooth controls and layout hitching. The
+current public input file readback still has blob
+`c3d90f7ca21e1a18b1f945cef999287af054ec9c`, identical to the reviewed4277d4c
+revision. MIT LICENSE readback is `b7f230132ee7f02cf3a70d97da95362132e6a6fb`.
+Also reviewed that pinned public revision's `crates/player/src/ui.rs`
+(`6e9e13c8570e08ed0606f7f6272fc0ac07bcccbd`) and `library.rs`
+(`6433f62910ac8a20af46496aabae67e449237ee5`). No sibling checkout/private files
+or running PSX app were read or changed.
+
+Selected adaptations: following thumb centers and continuous radial dead-zone
+rescaling from `StickGesture::track`, captured D-pad direction hysteresis, the
+lower primary-thumb band with auxiliary keys beside it, and the compact centered
+720-point menu column. GameCube keeps its octagonal gate, named18-channel packet,
+separate travel/clicks, original color/label cues and no stick-click gestures.
+Game entries precede auxiliary actions, with compact mixed-case native buttons;
+the menu and its policy remain Rust-owned. The editor, renderer, entire frontend,
+system-specific masks and private presets were not imported.
+
+PSX's pending-press idea cannot be copied at gcx's host-tick boundary: Dolphin
+runs independently. ABI8's original Rust pulse policy consumes presses only at
+Dolphin's actual complete pad read through a small maintained GPL callback.
+Fixed16-pointer storage, immutable shared geometry and equivalent-inset capture
+retention remove avoidable allocation/cancellation work. Bounded per-runtime
+timing separates Android event age, dispatch-to-pad delay and native poll cadence
+from game/display behavior. Tests and future hardware results remain source-bound.

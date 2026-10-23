@@ -7,6 +7,7 @@ use crate::{
     Pad,
     touch::{Area, Layout, TouchPad},
 };
+use std::sync::Arc;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Insets {
@@ -30,6 +31,44 @@ pub struct WindowGeometry {
     /// The picture independently uses the complete taken drawable, as in PSX.
     pub clearance: Insets,
     pub density: f32,
+}
+impl WindowGeometry {
+    fn control_bounds(self) -> Option<Area> {
+        let i = self.clearance;
+        if !valid(self.window)
+            || !valid(self.surface)
+            || !valid(self.content)
+            || ![i.left, i.top, i.right, i.bottom]
+                .iter()
+                .all(|n| n.is_finite() && *n >= 0.0)
+            || !self.input_origin.0.is_finite()
+            || !self.input_origin.1.is_finite()
+            || !self.density.is_finite()
+            || self.density <= 0.0
+        {
+            return None;
+        }
+        let safe = intersection(
+            intersection(self.surface, self.content),
+            Area {
+                left: self.window.left + i.left,
+                top: self.window.top + i.top,
+                right: self.window.right - i.right,
+                bottom: self.window.bottom - i.bottom,
+            },
+        );
+        (valid(safe) && safe.right - safe.left >= 2.0 && safe.bottom - safe.top >= 2.0)
+            .then_some(safe)
+    }
+    fn same_mapping(self, other: Self) -> bool {
+        self.window == other.window
+            && self.surface == other.surface
+            && self.input_origin == other.input_origin
+            && self.density == other.density
+            && self
+                .control_bounds()
+                .is_some_and(|safe| Some(safe) == other.control_bounds())
+    }
 }
 
 fn valid(a: Area) -> bool {
@@ -57,22 +96,8 @@ pub struct Geometry {
 }
 impl Geometry {
     pub fn new(window: WindowGeometry, width: f32, height: f32) -> Option<Self> {
-        let i = window.clearance;
-        if !valid(window.window)
-            || !valid(window.surface)
-            || !valid(window.content)
-            || ![i.left, i.top, i.right, i.bottom]
-                .iter()
-                .all(|n| n.is_finite() && *n >= 0.0)
-            || !window.input_origin.0.is_finite()
-            || !window.input_origin.1.is_finite()
-            || !window.density.is_finite()
-            || window.density <= 0.0
-            || !width.is_finite()
-            || !height.is_finite()
-            || width < 2.0
-            || height < 2.0
-        {
+        let safe = window.control_bounds()?;
+        if !width.is_finite() || !height.is_finite() || width < 2.0 || height < 2.0 {
             return None;
         }
         // This player never requests an independently stretched surface. During
@@ -81,18 +106,6 @@ impl Geometry {
         let surface_aspect = (window.surface.right - window.surface.left)
             / (window.surface.bottom - window.surface.top);
         if ((width / height) / surface_aspect - 1.0).abs() > 0.02 {
-            return None;
-        }
-        let safe = intersection(
-            intersection(window.surface, window.content),
-            Area {
-                left: window.window.left + i.left,
-                top: window.window.top + i.top,
-                right: window.window.right - i.right,
-                bottom: window.window.bottom - i.bottom,
-            },
-        );
-        if !valid(safe) || safe.right - safe.left < 2.0 || safe.bottom - safe.top < 2.0 {
             return None;
         }
         // Intersect rectangles in one space before transforming: an already
@@ -187,7 +200,7 @@ impl Geometry {
 /// invalidation or drawable size change releases captures before accepting input.
 pub struct PlayerView {
     window: Option<WindowGeometry>,
-    presented: Option<Geometry>,
+    presented: Option<Arc<Geometry>>,
     touch: TouchPad,
 }
 impl PlayerView {
@@ -200,7 +213,16 @@ impl PlayerView {
     }
     pub fn measure(&mut self, window: Option<WindowGeometry>) {
         if self.window != window {
-            self.invalidate();
+            // Bar/chrome measurements can change while effective targets and
+            // input mapping stay identical. Retain the same immutable geometry
+            // and gestures in that case; actual surface/mapping changes cancel.
+            if !self
+                .window
+                .zip(window)
+                .is_some_and(|(old, new)| old.same_mapping(new))
+            {
+                self.invalidate();
+            }
             self.window = window;
         }
     }
@@ -211,14 +233,17 @@ impl PlayerView {
     pub fn cancel(&mut self) {
         self.touch.cancel();
     }
-    pub fn present(&mut self, width: f32, height: f32) -> Option<&Geometry> {
+    pub fn present(&mut self, width: f32, height: f32) -> Option<&Arc<Geometry>> {
         if self
             .presented
             .as_ref()
             .is_none_or(|g| g.buffer != (width, height))
         {
             self.invalidate();
-            self.presented = self.window.and_then(|w| Geometry::new(w, width, height));
+            self.presented = self
+                .window
+                .and_then(|w| Geometry::new(w, width, height))
+                .map(Arc::new);
         }
         self.presented.as_ref()
     }
@@ -240,6 +265,21 @@ impl PlayerView {
     }
     pub fn pad(&self) -> Pad {
         self.touch.pad()
+    }
+    pub fn sample_pad(&mut self) -> Pad {
+        self.touch.sample_pad()
+    }
+    pub fn begin_runtime(&mut self) {
+        self.touch.begin_runtime();
+    }
+    pub fn delivery(&self) -> crate::touch::DeliveryStats {
+        self.touch.delivery()
+    }
+    pub fn record_source_age(&mut self, age: Option<std::time::Duration>) {
+        self.touch.record_source_age(age);
+    }
+    pub fn stick_center(&self, axis: crate::Control) -> Option<(f32, f32)> {
+        self.touch.stick_center(axis)
     }
 }
 impl Default for PlayerView {
@@ -274,6 +314,76 @@ mod tests {
             },
             density: 2.75,
         }
+    }
+    #[test]
+    fn stable_draws_reuse_geometry_and_native_poll_alone_consumes_input() {
+        let mut view = PlayerView::new();
+        let w = window();
+        view.measure(Some(w));
+        let first = view.present(2280.0, 1080.0).unwrap().clone();
+        let a = first
+            .layout
+            .zones
+            .iter()
+            .find(|z| z.target == Target::Button(Control::A))
+            .unwrap()
+            .area;
+        let (x, y) = a.center();
+        view.down(1, x, y);
+        view.up(1);
+        for _ in 0..50 {
+            view.measure(Some(w));
+            let frame = view.present(2280.0, 1080.0).unwrap();
+            assert!(Arc::ptr_eq(&first, frame));
+            assert_eq!(view.pad().values()[Control::A as usize], 0.0);
+        }
+        assert_eq!(view.sample_pad().values()[Control::A as usize], 1.0);
+        assert_eq!(view.sample_pad().values()[Control::A as usize], 0.0);
+        view.down(2, x, y);
+        view.up(2);
+        let mut changed = w;
+        changed.clearance.left = 50.0;
+        view.measure(Some(changed));
+        let second = view.present(2280.0, 1080.0).unwrap();
+        assert!(!Arc::ptr_eq(&first, second));
+        assert_eq!(view.sample_pad().values(), &[0.0; 18]);
+    }
+    #[test]
+    fn equivalent_inset_notifications_keep_held_sticks_and_pending_presses() {
+        let mut view = PlayerView::new();
+        let hidden = window();
+        view.measure(Some(hidden));
+        let first = view.present(2280.0, 1080.0).unwrap().clone();
+        let stick = first
+            .layout
+            .zones
+            .iter()
+            .find(|z| matches!(z.target, Target::Stick(Control::StickX, _)))
+            .unwrap()
+            .area;
+        let button = first
+            .layout
+            .zones
+            .iter()
+            .find(|z| z.target == Target::Button(Control::A))
+            .unwrap()
+            .area;
+        view.down(1, stick.center().0, stick.center().1);
+        view.moved(1, stick.center().0 + 40.0, stick.center().1);
+        view.down(2, button.center().0, button.center().1);
+        view.up(2);
+        let expected = view.pad().values()[Control::StickX as usize];
+        let mut shown = hidden;
+        shown.content = rect(100.0, 266.0, 2380.0, 1214.0);
+        view.measure(Some(shown));
+        assert!(Arc::ptr_eq(&first, view.present(2280.0, 1080.0).unwrap()));
+        let packet = view.sample_pad();
+        assert_eq!(packet.values()[Control::StickX as usize], expected);
+        assert!(expected > 0.0);
+        assert_eq!(packet.values()[Control::A as usize], 1.0);
+        view.measure(Some(hidden));
+        assert!(Arc::ptr_eq(&first, view.present(2280.0, 1080.0).unwrap()));
+        assert_eq!(view.pad().values()[Control::StickX as usize], expected);
     }
     #[test]
     fn nonzero_origins_inset_and_edge_to_edge_surfaces_have_the_same_screen_layout() {

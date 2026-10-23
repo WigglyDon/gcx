@@ -77,7 +77,7 @@ pixels reserved only for gestures. PSX's reviewed public clear-picture policy is
 adapted to maximize the complete picture around actual control targets using
 Dolphin's reported aspect. It does not reserve entire side rails or shrink for
 transient bars. The OS can overlay its temporarily revealed bars on that stable
-picture; controls retain clearance. A changed/invalid measurement or mismatched
+picture; controls retain clearance. A changed effective/invalid mapping or mismatched
 rotation releases held input; the game is retained.
 App-local API30+ WindowInsetsController (API28/29 immersive-sticky fallback) hides
 bars only while playing; menus/picker restore ordinary navigation. Main-thread
@@ -240,6 +240,29 @@ Use private recoverable backups before app/storage updates. Export/import should
 preserve ordinary card saves independently of version-bound machine checkpoints.
 
 ## Native picture, audio and controls
+
+ABI8 samples the Rust touch packet at `Pad::GetStatus`, under Dolphin's controller
+state lock, immediately before its GameCube SI input read. Rust owns fixed16-slot
+pointer captures, latest analog positions and digital presses retained until one
+actual native poll; draw callbacks and the Android host tick never consume them.
+All18 GameCube channels remain independent. The callback lives through native
+join, and registration/reads share the controller lock. Rust drops its UI lock
+before entering core/pad operations; the sampling callback only takes the short
+Rust input lock and copies a stack packet. No input pulse or callback address is
+a durable game/session identity or checkpoint field.
+
+PSX-adapted following centers, continuous radial dead-zone rescaling and D-pad
+hysteresis are positional input policy, with GameCube's octagonal gate retained.
+There is no time interpolation of logical controls. The two render callbacks
+share an immutable geometry allocation. A valid measurement with identical
+effective input/surface mapping preserves captures; real changes, invalid
+measurements and interruptions clear held and pending input. Content-inset-only
+events refresh that mapping without an unconditional renderer resize.
+
+Per-runtime bounded counters separately observe foreground Android event age,
+dispatch-to-native-pad age and active pad-poll gaps. They retain no raw touch/game
+data and log only summaries on checkpoint departure. They are software pipeline
+evidence, not touch-to-photon, game movement, FPS or hard real-time guarantees.
 
 Evaluate native Vulkan and GLES paths against actual Fold capabilities, retaining
 Dolphin's working backend behavior. No required backend is chosen solely because

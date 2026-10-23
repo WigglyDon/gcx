@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-//! Unsafe declarations for native/bridge.h, ABI 7. One Rust host thread owns
+//! Unsafe declarations for native/bridge.h, ABI 8. One Rust host thread owns
 //! lifecycle calls. Callbacks must not unwind and remain valid through teardown.
 use std::ffi::{c_char, c_void};
 pub const BUILD_ENGINE_SHA256: &str = env!("GCX_ENGINE_SHA256");
@@ -72,6 +72,8 @@ unsafe extern "C" {
     pub fn gcx_engine_surface(window: *mut c_void) -> i32;
     pub fn gcx_engine_resize();
     pub fn gcx_engine_input(controls: *const f64);
+    /// CPU-thread callback at the actual complete native pad poll, through join.
+    pub fn gcx_engine_input_sampler(sampler: Option<unsafe extern "C" fn(*mut f64)>);
     pub fn gcx_engine_pad_status(status: *mut PadStatus);
     pub fn gcx_engine_stop();
     pub fn gcx_engine_shutdown();

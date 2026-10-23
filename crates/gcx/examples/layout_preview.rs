@@ -71,9 +71,10 @@ fn main() {
         let mut ink = "#252629";
         match zone.target {
             Target::Stick(cx, _) => {
-                circle(w * 0.5, "#292a2c");
+                circle(w * 0.5, "#8f9298");
+                circle(w * 0.5 - 1.5, "#26292e");
                 circle(
-                    w * 0.5 * if cx == Control::CX { 0.38 } else { 0.48 },
+                    w * 0.5 * 0.36,
                     if cx == Control::CX {
                         "#e6cf51"
                     } else {
@@ -91,7 +92,10 @@ fn main() {
                 rect(a.left, a.top + h / 3.0, w, h / 3.0, &color);
                 continue;
             }
-            Target::Button(_) if (w - h).abs() < 1.0 => circle(w * 0.5, &color),
+            Target::Button(_) if (w - h).abs() < 1.0 => {
+                circle(w * 0.5, "#d1d4db");
+                circle(w * 0.5 - 1.2, &color);
+            }
             Target::Button(_) => rect(a.left, a.top, w, h, &color),
             _ => {
                 rect(a.left, a.top, w, h, &color);

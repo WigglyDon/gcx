@@ -1,5 +1,88 @@
 # Direct Dolphin integration
 
+## Pixel4 scene return, 2026-10-23
+
+Preserved ABI7 source `dae7e3f1326fb320a231efa5ffd89c853482f417` / APK
+`261a4976606117c29b70df2a7485f48188a64067d6224c5d1721b546c3763b75` now has a
+real intentional-pause cold-process checkpoint return. Complete quiescent
+checkpoint/card/SRAM/session backups were independently validated before retiring
+each old process. New process/start identities and restored paused menus were
+verified; explicit Resume returned to unsaved bridge and grass-villager dialogue
+scenes with actual Vulkan output. The owner confirmed the second scene, audible
+sound, controls and clear Home handle, with a slight reload hitch followed by
+correct continuation. Stop/game-menu loading did not prepare or substitute for
+these returns. The actual payloads were93,382,166 and93,447,857bytes.
+
+First-pass external Pause-dispatch→durable-ack and cold-launch→restore-ack bounds
+were2.752s and7.223s, including adb/scheduling. Sampled PSS/RSS was793854/908936KiB
+before capture and748262/845124KiB after restore/Resume, not peak memory or speed.
+Full internal phase timing, touch-to-photon and measured audio interruptions are
+unqualified. The owner separately reports weak control layout, unsmooth controls
+and layout hitching. Current captures still show a narrow aspect-preserving
+picture with side controls; no new edge-to-edge acceptance is inferred.
+
+Final normal Stops joined workers and published clean metadata; actual complete
+backups and unchanged ordinary cards were verified, updated SRAM retained, app
+absence/screen-off observed and leases released. A subsequent library window was
+reclaimed by the owner before importing/booting Twilight Princess. Latest verified
+return:2026-10-23 18:28:35UTC. The supplied second title is on Pixel4; no Fold copy
+was needed or performed. Automatic paused=false return, real A/B/A, actual pins/
+taps and a new ordinary-save/reload row remain unrun. See [scene evidence](https://github.com/WigglyDon/gcx/issues/2#issuecomment-6371910629).
+
+## Input/UI follow-up, ABI8, off-device
+
+Rust now supplies a complete18-channel packet at Dolphin's actual pad read.
+The maintained GPL change is an optional `Pad::GetStatus` callback under the
+controller state lock. ABI8's `gcx_engine_input_sampler` registers a synchronous
+host callback before init or while quiescent; it remains valid through native
+join. The legacy setter remains for diagnostics. Original Rust fixed16-slot
+captures retain quick digital presses until one native poll, keep latest analog
+positions, and cancel held/unsampled input on interruption. Draw/host ticks never
+consume presses. GameCube trigger travel and clicks stay separate.
+
+Selected public MIT PSX concepts inform following thumb centers, a continuous
+radial dead zone, D-pad hysteresis and lower mirrored primary-stick wells with
+auxiliary controls beside them. The GameCube gate/colors/labels are retained.
+Immutable shared geometry removes per-frame layout clones; equivalent effective
+inset mappings retain gestures. Content-only events refresh geometry without
+unconditionally resizing the renderer. Rust-built menus use a compact centered
+column, mixed-case buttons and game entries before auxiliary actions.
+
+Per-runtime bounded histograms separate Android source-event age, Rust dispatch
+to native pad poll, and active poll cadence. Intentional pause gaps are excluded;
+invalid timestamps are counted. No raw touch/game data, logical input time
+interpolation, background profiler, permission or dependency is introduced.
+These are software delivery measurements, not game response or hardware latency
+acceptance. The ABI7 working pair/checkpoints/symbols remain protected. ABI8 has a
+different native fingerprint; incompatible checkpoints stay retained with explicit
+restart using current saves. State ABI1/card persistence format is unchanged.
+
+Focused reproduction after the native host build:
+
+```sh
+GCX_ENGINE_LIB_DIR="$PWD/build/host/gcx" cargo build -p gcx --features native-engine --bin gcx-probe
+LD_LIBRARY_PATH="$PWD/build/host/gcx" target/debug/gcx-probe \
+  "$PWD/.local/input-poll-NEW" "$PWD/.local/source/dolphin/Data/Sys" --input-poll
+```
+
+Use a new isolated directory. This original DOL/Null-video/audio fixture exercises
+actual native pad sampling, short presses, both sticks, independent trigger travel/
+clicks/releases and interruption cancellation. It is not game or Android timing
+evidence. Source/license coupling is recorded in docs/PSX_TRANSFER.md.
+
+Focused results:43 Rust tests pass. The actual native fixture passes quick A/B/L
+click and diagonal D-pad delivery once, calibrated Control/C sticks, independent
+25/75percent trigger travel/release, neutral cancellation and joined teardown.
+Host/ARM64 native builds and warnings-denied Rust Clippy pass. Added JNI widget
+signatures were checked against the installed SDK; source/format/diff/TOML checks
+pass. Android native SHA256
+`d1280e0f9d06a903b8fd4e3111e01af125a1d273ce8f145edb64e8adc0270026`, BuildID
+`2bca4a72879e25e8276bbb0dd46ddc3a19216e23`; maintained patch SHA256
+`85ec2d66b365c3a77e6e7e52fc41d13d34d343e4ab63bf12853c7d99178af963`.
+Packaging/source preservation is the next off-device step. No Android
+responsiveness, layout-feel, gameplay, card-save or resume result transfers from
+ABI7 to this new native/Rust build.
+
 ## Checked native save reads, 2026-10-22
 
 ABI7 closes an additional coherence gap found after the ABI6 candidate: the native
@@ -21,7 +104,8 @@ are retained with matching source. Patch SHA256
 Actual ABI/defined exports/JNI/dependencies, unchanged signer, zero permissions,
 resource/native bytes and16KiB ELF/ZIP alignment checks pass. All65 preserved
 corresponding-source checksums pass, with92 public source inputs. The ABI6 artifacts
-below remain immutable; this candidate is not installed or hardware-qualified.
+below remain immutable. The initial off-device status is superseded only by the
+bounded ABI7 hardware evidence above; the subsequent ABI8 increment is uninstalled.
 
 An optional native image-read callback now delegates existing card/SRAM reads to
 Rust. Rust distinguishes genuine absence from errors, owns path/canonical-profile

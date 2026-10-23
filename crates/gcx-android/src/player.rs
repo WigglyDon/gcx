@@ -30,6 +30,18 @@ type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 static OWNER: AtomicBool = AtomicBool::new(false);
 static NEXT_RUNTIME: AtomicU64 = AtomicU64::new(1);
 static UI: Mutex<PlayerView> = Mutex::new(PlayerView::new());
+// The core asks for one complete input packet at its actual pad poll. Rendering
+// and the Android owner loop never consume quick-press pulses.
+unsafe extern "C" fn sample_input(controls: *mut f64) {
+    if controls.is_null() {
+        return;
+    }
+    let pad = UI.lock().map(|mut ui| ui.sample_pad()).unwrap_or_default();
+    // SAFETY: ABI8 lends exactly18 writable doubles for this synchronous call.
+    unsafe {
+        std::ptr::copy_nonoverlapping(pad.values().as_ptr(), controls, 18);
+    }
+}
 pub(crate) fn measure_window(geometry: Option<WindowGeometry>) {
     if let Ok(mut ui) = UI.lock() {
         ui.measure(geometry);
@@ -87,8 +99,30 @@ fn save_checkpoint(
     if !active.native_alive {
         return Err("The native runtime is already unloaded.".into());
     }
-    if let Ok(mut touch) = UI.lock() {
+    let timing = UI.lock().ok().map(|mut touch| {
         touch.cancel();
+        touch.delivery()
+    });
+    if let Some(timing) = timing {
+        platform::diagnostic(&format!(
+            "Input delivery: {} updates, {} native sampled batches, {} canceled batches, max dispatch-to-pad {}us; <=1/2/4/8/16/33/>33ms {:?}. Software path only.",
+            timing.updates,
+            timing.sampled_batches,
+            timing.canceled_batches,
+            timing.max_dispatch_to_poll_micros,
+            timing.histogram
+        ));
+        platform::diagnostic(&format!(
+            "Input source age: {} foreground motion events, max event-to-dispatch {}us; <=1/2/4/8/16/33/>33ms {:?}; {} invalid timestamps. Software timestamps, not touch-to-photon.",
+            timing.source_events,
+            timing.max_event_to_dispatch_micros,
+            timing.event_histogram,
+            timing.invalid_source_times
+        ));
+        platform::diagnostic(&format!(
+            "Input native poll cadence: {} complete pad polls; largest active gap {}us. Deliberate pause/departure gaps excluded; not game response or display FPS.",
+            timing.native_polls, timing.max_poll_gap_micros
+        ));
     }
     unsafe {
         gcx_engine_pause(1);
@@ -292,15 +326,29 @@ unsafe extern "C" fn event(context: *mut std::ffi::c_void, id: u32, message: *co
     }
 }
 extern "C" fn draw(phase: u32, width: f32, height: f32, aspect: f32) -> Rect {
-    let (geometry, pad) = {
+    let (geometry, pad, centers) = {
         let Ok(mut ui) = UI.lock() else {
             return Rect::default();
         };
         let Some(geometry) = ui.present(width, height).cloned() else {
             return Rect::default();
         };
-        (geometry, ui.pad())
+        let pad = if phase == 1 { ui.pad() } else { Pad::default() };
+        let centers = [
+            ui.stick_center(gcx::Control::StickX),
+            ui.stick_center(gcx::Control::CX),
+        ];
+        (geometry, pad, centers)
     };
+    if phase == 0 {
+        let a = geometry.picture(aspect);
+        return Rect {
+            left: a.left as i32,
+            top: a.top as i32,
+            right: a.right as i32,
+            bottom: a.bottom as i32,
+        };
+    }
     let layout = &geometry.layout;
     if phase == 1 {
         let value = |control: gcx::Control| pad.values()[control as usize] as f32;
@@ -312,14 +360,16 @@ extern "C" fn draw(phase: u32, width: f32, height: f32, aspect: f32) -> Rect {
                 let radius = (a.right - a.left) * 0.5;
                 match zone.target {
                     Target::Stick(cx, cy) => {
-                        gcx_ui_circle(x, y, radius, 0x703c3b3a);
-                        let reach = radius * if cx == gcx::Control::CX { 0.6 } else { 0.5 };
+                        let (x, y) = centers[usize::from(cx == gcx::Control::CX)].unwrap_or((x, y));
+                        gcx_ui_circle(x, y, radius, 0x708f9298);
+                        gcx_ui_circle(x, y, radius - 1.5 * geometry.density, 0xc026292e);
+                        let reach = radius * 0.64;
                         let knob_x = x + value(cx) * reach;
                         let knob_y = y - value(cy) * reach;
                         gcx_ui_circle(
                             knob_x,
                             knob_y,
-                            radius * if cx == gcx::Control::CX { 0.38 } else { 0.48 },
+                            radius * 0.36,
                             if cx == gcx::Control::CX {
                                 0xff51cfe6
                             } else {
@@ -346,7 +396,8 @@ extern "C" fn draw(phase: u32, width: f32, height: f32, aspect: f32) -> Rect {
                             color
                         };
                         if (a.right - a.left - (a.bottom - a.top)).abs() < 1.0 {
-                            gcx_ui_circle(x, y, radius, color);
+                            gcx_ui_circle(x, y, radius, 0xa0d1d4db);
+                            gcx_ui_circle(x, y, radius - 1.2 * geometry.density, color);
                         } else {
                             gcx_ui_rect(a.left, a.top, a.right, a.bottom, color);
                         }
@@ -363,8 +414,31 @@ extern "C" fn draw(phase: u32, width: f32, height: f32, aspect: f32) -> Rect {
                     }
                     Target::Dpad => {
                         let step = (a.right - a.left) / 3.0;
-                        gcx_ui_rect(a.left + step, a.top, a.right - step, a.bottom, 0xffaaa6a2);
-                        gcx_ui_rect(a.left, a.top + step, a.right, a.bottom - step, 0xffaaa6a2);
+                        gcx_ui_rect(
+                            a.left + step,
+                            a.top + step,
+                            a.right - step,
+                            a.bottom - step,
+                            0xff848b95,
+                        );
+                        for (control, left, top) in [
+                            (gcx::Control::Up, a.left + step, a.top),
+                            (gcx::Control::Down, a.left + step, a.bottom - step),
+                            (gcx::Control::Left, a.left, a.top + step),
+                            (gcx::Control::Right, a.right - step, a.top + step),
+                        ] {
+                            gcx_ui_rect(
+                                left,
+                                top,
+                                left + step,
+                                top + step,
+                                if value(control) > 0.0 {
+                                    0xffeeeeee
+                                } else {
+                                    0xffaaa6a2
+                                },
+                            );
+                        }
                         continue;
                     }
                     Target::Pause => gcx_ui_rect(a.left, a.top, a.right, a.bottom, 0xb03c3b3a),
@@ -388,13 +462,7 @@ extern "C" fn draw(phase: u32, width: f32, height: f32, aspect: f32) -> Rect {
             }
         }
     }
-    let a = geometry.picture(aspect);
-    Rect {
-        left: a.left as i32,
-        top: a.top as i32,
-        right: a.right as i32,
-        bottom: a.bottom as i32,
-    }
+    Rect::default()
 }
 
 fn id() -> Result<String> {
@@ -480,7 +548,7 @@ fn boot(
     });
     // SAFETY: serialized owner, valid strings and stable process-long callbacks.
     unsafe {
-        if gcx_engine_abi() != 7 {
+        if gcx_engine_abi() != 8 {
             return Err("engine ABI mismatch".into());
         }
         let cards = gcx::storage::CardStore::bind(&profile.path)?;
@@ -488,6 +556,10 @@ fn boot(
         gcx_engine_saved_reader(gcx::storage::read_image);
         gcx_engine_platform(platform::dispatch);
         gcx_engine_ui(draw);
+        if let Ok(mut ui) = UI.lock() {
+            ui.begin_runtime();
+        }
+        gcx_engine_input_sampler(Some(sample_input));
         if gcx_engine_init(
             user.as_ptr(),
             sys.as_ptr(),
@@ -668,9 +740,12 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                         }
                     }
                     MainEvent::Destroy => destroyed = true,
-                    MainEvent::WindowResized { .. }
-                    | MainEvent::ContentRectChanged { .. }
-                    | MainEvent::ConfigChanged { .. } => {
+                    MainEvent::ContentRectChanged { .. } => {
+                        // Insets alone do not resize the native drawable. The
+                        // shared geometry cancels only if its effective map changes.
+                        platform::refresh_window(app);
+                    }
+                    MainEvent::WindowResized { .. } | MainEvent::ConfigChanged { .. } => {
                         measure_window(None);
                         platform::refresh_window(app);
                         if let Ok(mut touch) = UI.lock() {
@@ -691,6 +766,9 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                                         && window.is_some()
                                         && let Ok(mut touch) = UI.lock()
                                     {
+                                        touch.record_source_age(platform::motion_age(
+                                            motion.event_time(),
+                                        ));
                                         match motion.action() {
                                             MotionAction::Down | MotionAction::PointerDown => {
                                                 let pointer =
@@ -1226,12 +1304,7 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                             platform::push(Command::Error("Could not preserve session settings. The paused game and previous checkpoint are retained.".into()));
                         }
                     }
-                    let pad = if paused {
-                        Pad::default()
-                    } else {
-                        UI.lock().map(|touch| touch.pad()).unwrap_or_default()
-                    };
-                    gcx_engine_input(pad.values().as_ptr());
+                    // ABI8 samples Rust input at the actual native pad poll.
                 }
             }
             if runtime

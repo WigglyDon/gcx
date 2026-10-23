@@ -5,12 +5,115 @@ use gcx::{Control, Pad, ProfileLock};
 use std::ffi::{CStr, CString, c_char};
 use std::io::Write;
 use std::path::PathBuf;
+use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 static STOP: AtomicBool = AtomicBool::new(false);
 static ERROR: AtomicBool = AtomicBool::new(false);
 static CARD_ERROR: AtomicBool = AtomicBool::new(false);
+static INPUT: Mutex<gcx::touch::TouchPad> = Mutex::new(gcx::touch::TouchPad::new());
+unsafe extern "C" fn sample_input(controls: *mut f64) {
+    let pad = INPUT
+        .lock()
+        .map(|mut input| input.sample_pad())
+        .unwrap_or_default();
+    // SAFETY: the ABI8 sampler lends18 writable values during the pad poll.
+    unsafe {
+        std::ptr::copy_nonoverlapping(pad.values().as_ptr(), controls, 18);
+    }
+}
+fn input_poll_fixture() -> Result<(), Box<dyn std::error::Error>> {
+    use gcx::touch::{Layout, Target};
+    let layout = Layout::for_display(2280.0, 948.0, 2.75);
+    let point = |target| {
+        layout
+            .zones
+            .iter()
+            .find(|z| z.target == target)
+            .unwrap()
+            .area
+    };
+    {
+        let mut input = INPUT.lock().unwrap();
+        input.cancel();
+        for (id, control) in [(1, Control::A), (2, Control::B), (3, Control::LClick)] {
+            let (x, y) = point(Target::Button(control)).center();
+            input.down(id, x, y, &layout);
+            input.up(id); // Entire touch occurs before the next real native poll.
+        }
+        for (id, control, value) in [(4, Control::LTravel, 0.25), (5, Control::RTravel, 0.75)] {
+            let a = point(Target::Travel(control));
+            input.down(
+                id,
+                a.left + (a.right - a.left) * value,
+                a.center().1,
+                &layout,
+            );
+        }
+        for (id, cx, cy, dx, dy) in [
+            (6, Control::StickX, Control::StickY, 0.56, 0.0),
+            (7, Control::CX, Control::CY, 0.0, 0.648),
+        ] {
+            let a = point(Target::Stick(cx, cy));
+            let (x, y) = a.center();
+            let reach = (a.right - a.left) * 0.32;
+            input.down(id, x, y, &layout);
+            input.moved(id, x + reach * dx, y + reach * dy);
+        }
+        let a = point(Target::Dpad);
+        let (x, y) = a.center();
+        input.down(
+            9,
+            x - (a.right - a.left) * 0.2,
+            y - (a.bottom - a.top) * 0.2,
+            &layout,
+        );
+        input.up(9);
+    }
+    // SAFETY: initialized native owner, paused original fixture, static callback.
+    unsafe {
+        gcx_engine_input_sampler(Some(sample_input));
+        let mut s = PadStatus::default();
+        gcx_engine_pad_status(&mut s);
+        if s.buttons & 0x036f != 0x0349
+            || !(62..=65).contains(&s.triggers[0])
+            || !(190..=193).contains(&s.triggers[1])
+            || !(190..=193).contains(&s.axes[0])
+            || !(49..=53).contains(&s.axes[3])
+        {
+            return Err(format!("rapid presses/independent trigger sample failed: {s:?}").into());
+        }
+        gcx_engine_pad_status(&mut s);
+        if s.buttons != 0 {
+            return Err("quick press repeated after its native sample".into());
+        }
+        INPUT.lock().unwrap().up(5);
+        gcx_engine_pad_status(&mut s);
+        if !(62..=65).contains(&s.triggers[0]) || s.triggers[1] != 0 {
+            return Err("trigger release lost independence".into());
+        }
+        {
+            let mut input = INPUT.lock().unwrap();
+            let (x, y) = point(Target::Button(Control::A)).center();
+            input.down(8, x, y, &layout);
+            input.up(8);
+            input.cancel(); // Interruptions clear both held input and unsampled pulses.
+        }
+        gcx_engine_pad_status(&mut s);
+        if s.buttons != 0 || s.axes != [128; 4] || s.triggers != [0; 2] {
+            return Err("interruption replayed stale input".into());
+        }
+        let timing = INPUT.lock().unwrap().delivery();
+        println!(
+            "PASS actual native pad sampling: quick A/B/L click and diagonal D-pad once, calibrated Control/C sticks, independent25/75percent trigger travel/release, canceled pulse neutral; {} sampled dispatch batches. Host-only timing; no game/display latency claim.",
+            timing.sampled_batches
+        );
+        gcx_engine_input_sampler(None);
+        gcx_engine_input(Pad::default().values().as_ptr());
+    }
+    Ok(())
+}
 struct EngineGuard;
 impl Drop for EngineGuard {
     fn drop(&mut self) {
@@ -48,9 +151,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         || args.len() == 3
             && (args[2] == "--unavailable-audio"
                 || args[2] == "--reentry"
-                || args[2] == "--card-retry"))
+                || args[2] == "--card-retry"
+                || args[2] == "--input-poll"))
     {
-        return Err("usage: gcx-probe <new-private-directory> <Dolphin-Data/Sys> [--unavailable-audio|--reentry|--card-retry]".into());
+        return Err("usage: gcx-probe <new-private-directory> <Dolphin-Data/Sys> [--unavailable-audio|--reentry|--card-retry|--input-poll]".into());
     }
     let root = PathBuf::from(&args[0]);
     let sys = PathBuf::from(&args[1]).canonicalize()?;
@@ -72,7 +176,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let b = root.join("B");
         std::fs::create_dir(&a)?;
         std::fs::create_dir(&b)?;
-        fixture(&a, &sys, false, false)?;
+        fixture(&a, &sys, false, false, false)?;
         let card = raw_card(&a)?;
         let mut expected = std::fs::read(&card)?;
         let marker = b"original gcx card reentry fixture";
@@ -85,11 +189,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let _writer = ProfileLock::acquire(&a)?;
             gcx::storage::atomic_replace(&card, &expected)?;
         }
-        fixture(&b, &sys, false, false)?;
+        fixture(&b, &sys, false, false, false)?;
         if std::fs::read(raw_card(&b)?)? == expected {
             return Err("native fixture profiles unexpectedly shared a card".into());
         }
-        fixture(&a, &sys, false, false)?;
+        fixture(&a, &sys, false, false, false)?;
         if std::fs::read(&card)? != expected {
             return Err("native card marker was lost across profile reentry".into());
         }
@@ -102,6 +206,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             &sys,
             args.len() == 3 && args[2] == "--unavailable-audio",
             args.len() == 3 && args[2] == "--card-retry",
+            args.len() == 3 && args[2] == "--input-poll",
         )?;
     }
     println!(
@@ -131,6 +236,7 @@ fn fixture(
     sys: &std::path::Path,
     unavailable_audio: bool,
     card_retry: bool,
+    input_poll: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     STOP.store(false, Ordering::Relaxed);
     ERROR.store(false, Ordering::Relaxed);
@@ -155,7 +261,7 @@ fn fixture(
     // SAFETY: one host thread owns all native entrypoints and borrowed C strings.
     // The callback uses atomics, never unwinds, and remains alive through shutdown.
     unsafe {
-        if gcx_engine_abi() != 7 {
+        if gcx_engine_abi() != 8 {
             return Err("incompatible engine ABI".into());
         }
         gcx_engine_card_writer(gcx::storage::write_card);
@@ -204,6 +310,9 @@ fn fixture(
                 eprintln!("fixture neutral pad={status:?}");
                 input_verified &=
                     status.buttons == 0 && status.axes == [128; 4] && status.triggers == [0; 2];
+                if input_poll {
+                    input_poll_fixture()?;
+                }
                 break;
             }
             std::thread::sleep(Duration::from_millis(5));

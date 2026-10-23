@@ -22,6 +22,35 @@ type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 unsafe extern "C" {
     fn __android_log_write(priority: i32, tag: *const c_char, text: *const c_char) -> i32;
 }
+/// NDK motion timestamps use System.nanoTime's CLOCK_MONOTONIC time base.
+/// This is foreground event age, not physical touch or display latency.
+pub fn motion_age(event_nanos: i64) -> Option<std::time::Duration> {
+    #[repr(C)]
+    struct Timespec {
+        seconds: std::ffi::c_long,
+        nanos: std::ffi::c_long,
+    }
+    unsafe extern "C" {
+        fn clock_gettime(clock: i32, time: *mut Timespec) -> i32;
+    }
+    let mut time = Timespec {
+        seconds: 0,
+        nanos: 0,
+    };
+    // SAFETY: initialized timespec output; CLOCK_MONOTONIC is1 on stock Android.
+    if unsafe { clock_gettime(1, &mut time) } != 0 {
+        return None;
+    }
+    let now = u64::try_from(time.seconds)
+        .ok()?
+        .checked_mul(1_000_000_000)?
+        .checked_add(u64::try_from(time.nanos).ok()?)?;
+    let event = u64::try_from(event_nanos).ok()?;
+    if event == 0 {
+        return None;
+    }
+    Some(std::time::Duration::from_nanos(now.checked_sub(event)?))
+}
 pub fn diagnostic(message: &str) {
     let message: String = message.chars().filter(|c| *c != '\0').take(4096).collect();
     if let Ok(message) = std::ffi::CString::new(message) {
@@ -641,8 +670,8 @@ pub fn menu(app: &AndroidApp, show: bool, message: Option<String>) {
 }
 pub fn unloaded_menu(app: &AndroidApp, title: &str, error: Option<String>) {
     let recovery = error.is_some();
-    let text = error
-        .unwrap_or_else(|| format!("gcx\n\nGame stopped. Card saves are preserved.\n\n{title}"));
+    let text =
+        error.unwrap_or_else(|| format!("gcx\n\n{title}\n\nGame stopped · in-game saves kept"));
     render_menu(
         app,
         true,
@@ -653,7 +682,7 @@ pub fn unloaded_menu(app: &AndroidApp, title: &str, error: Option<String>) {
                 if recovery {
                     "Restart with current saves".into()
                 } else {
-                    format!("Open {title}")
+                    "Play".into()
                 },
             ),
             (7, "Add game to Home screen".into()),
@@ -665,9 +694,9 @@ pub fn unloaded_menu(app: &AndroidApp, title: &str, error: Option<String>) {
 }
 pub fn player_menu(app: &AndroidApp, runtime: u64, can_resume: bool, error: Option<String>) {
     let mut text = error
-        .map(|s| format!("gcx paused\n\n{s}"))
-        .unwrap_or_else(|| "gcx paused".into());
-    text.push_str("\n\nStop game keeps in-game saves and discards the resume point. Save inside the game first to keep progress.");
+        .map(|s| format!("Paused\n\n{s}"))
+        .unwrap_or_else(|| "Paused".into());
+    text.push_str("\n\nStop game discards this resume point. Save in-game first to keep progress.");
     let mut actions = Vec::new();
     if can_resume {
         actions.push((3, "Resume".into()));
@@ -743,7 +772,39 @@ fn render_menu_with_games(
                     &[JValue::Object(activity)],
                 )?;
                 env.call_method(&view, "setOrientation", "(I)V", &[JValue::Int(1)])?;
-                env.call_method(&view, "setGravity", "(I)V", &[JValue::Int(17)])?;
+                env.call_method(&view, "setGravity", "(I)V", &[JValue::Int(49)])?;
+                let resources = env
+                    .call_method(
+                        activity,
+                        "getResources",
+                        "()Landroid/content/res/Resources;",
+                        &[],
+                    )?
+                    .l()?;
+                let metrics = env
+                    .call_method(
+                        &resources,
+                        "getDisplayMetrics",
+                        "()Landroid/util/DisplayMetrics;",
+                        &[],
+                    )?
+                    .l()?;
+                let density = env
+                    .get_field(&metrics, "density", "F")?
+                    .f()?
+                    .clamp(0.5, 8.0);
+                let dp = |value: f32| (value * density).round() as i32;
+                env.call_method(
+                    &view,
+                    "setPadding",
+                    "(IIII)V",
+                    &[
+                        JValue::Int(dp(16.0)),
+                        JValue::Int(dp(12.0)),
+                        JValue::Int(dp(16.0)),
+                        JValue::Int(dp(12.0)),
+                    ],
+                )?;
                 let label = env.new_object(
                     "android/widget/TextView",
                     "(Landroid/content/Context;)V",
@@ -756,8 +817,19 @@ fn render_menu_with_games(
                     "(Ljava/lang/CharSequence;)V",
                     &[JValue::Object(&text)],
                 )?;
-                env.call_method(&label, "setTextSize", "(F)V", &[JValue::Float(20.0)])?;
-                env.call_method(&label, "setGravity", "(I)V", &[JValue::Int(17)])?;
+                env.call_method(&label, "setTextSize", "(F)V", &[JValue::Float(18.0)])?;
+                env.call_method(&label, "setGravity", "(I)V", &[JValue::Int(3)])?;
+                env.call_method(
+                    &label,
+                    "setPadding",
+                    "(IIII)V",
+                    &[
+                        JValue::Int(dp(4.0)),
+                        JValue::Int(dp(8.0)),
+                        JValue::Int(dp(4.0)),
+                        JValue::Int(dp(20.0)),
+                    ],
+                )?;
                 env.call_method(&label, "setTextColor", "(I)V", &[JValue::Int(-1)])?;
                 env.call_method(
                     &view,
@@ -769,15 +841,16 @@ fn render_menu_with_games(
                     &view,
                     "setBackgroundColor",
                     "(I)V",
-                    &[JValue::Int(0xff14232b_u32 as i32)],
+                    &[JValue::Int(0xff11161c_u32 as i32)],
                 )?;
-                let rows = actions
+                // Public PSX's game-first column: entries precede auxiliary actions.
+                let rows = games
                     .into_iter()
-                    .map(|(action, text)| (Some(action), None, text))
+                    .map(|(game, title)| (None, Some(game), title))
                     .chain(
-                        games
+                        actions
                             .into_iter()
-                            .map(|(game, title)| (None, Some(game), title)),
+                            .map(|(action, text)| (Some(action), None, text)),
                     );
                 for (action, game, text) in rows {
                     // Pop temporary JNI refs for each row; large collections do
@@ -787,6 +860,35 @@ fn render_menu_with_games(
                             "android/widget/Button",
                             "(Landroid/content/Context;)V",
                             &[JValue::Object(activity)],
+                        )?;
+                        env.call_method(&button, "setAllCaps", "(Z)V", &[JValue::Bool(0)])?;
+                        env.call_method(&button, "setTextSize", "(F)V", &[JValue::Float(16.0)])?;
+                        env.call_method(&button, "setMinHeight", "(I)V", &[JValue::Int(dp(56.0))])?;
+                        env.call_method(
+                            &button,
+                            "setTextColor",
+                            "(I)V",
+                            &[JValue::Int(0xffeef2f6_u32 as i32)],
+                        )?;
+                        let color = match action {
+                            Some(3 | 5) => 0xff315b64_u32,
+                            Some(4) => 0xff57363e,
+                            _ if game.is_some() => 0xff253c45,
+                            _ => 0xff26313b,
+                        };
+                        let tint = env
+                            .call_static_method(
+                                "android/content/res/ColorStateList",
+                                "valueOf",
+                                "(I)Landroid/content/res/ColorStateList;",
+                                &[JValue::Int(color as i32)],
+                            )?
+                            .l()?;
+                        env.call_method(
+                            &button,
+                            "setBackgroundTintList",
+                            "(Landroid/content/res/ColorStateList;)V",
+                            &[JValue::Object(&tint)],
                         )?;
                         let text = env.new_string(text)?;
                         env.call_method(
@@ -849,6 +951,38 @@ fn render_menu_with_games(
                     &[JValue::Object(activity)],
                 )?;
                 env.call_method(&scroll, "setFillViewport", "(Z)V", &[JValue::Bool(1)])?;
+                env.call_method(
+                    &scroll,
+                    "setBackgroundColor",
+                    "(I)V",
+                    &[JValue::Int(0xff11161c_u32 as i32)],
+                )?;
+                let parent_window = env
+                    .call_method(activity, "getWindow", "()Landroid/view/Window;", &[])?
+                    .l()?;
+                let decor = env
+                    .call_method(&parent_window, "getDecorView", "()Landroid/view/View;", &[])?
+                    .l()?;
+                let measured = env.call_method(&decor, "getWidth", "()I", &[])?.i()?;
+                let width = if measured > 0 {
+                    measured
+                } else {
+                    env.get_field(&metrics, "widthPixels", "I")?.i()?
+                };
+                // Adapt PSX's centered720-point column. Insets can make the
+                // framework parent narrower; padding keeps children inside it.
+                let side = dp(16.0).max((width - dp(720.0)) / 2);
+                env.call_method(
+                    &view,
+                    "setPadding",
+                    "(IIII)V",
+                    &[
+                        JValue::Int(side),
+                        JValue::Int(dp(12.0)),
+                        JValue::Int(side),
+                        JValue::Int(dp(12.0)),
+                    ],
+                )?;
                 env.call_method(
                     &scroll,
                     "addView",
