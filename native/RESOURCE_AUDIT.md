@@ -18,3 +18,10 @@ must be diagnosed against that route before expanding this allowlist. Resources
 needed for optional cheats, LLE, Wii or a donor frontend are not admitted by a
 missing-file message alone. Inventory and hash actual staged assets and the APK;
 an allowlist in source is not proof of what a package contains.
+
+The source checker also requires every selected resource, including discovered
+GameCube G/D GameSettings INIs, to be tracked in the pinned source checkout.
+Git path arguments are literal: a local filename containing a wildcard cannot
+stand in for tracked inputs. Actual refusal tests injected an ordinary untracked
+INI and a literal wildcard filename, verified rejection, then removed only those
+owned fixtures and rechecked the source graph. No new packaged assets are admitted.

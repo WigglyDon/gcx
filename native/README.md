@@ -131,6 +131,22 @@ GCX_ENGINE_LIB_DIR="$PWD/build/host/gcx" cargo build --release -p gcx --features
 LD_LIBRARY_PATH="$PWD/build/host/gcx" timeout 90 target/release/gcx-checkpoint-probe ANOTHER_NEW_PRIVATE_FIXTURE .local/source/dolphin/Data/Sys --reentry
 ```
 
+For a copied, offline private profile, a read-only host inspection mode uses the
+same Rust envelope/generation validator without native boot or restore:
+
+```sh
+LD_LIBRARY_PATH="$PWD/build/host/gcx" target/release/gcx-checkpoint-probe --verify COPIED_PRIVATE_PROFILE CHECKPOINT_ID TRUSTED_BINDING_JSON
+```
+
+The expected Binding JSON must come from independent trusted source/media/profile
+receipts, not merely from the checkpoint header being checked. It must match the
+Android engine/resource/disc identities when inspecting an Android copy; the host
+engine identity is not interchangeable. The tool rechecks current files after
+payload verification and does not mutate the profile. Actual original-fixture
+inspection passed, wrong engine binding was refused, and all file content hashes
+remained unchanged. This is not a restore operation or authority to inspect a live
+owner profile. Device test preparation remains private and requires a fresh window.
+
 The host JIT test needs ordinary native execution; the restricted agent sandbox
 traps it. No device/game/firmware input is used. `native/host_fixture.cpp` exposes
 only CPU/card fixture operations and is excluded from Android. Application policy

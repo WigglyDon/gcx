@@ -82,7 +82,34 @@ fn source_check(source: &std::path::Path) -> Result<(), Box<dyn std::error::Erro
             return Err(format!("modified dependency: {path}").into());
         }
     }
-    println!("Verified Dolphin revision and selected dependency gitlinks");
+    // GameSettings selection must remain inside the pinned source graph, even
+    // though Git diff does not report untracked files. Never silently package a
+    // local scratch configuration alongside the reviewed resources.
+    let mut resources: Vec<String> = include_str!("../../native/resources.txt")
+        .lines()
+        .map(|name| format!("Data/Sys/{name}"))
+        .collect();
+    for item in std::fs::read_dir(source.join("Data/Sys/GameSettings"))? {
+        let item = item?;
+        let name = item
+            .file_name()
+            .into_string()
+            .map_err(|_| "invalid resource filename")?;
+        if name.ends_with(".ini") && (name.starts_with('G') || name.starts_with('D')) {
+            resources.push(format!("Data/Sys/GameSettings/{name}"));
+        }
+    }
+    let tracked = Command::new("git")
+        .arg("--literal-pathspecs")
+        .arg("-C")
+        .arg(source)
+        .args(["ls-files", "--error-unmatch", "--"])
+        .args(resources)
+        .output()?;
+    if !tracked.status.success() {
+        return Err("selected resources include files outside the pinned source graph".into());
+    }
+    println!("Verified Dolphin revision, selected dependency gitlinks and selected resource graph");
     Ok(())
 }
 fn main() -> Result<(), Box<dyn std::error::Error>> {

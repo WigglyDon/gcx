@@ -464,6 +464,31 @@ mod host {
     }
     pub fn run() -> Result {
         let args: Vec<_> = std::env::args_os().skip(1).collect();
+        if args.len() == 4 && args[0] == "--verify" {
+            // Read-only inspection of an offline profile copy. Expected identity
+            // comes from a trusted independent receipt, never its state header.
+            let profile = PathBuf::from(&args[1]);
+            let id = args[2].to_str().ok_or("checkpoint ID encoding")?;
+            let file = fs::File::open(&args[3])?;
+            if file.metadata()?.len() > 8192 {
+                return Err("expected binding is too large".into());
+            }
+            use std::io::Read;
+            let mut bytes = Vec::new();
+            file.take(8193).read_to_end(&mut bytes)?;
+            if bytes.len() > 8192 {
+                return Err("expected binding grew beyond its limit".into());
+            }
+            let expected: Binding = serde_json::from_slice(&bytes)?;
+            let state = checkpoint::load(&profile, id, &expected)?;
+            state.verify_current_saves(&profile)?;
+            println!(
+                "PASS read-only checkpoint inspection: {} payload bytes; captured pause intent={}. No native boot, restore or profile mutation.",
+                state.payload.len(),
+                state.paused
+            );
+            return Ok(());
+        }
         if args.len() == 4 && args[0] == "--phase" {
             return phase(
                 &PathBuf::from(&args[2]),
@@ -474,7 +499,7 @@ mod host {
         let reentry_requested = args.len() == 3 && args[2] == "--reentry";
         if args.len() != 2 && !reentry_requested {
             return Err(
-                "usage: gcx-checkpoint-probe <NEW-private-root> <Dolphin-Data/Sys> [--reentry]"
+                "usage: gcx-checkpoint-probe <NEW-private-root> <Dolphin-Data/Sys> [--reentry] OR --verify <offline-profile> <checkpoint-ID> <trusted-binding.json>"
                     .into(),
             );
         }
