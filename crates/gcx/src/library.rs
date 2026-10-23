@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GameId(pub String);
 #[derive(Clone, Serialize, Deserialize)]
 pub struct SaveProfileId(pub String);
@@ -78,7 +78,38 @@ pub fn valid_id(value: &str) -> bool {
             .bytes()
             .all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(&c))
 }
+#[derive(Debug, PartialEq, Eq)]
+pub enum GameOpen {
+    ResumeCurrent,
+    Select(usize),
+}
 impl Collection {
+    /// A launch/UI request names an existing entry, never a document or profile
+    /// path. Unknown, removed and malformed IDs leave the live owner untouched.
+    pub fn resolve_game(&self, id: &str) -> Result<usize, &'static str> {
+        if !valid_id(id) {
+            return Err("Invalid game identity.");
+        }
+        self.entries
+            .iter()
+            .position(|entry| entry.game_id.0 == id)
+            .ok_or("This game is no longer in the library. Import or relink it explicitly.")
+    }
+    pub fn open_game(&self, id: &str, live_game: Option<&str>) -> Result<GameOpen, &'static str> {
+        let target = self.resolve_game(id)?;
+        if let Some(live) = live_game {
+            let current = self.resolve_game(live)?;
+            if self.entries[current].restart_required {
+                return Err(
+                    "The current game needs recovery. Use Stop or Restart with current saves before opening another game.",
+                );
+            }
+            if current == target {
+                return Ok(GameOpen::ResumeCurrent);
+            }
+        }
+        Ok(GameOpen::Select(target))
+    }
     pub fn validate(&self) -> Result<(), &'static str> {
         if self.schema_version != 1 {
             return Err("unsupported collection schema; original retained");
@@ -88,6 +119,7 @@ impl Collection {
         }
         let mut games = BTreeSet::new();
         let mut documents = BTreeSet::new();
+        let mut profiles = BTreeSet::new();
         for e in &self.entries {
             if !valid_id(&e.game_id.0)
                 || !valid_id(&e.profile_id.0)
@@ -101,7 +133,10 @@ impl Collection {
             {
                 return Err("invalid collection metadata; original retained");
             }
-            if !games.insert(e.game_id.0.as_str()) || !documents.insert(e.uri.as_str()) {
+            if !games.insert(e.game_id.0.as_str())
+                || !documents.insert(e.uri.as_str())
+                || !profiles.insert(e.profile_id.0.as_str())
+            {
                 return Err("ambiguous collection identity; original retained");
             }
         }
@@ -184,6 +219,51 @@ mod tests {
         loaded.request_restart();
         assert!(loaded.boot_allowed() && loaded.checkpoint.is_none());
         assert_eq!(loaded.profile_id.0, original.profile_id.0);
+    }
+    #[test]
+    fn library_requests_resolve_stable_ids_and_refuse_paths_unknown_ids_or_shared_profiles() {
+        let a = entry();
+        let mut b = entry();
+        b.game_id.0 = "c".repeat(32);
+        b.profile_id.0 = "d".repeat(32);
+        b.uri = "content://fixture/other".into();
+        let mut c = Collection {
+            entries: vec![a, b],
+            selected: None,
+            ..Default::default()
+        };
+        assert!(c.validate().is_ok());
+        assert_eq!(c.resolve_game(&"c".repeat(32)), Ok(1));
+        for _ in 0..3 {
+            assert_eq!(
+                c.open_game(&"a".repeat(32), Some(&"a".repeat(32))),
+                Ok(GameOpen::ResumeCurrent)
+            );
+        }
+        assert_eq!(
+            c.open_game(&"c".repeat(32), Some(&"a".repeat(32))),
+            Ok(GameOpen::Select(1))
+        );
+        c.entries[0].fail("checkpoint publication failed".into());
+        assert!(c.open_game(&"c".repeat(32), Some(&"a".repeat(32))).is_err());
+        assert!(c.open_game(&"a".repeat(32), Some(&"a".repeat(32))).is_err());
+        c.entries[0].request_restart();
+        for id in [
+            "../profiles/card",
+            "content://fixture/game",
+            &"e".repeat(32),
+            &"A".repeat(32),
+        ] {
+            assert!(c.resolve_game(id).is_err());
+        }
+        c.entries[1].profile_id = c.entries[0].profile_id.clone();
+        assert!(c.validate().is_err(), "initial profiles must be isolated");
+        c.entries.swap(0, 1);
+        assert_eq!(
+            c.resolve_game(&"c".repeat(32)),
+            Ok(0),
+            "identity survives row reordering"
+        );
     }
     #[test]
     fn interrupted_runtime_requires_explicit_restart_without_changing_save_identity() {

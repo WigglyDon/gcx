@@ -50,6 +50,8 @@ pub enum Command {
     Resume(u64),
     Stop(u64),
     Open,
+    Library,
+    Game(String),
     Selected(String),
     Canceled,
     MenuHidden(u64),
@@ -623,7 +625,8 @@ pub fn menu(app: &AndroidApp, show: bool, message: Option<String>) {
     if recovery {
         actions.push((2, "Restart with current saves".to_owned()));
     }
-    actions.push((1, "Choose a GameCube game".to_owned()));
+    actions.push((6, "Library".to_owned()));
+    actions.push((1, "Import a GameCube game".to_owned()));
     render_menu(
         app,
         show,
@@ -649,7 +652,8 @@ pub fn unloaded_menu(app: &AndroidApp, title: &str, error: Option<String>) {
                     format!("Open {title}")
                 },
             ),
-            (1, "Choose a GameCube game".into()),
+            (6, "Library".into()),
+            (1, "Import a GameCube game".into()),
         ],
         0,
     );
@@ -662,8 +666,11 @@ pub fn player_menu(app: &AndroidApp, runtime: u64, can_resume: bool, error: Opti
     let mut actions = Vec::new();
     if can_resume {
         actions.push((3, "Resume".into()));
+    } else {
+        actions.push((2, "Restart with current saves".into()));
     }
     actions.push((4, "Stop game".into()));
+    actions.push((6, "Library".into()));
     render_menu(app, true, text, actions, runtime);
 }
 pub fn menu_current(generation: u64) -> bool {
@@ -675,6 +682,40 @@ fn render_menu(
     text: String,
     actions: Vec<(i32, String)>,
     runtime: u64,
+) {
+    render_menu_with_games(app, show, text, actions, runtime, Vec::new());
+}
+pub fn library_menu(
+    app: &AndroidApp,
+    games: Vec<(String, String)>,
+    runtime: Option<u64>,
+    can_resume: bool,
+) {
+    let mut actions = Vec::new();
+    if let Some(epoch) = runtime {
+        if can_resume {
+            actions.push((3, "Resume current game".into()));
+        }
+        actions.push((4, "Stop current game".into()));
+        actions.push((1, "Import a GameCube game".into()));
+        render_menu_with_games(app, true, "gcx library".into(), actions, epoch, games);
+    } else {
+        actions.push((1, "Import a GameCube game".into()));
+        let text = if games.is_empty() {
+            "gcx library\n\nImport a local GameCube game to begin."
+        } else {
+            "gcx library"
+        };
+        render_menu_with_games(app, true, text.into(), actions, 0, games);
+    }
+}
+fn render_menu_with_games(
+    app: &AndroidApp,
+    show: bool,
+    text: String,
+    actions: Vec<(i32, String)>,
+    runtime: u64,
+    games: Vec<(String, String)>,
 ) {
     let epoch = EPOCH.load(Ordering::Acquire);
     let generation = MENU_GENERATION.fetch_add(1, Ordering::AcqRel) + 1;
@@ -724,58 +765,90 @@ fn render_menu(
                     "(I)V",
                     &[JValue::Int(0xff14232b_u32 as i32)],
                 )?;
-                for (action, text) in actions {
-                    let button = env.new_object(
-                        "android/widget/Button",
-                        "(Landroid/content/Context;)V",
-                        &[JValue::Object(activity)],
-                    )?;
-                    let text = env.new_string(text)?;
-                    env.call_method(
-                        &button,
-                        "setText",
-                        "(Ljava/lang/CharSequence;)V",
-                        &[JValue::Object(&text)],
-                    )?;
-                    let class = env
-                        .call_method(activity, "getClass", "()Ljava/lang/Class;", &[])?
-                        .l()?;
-                    let loader = env
-                        .call_method(class, "getClassLoader", "()Ljava/lang/ClassLoader;", &[])?
-                        .l()?;
-                    let name = env.new_string("com.machinerhythm.gcx.GcxActivity$Action")?;
-                    let class = JClass::from(
-                        env.call_method(
-                            loader,
-                            "loadClass",
-                            "(Ljava/lang/String;)Ljava/lang/Class;",
-                            &[JValue::Object(&name)],
-                        )?
-                        .l()?,
+                let rows = actions
+                    .into_iter()
+                    .map(|(action, text)| (Some(action), None, text))
+                    .chain(
+                        games
+                            .into_iter()
+                            .map(|(game, title)| (None, Some(game), title)),
                     );
-                    let listener = env.new_object(
-                        class,
-                        "(Lcom/machinerhythm/gcx/GcxActivity;IJJ)V",
-                        &[
-                            JValue::Object(activity),
-                            JValue::Int(action),
-                            JValue::Long(generation as i64),
-                            JValue::Long(runtime as i64),
-                        ],
-                    )?;
-                    env.call_method(
-                        &button,
-                        "setOnClickListener",
-                        "(Landroid/view/View$OnClickListener;)V",
-                        &[JValue::Object(&listener)],
-                    )?;
-                    env.call_method(
-                        &view,
-                        "addView",
-                        "(Landroid/view/View;)V",
-                        &[JValue::Object(&button)],
-                    )?;
+                for (action, game, text) in rows {
+                    // Pop temporary JNI refs for each row; large collections do
+                    // not grow an attached Java thread's local reference table.
+                    env.with_local_frame(24, |env| -> Result<()> {
+                        let button = env.new_object(
+                            "android/widget/Button",
+                            "(Landroid/content/Context;)V",
+                            &[JValue::Object(activity)],
+                        )?;
+                        let text = env.new_string(text)?;
+                        env.call_method(
+                            &button,
+                            "setText",
+                            "(Ljava/lang/CharSequence;)V",
+                            &[JValue::Object(&text)],
+                        )?;
+                        let listener = if let Some(game) = game {
+                            let class = activity_class(
+                                env,
+                                activity,
+                                "com.machinerhythm.gcx.GcxActivity$GameAction",
+                            )?;
+                            let game = env.new_string(game)?;
+                            env.new_object(
+                                class,
+                                "(Lcom/machinerhythm/gcx/GcxActivity;Ljava/lang/String;J)V",
+                                &[
+                                    JValue::Object(activity),
+                                    JValue::Object(&game),
+                                    JValue::Long(generation as i64),
+                                ],
+                            )?
+                        } else {
+                            let class = activity_class(
+                                env,
+                                activity,
+                                "com.machinerhythm.gcx.GcxActivity$Action",
+                            )?;
+                            env.new_object(
+                                class,
+                                "(Lcom/machinerhythm/gcx/GcxActivity;IJJ)V",
+                                &[
+                                    JValue::Object(activity),
+                                    JValue::Int(action.ok_or("missing menu action")?),
+                                    JValue::Long(generation as i64),
+                                    JValue::Long(runtime as i64),
+                                ],
+                            )?
+                        };
+                        env.call_method(
+                            &button,
+                            "setOnClickListener",
+                            "(Landroid/view/View$OnClickListener;)V",
+                            &[JValue::Object(&listener)],
+                        )?;
+                        env.call_method(
+                            &view,
+                            "addView",
+                            "(Landroid/view/View;)V",
+                            &[JValue::Object(&button)],
+                        )?;
+                        Ok(())
+                    })?;
                 }
+                let scroll = env.new_object(
+                    "android/widget/ScrollView",
+                    "(Landroid/content/Context;)V",
+                    &[JValue::Object(activity)],
+                )?;
+                env.call_method(&scroll, "setFillViewport", "(Z)V", &[JValue::Bool(1)])?;
+                env.call_method(
+                    &scroll,
+                    "addView",
+                    "(Landroid/view/View;)V",
+                    &[JValue::Object(&view)],
+                )?;
                 // NativeActivity owns the root drawing surface. Views added to
                 // that hierarchy can receive input while remaining unpainted.
                 // This app-owned dialog has a framework-rendered window; the
@@ -793,7 +866,7 @@ fn render_menu(
                     &dialog,
                     "setContentView",
                     "(Landroid/view/View;)V",
-                    &[JValue::Object(&view)],
+                    &[JValue::Object(&scroll)],
                 )?;
                 env.call_method(&dialog, "show", "()V", &[])?;
                 let window = env
@@ -863,7 +936,27 @@ extern "system" fn Java_com_machinerhythm_gcx_GcxActivity_uiAction(
         3 => push(Command::Resume(runtime as u64)),
         4 => push(Command::Stop(runtime as u64)),
         5 => push(Command::Open),
+        6 => push(Command::Library),
         _ => {}
+    }
+}
+#[unsafe(no_mangle)]
+extern "system" fn Java_com_machinerhythm_gcx_GcxActivity_gameAction(
+    mut env: JNIEnv<'_>,
+    activity: JObject<'_>,
+    game: JString<'_>,
+    menu: jlong,
+) {
+    if !current_activity(&env, &activity) || !menu_current(menu as u64) {
+        return;
+    }
+    let id = env.get_string(&game).map(String::from);
+    match id {
+        Ok(id) if gcx::library::valid_id(&id) => push(Command::Game(id)),
+        _ => {
+            let _ = env.exception_clear();
+            push(Command::Notice("Invalid library game.".into()));
+        }
     }
 }
 pub fn notice(app: &AndroidApp, message: String) {

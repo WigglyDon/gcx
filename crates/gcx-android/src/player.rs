@@ -5,7 +5,7 @@ use android_activity::{
     input::{InputEvent, MotionAction},
 };
 use gcx::checkpoint::{self, Binding, Checkpoint};
-use gcx::library::{Collection, GameId, SaveProfileId, SavedSession, valid_id};
+use gcx::library::{Collection, GameId, GameOpen, SaveProfileId, SavedSession, valid_id};
 use gcx::lifecycle::{StopResult, StopRuntime, stop_game};
 use gcx::{
     Pad, ProfileLock,
@@ -764,10 +764,51 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                         continue;
                     }
                 }
+                Command::Game(id) => match collection
+                    .open_game(&id, runtime.as_ref().map(|r| r.events.game_id.as_str()))
+                {
+                    Ok(GameOpen::ResumeCurrent) => {
+                        if let Some(index) = selected {
+                            collection.entries[index].paused = false;
+                        }
+                        platform::menu(app, false, None);
+                        continue;
+                    }
+                    Ok(GameOpen::Select(index)) => {
+                        Command::Selected(collection.entries[index].uri.clone())
+                    }
+                    Err(error) => {
+                        platform::notice(app, error.into());
+                        continue;
+                    }
+                },
                 other => other,
             };
             match command {
-                Command::NativeError { .. } => continue,
+                Command::NativeError { .. } | Command::Game(_) => continue,
+                Command::Library => {
+                    hidden = false;
+                    if let Some(index) = selected.filter(|_| runtime.is_some()) {
+                        collection.entries[index].paused = true;
+                    }
+                    pause_for_background(
+                        &root,
+                        &mut runtime,
+                        &mut collection,
+                        selected,
+                        &mut native_paused,
+                    );
+                    platform::library_menu(
+                        app,
+                        collection
+                            .entries
+                            .iter()
+                            .map(|e| (e.game_id.0.clone(), e.title.clone()))
+                            .collect(),
+                        runtime.as_ref().map(|r| r.events.epoch),
+                        selected.is_some_and(|i| !collection.entries[i].restart_required),
+                    );
+                }
                 Command::Choose => {
                     if !picker_pending {
                         platform::picker(app);
@@ -836,6 +877,10 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                 Command::Selected(uri) => {
                     picker_pending = false;
                     if runtime.is_some() {
+                        if selected.is_some_and(|i| collection.entries[i].restart_required) {
+                            platform::notice(app, "The current game needs recovery. Use Stop or Restart with current saves before opening another game.".into());
+                            continue;
+                        }
                         let mut info = MediaInfo::default();
                         let valid=CString::new(uri.as_str()).is_ok_and(|candidate| unsafe {gcx_engine_inspect(candidate.as_ptr(),&mut info)}!=0);
                         if !valid {
@@ -846,6 +891,9 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                             collection.entries[i].uri == uri
                                 && !collection.entries[i].restart_required
                         }) {
+                            if let Some(index) = selected {
+                                collection.entries[index].paused = false;
+                            }
                             platform::menu(app, false, None);
                             continue;
                         }
@@ -853,11 +901,7 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                     // Save the departing scene and join while its profile remains
                     // exclusively owned. A failed checkpoint keeps its live RAM.
                     if let (Some(active), Some(index)) = (runtime.as_mut(), selected) {
-                        let saved = if collection.entries[index].restart_required {
-                            active.pause_commit().map_err(|e| e.into())
-                        } else {
-                            save_checkpoint(active, &root, &mut collection, index)
-                        };
+                        let saved = save_checkpoint(active, &root, &mut collection, index);
                         if let Err(error) = saved {
                             native_paused = Some(true);
                             platform::push(Command::Error(format!(
@@ -865,13 +909,7 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                             )));
                             continue;
                         }
-                        let joined = active.join().and_then(|()| {
-                            if collection.entries[index].restart_required {
-                                Ok(())
-                            } else {
-                                active.verify_departure()
-                            }
-                        });
+                        let joined = active.join().and_then(|()| active.verify_departure());
                         collection.entries[index].runtime_incomplete = joined.is_err();
                         if let Err(error) = joined {
                             collection.entries[index].fail(error);
@@ -916,6 +954,9 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                         && !collection.entries[index].restart_required
                     {
                         collection.entries[index].request_restart();
+                    }
+                    if !collection.entries[index].restart_required {
+                        collection.entries[index].paused = false;
                     }
                     if save_collection(&root, &collection).is_err() {
                         platform::notice(app,"Could not durably save the collection. Files are retained; choose the document again to retry.".into());

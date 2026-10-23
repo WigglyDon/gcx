@@ -127,6 +127,17 @@ intentionally-paused, interrupted, saving, checkpointed/unloaded and failed.
 More than one saved session is ordinary behavior; one live runtime is initial
 policy. A future paused-resident optimization must not change durable identities.
 
+The Rust library dialog now lists imported entries by stable GameId, with scrollable
+native views built from Rust and bounded JNI reference frames. Rows carry only
+GameId and menu generation through a mechanical callback. Unknown/malformed IDs
+leave the current runtime intact; repeated same-game requests return to its live
+owner, and another entry uses the existing coherent checkpoint/join path. A live
+recovery error blocks switching until explicit Stop/restart. Opening a saved game
+expresses Resume intent; no new profile is allocated. Duplicate profile identities
+are rejected in this initial isolated-profile policy. Import still uses scoped
+document grants. Library display/switching remains Android-unqualified; this does
+not implement pinned launcher shortcuts or relink/multi-disc support.
+
 ## GameCube storage, not a PS1 card copy or Xbox disk overlay
 
 Dolphin's inspected implementation has raw-memory-card and GCI-directory modes,

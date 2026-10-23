@@ -9,6 +9,7 @@ public final class GcxActivity extends android.app.NativeActivity {
     static { System.loadLibrary("gcx_android"); }
     private native void documentResult(int request, int result, android.content.Intent data);
     private native void uiAction(int action, long menu, long runtime);
+    private native void gameAction(String game, long menu);
     private native void beforeDestroy();
     private native void windowChanged();
     private native void windowFocus(boolean focused);
@@ -43,6 +44,16 @@ public final class GcxActivity extends android.app.NativeActivity {
             this.activity = activity; this.action = action; this.menu = menu; this.runtime = runtime;
         }
         @Override public void onClick(android.view.View view) { activity.uiAction(action, menu, runtime); }
+    }
+
+    public static final class GameAction implements android.view.View.OnClickListener {
+        private final String game;
+        private final long menu;
+        private final GcxActivity activity;
+        public GameAction(GcxActivity activity, String game, long menu) {
+            this.activity = activity; this.game = game; this.menu = menu;
+        }
+        @Override public void onClick(android.view.View view) { activity.gameAction(game, menu); }
     }
 
     @Override
