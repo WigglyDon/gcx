@@ -29,7 +29,37 @@ return:2026-10-23 18:28:35UTC. The supplied second title is on Pixel4; no Fold c
 was needed or performed. Automatic paused=false return, real A/B/A, actual pins/
 taps and a new ordinary-save/reload row remain unrun. See [scene evidence](https://github.com/WigglyDon/gcx/issues/2#issuecomment-6371910629).
 
-## Input/UI follow-up, ABI8, off-device
+## Input/UI follow-up, ABI8
+
+The unchanged candidate below was installed on Pixel4 on2026-10-24UTC after a
+verified complete private backup. The compact menu and colored controls rendered;
+held Start/A loaded the existing one-rupee quest, and injected Control/C Stick
+gestures changed the unsaved world/camera position. Seven captures were privately
+inspected. Pause/Home durably published a paused checkpoint. Its independently
+validated payload was93,382,166bytes; the complete checkpoint/card/SRAM/session
+backup was110,169,600bytes. This pass did not perform fresh-process restoration,
+and has no owner audio/control-feel confirmation. Earlier ABI7 evidence stays
+bound to ABI7.
+
+Injected-event measurements:171 source events, maximum event→dispatch20,129us;
+169 updates/161 sampled batches, maximum dispatch→native-pad14,039us;
+96,087 complete polls and largest active gap431,467us. The interval includes
+startup/loading; the gap is unattributed. These are software-stage observations,
+not steady-state latency, game response or touch-to-photon acceptance. A bare
+synthetic Start tap did not advance the title while a180ms hold did; a native-poll
+delivery guarantee alone does not prove game recognition of arbitrary short taps.
+
+The interactive command deadline expired before normal Stop, leaving the paused
+writer and cleanup pending. Same-task bounded recovery subsequently backed up and
+validated the generation, used normal Stop through worker join/profile release,
+verified a22,556,160byte final archive and unchanged ordinary card, and retired
+only gcx. Verified final return:2026-10-24 01:47:27UTC, physical displayOFF,
+nonsecure keyguard showing, app absent and lease released. Wakefulness was Dozing;
+the physical display readback establishes OFF. Original pending evidence is retained
+alongside the resolved canonical receipt. Fold/siblings were untouched.
+See [complete results and limits](https://github.com/WigglyDon/gcx/issues/2#issuecomment-6378376203).
+Cold scene return, human feel/audio, full trigger/multitouch coverage, A/B/A,
+actual shortcuts and a new ordinary-save/reload row remain due on ABI8.
 
 Rust now supplies a complete18-channel packet at Dolphin's actual pad read.
 The maintained GPL change is an optional `Pad::GetStatus` callback under the
@@ -86,9 +116,10 @@ SHA256 `c7194951d9420e45622c7eefb29baaa5365fec694e6cefa015a7049dc724e5c9`
 Actual ABI/defined exports/JNI/dependency closure, separate unchanged signer,
 zero permissions, resources/notices and16KiB ELF/ZIP alignment pass. The complete
 private binary/source pair is preserved and all65 source checksums pass, with92
-public source inputs. This candidate is not installed. No Android responsiveness,
-layout-feel, gameplay, card-save or resume result transfers from ABI7 to this new
-native/Rust build. Later documentation bindings do not require an unchanged rebuild.
+public source inputs. The bounded Android observations above supersede its original
+off-device status. No layout-feel, audible sound, card-save or cold-resume result
+transfers from ABI7 to this new native/Rust build. Later documentation bindings do
+not require an unchanged rebuild.
 
 ## Checked native save reads, 2026-10-22
 
@@ -112,7 +143,7 @@ Actual ABI/defined exports/JNI/dependencies, unchanged signer, zero permissions,
 resource/native bytes and16KiB ELF/ZIP alignment checks pass. All65 preserved
 corresponding-source checksums pass, with92 public source inputs. The ABI6 artifacts
 below remain immutable. The initial off-device status is superseded only by the
-bounded ABI7 hardware evidence above; the subsequent ABI8 increment is uninstalled.
+bounded ABI7 hardware evidence above; ABI8 has only its separately recorded results.
 
 An optional native image-read callback now delegates existing card/SRAM reads to
 Rust. Rust distinguishes genuine absence from errors, owns path/canonical-profile

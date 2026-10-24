@@ -25,11 +25,15 @@ up. The landscape update now runs on Pixel 4 with GameCube colors and labels;
 the owner reports it works. Pause/Resume, one Home/return and clean Stop passed.
 The owner accepted the edge-to-edge picture correction, and a fresh-process reload
 of the earlier card save passed on that build. A misplaced system Home handle
-after bar reveal remains open. The full control matrix, extended surface transitions,
-Fold play and automatic resume remain unqualified. The new off-device checkpoint
-slice preserves machine/card generations in Rust and passes actual native
-fresh-process CPU/card-protocol restore and failure tests; its Android lifecycle
-is implemented but has not run on a phone. A Rust saved-game list, validated
+after bar reveal remains open. The full control matrix, extended surface transitions
+and Fold play remain unqualified. Rust-owned coherent
+machine/card checkpoints passed actual native restore/failure fixtures and an
+ABI7 Pixel4 fresh-process return to unsaved scenes, with owner-confirmed sound,
+controls and retained pause intent. The newer ABI8 input/UI build rendered its
+controls, ran the existing quest and produced a privately backed-up, validated
+checkpoint on Pixel4; its fresh-process scene return and human control feel/audio
+remain due. The automatic unpaused-return variant remains unqualified.
+A Rust saved-game list, validated
 GameId launcher links and system pin-request code are also built off-device;
 physical library and launcher tests remain due. See
 [native reproduction and limits](native/README.md).
