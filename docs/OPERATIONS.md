@@ -90,6 +90,14 @@ never a quoted `sh -c` string or an input-less hash command.
 
 The helper does not kill an unverified live writer to simulate Stop. It records
 pending recovery before releasing custody if normal cleanup cannot complete.
+For an authorized fresh-process checkpoint test, its named `retire_checkpoint`
+operation requires an unchanged complete backup and independent inspector verdict,
+matching intent/game/profile/checkpoint, fresh hashes of the actual checkpoint,
+card, SRAM, generation and collection, observed Home foreground, exact current
+PID/start identity and paused/publication evidence. Only then may it retire the
+own process. It records that this is not normal Stop; cleanup cannot invoke it
+as a substitute. Any changed data/process or missing quiescence refuses before
+retirement and ends new test work. Raw process/UI batches remain refused.
 Timeout means no further device commands from that helper. Clean Stop metadata,
 native join/profile release, own-client absence and physical display/keyguard
 return are separate observations; a helper flag alone is not acceptance. Confirm

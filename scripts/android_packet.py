@@ -12,6 +12,8 @@ import re
 import select
 import subprocess
 import struct
+import hashlib
+import tarfile
 import sys
 import time
 import xml.etree.ElementTree as ET
@@ -192,6 +194,83 @@ class Driver:
         self.last_capture = None
         return self.call(args)
 
+    def retire_checkpoint(self, command):
+        """Retire only our backed-up quiescent runtime; never claim joined Stop."""
+        name = command["archive"]
+        if Path(name).name != name:
+            raise Refused("checkpoint backup must be in this admitted evidence directory")
+        archive = self.root / name
+        record = json.loads((self.root / "verified-generation.private.json").read_text())
+        binding = json.loads((self.root / "trusted-binding.private.json").read_text())
+        if archive.is_symlink() or not (0 < archive.stat().st_size == record["archive_bytes"] <= 268435456):
+            raise Refused("verified checkpoint backup size/type changed")
+        with archive.open("rb") as file:
+            if hashlib.file_digest(file, "sha256").hexdigest() != record["archive_sha256"]:
+                raise Refused("verified backup changed before retirement")
+        profile = binding["profile_id"]
+        game = binding["game_id"]
+        checkpoint = record["checkpoint"]
+        if not (re.fullmatch(r"[0-9a-f]{32}", profile) and re.fullmatch(r"[0-9a-f]{32}", game)
+                and re.fullmatch(r"[0-9a-f]{64}", checkpoint)):
+            raise Refused("invalid checkpoint/profile binding")
+        base = f"files/gcx/profiles/{profile}/"
+        required = {"files/gcx/collection.json", base + "save-generation.json",
+                    base + "GC/SRAM.raw", base + f"checkpoints/{checkpoint}.gcx"}
+        hashes = {}
+        with tarfile.open(archive) as backup:
+            members = backup.getmembers()
+            if sum(m.size for m in members) > 268435456:
+                raise Refused("checkpoint backup expansion exceeds admitted bytes")
+            for member in members:
+                if member.isfile():
+                    if member.name in hashes:
+                        raise Refused("ambiguous backup member")
+                    hashes[member.name] = hashlib.file_digest(backup.extractfile(member), "sha256").hexdigest()
+            cards = {p for p in hashes if re.fullmatch(re.escape(base) + r"GC/MemoryCardA\.(USA|EUR|JAP)\.raw", p)}
+            if len(cards) != 1 or set(hashes) != required | cards:
+                raise Refused("backup must contain the complete selected generation only")
+            if hashes[base + f"checkpoints/{checkpoint}.gcx"] != checkpoint:
+                raise Refused("backup checkpoint bytes do not match their identity")
+            collection = json.load(backup.extractfile("files/gcx/collection.json"))
+        entry = next(e for e in collection["entries"] if e["game_id"] == collection["selected"])
+        intent = str(entry["paused"]).lower()
+        if not (entry["game_id"] == game and entry["profile_id"] == profile
+                and entry["checkpoint"] == checkpoint and entry["runtime_incomplete"]
+                and not entry["stopped"] and not entry["restart_required"]
+                and record["pause_intent"] == entry["paused"]
+                and "PASS read-only checkpoint inspection:" in record["verification"]
+                and f"captured pause intent={intent}" in record["verification"]):
+            raise Refused("backup lacks a matching independently validated live checkpoint")
+        a = self.call(["shell", "dumpsys activity activities | grep -E 'Display #[0-9]+|mResumedActivity:|topResumedActivity='"])
+        w = self.call(["shell", "dumpsys window displays | grep -E 'Display:|mCurrentFocus=|mTopFocusedDisplayId=|DisplayFrames'"])
+        current, _ = focused_pair(a.stdout.decode(), w.stdout.decode())
+        home = self.call(["shell", "cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME"])
+        if current != component(home.stdout.decode()):
+            raise Refused("checkpoint retirement requires the observed Home foreground")
+        actual = self.call(hash_arguments(sorted(hashes)))
+        lines = [line.split() for line in actual.stdout.decode().splitlines()]
+        if actual.returncode or any(len(line) != 2 for line in lines) or {p: h for h, p in lines} != hashes:
+            raise Refused("current checkpoint/saves/metadata differ from the protected backup")
+        pid = str(command["pid"])
+        ticks = str(command["start_ticks"])
+        if not (pid.isdecimal() and ticks.isdecimal()):
+            raise Refused("invalid current process observation")
+        if self.call(["shell", "pidof", PACKAGE]).stdout.decode().strip() != pid:
+            raise Refused("runtime process changed; reobserve before retirement")
+        stat = self.call(["shell", "cat", f"/proc/{pid}/stat"]).stdout.decode()
+        if stat.rsplit(")", 1)[-1].split()[19] != ticks:
+            raise Refused("runtime process start changed")
+        logs = self.call(["shell", f"logcat -d --pid={pid} -s gcx:I '*:S' | tail -64"]).stdout.decode()
+        states = re.findall(r"native\.pause\.end (paused|playing)", logs)
+        if not states or states[-1] != "paused" or "Checkpoint complete:" not in logs:
+            raise Refused("current runtime quiescence/publication not observed")
+        result = self.action(["shell", "am", "force-stop", PACKAGE])
+        if result.returncode or self.call(["shell", "pidof", PACKAGE]).stdout.strip():
+            raise Refused("checkpoint retirement did not reach process absence")
+        self.receipt["checkpoint_process_retired"] = True
+        self.receipt["retirement_is_normal_stop"] = False
+        return result
+
     def execute(self, command):
         op = command["op"]
         cleanup = bool(command.get("cleanup"))
@@ -301,6 +380,14 @@ class Driver:
                 raise Refused("unadmitted system UI step")
         elif op == "hash_files":
             result = self.call(hash_arguments(command["paths"]))
+        elif op == "retire_checkpoint":
+            if cleanup:
+                raise Refused("checkpoint test retirement is not cleanup Stop")
+            try:
+                result = self.retire_checkpoint(command)
+            except (OSError, ValueError, TypeError, KeyError, IndexError, StopIteration, tarfile.TarError, Refused) as error:
+                self.budget.forced_cleanup = True
+                raise Refused(str(error)) from error
         elif op == "adb":
             args = command["args"]
             joined = " ".join(args)

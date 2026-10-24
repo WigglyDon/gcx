@@ -4,6 +4,10 @@ import importlib.util
 from pathlib import Path
 import subprocess
 import struct
+import hashlib
+import io
+import json
+import tarfile
 import tempfile
 import unittest
 
@@ -36,6 +40,7 @@ class Fixture:
         self.clean = False
         self.display_states = ["OFF"]
         self.keyguard_states = ["true"]
+        self.retirement = None
         self.budget = packet.Budget(self.now, 1300)
         self.driver = packet.Driver(root, self.budget, self.invoke,
                                     lambda: self.now, self.sleep)
@@ -62,7 +67,9 @@ class Fixture:
             out = b"\x89PNG\r\n\x1a\n" + b"\0\0\0\rIHDR" + struct.pack(">II", 800, 400)
             if self.after_capture:
                 self.windows = self.after_capture
-        elif "collection.json" in joined:
+        elif "collection.json" in joined and "sha256sum" not in args:
+            if self.retirement:
+                return subprocess.CompletedProcess(args, 0, self.retirement["collection"], b"")
             value = "true" if self.clean else "false"
             out = ('{"selected":"fixture","entries":[{"game_id":"fixture",'
                    f'"stopped":{value},"runtime_incomplete":false,'
@@ -73,6 +80,12 @@ class Fixture:
             self.live = False
         elif "resolve-activity" in joined:
             out = b"com.example.home/.HomeActivity"
+        elif "sha256sum" in args and self.retirement:
+            out = "".join(f"{self.retirement['hashes'][p]}  {p}\n" for p in args[4:]).encode()
+        elif "/proc/1000/stat" in args and self.retirement:
+            out = ("1000 (gcx) S " + "0 " * 18 + str(self.retirement["ticks"])).encode()
+        elif "logcat" in joined and self.retirement:
+            out = self.retirement["logs"].encode()
         elif "dumpsys display" in joined:
             state = self.display_states.pop(0) if len(self.display_states) > 1 else self.display_states[0]
             out = ("Display State=" + state).encode()
@@ -87,6 +100,76 @@ class PacketTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.f = Fixture(self.temp.name)
+
+    def prepare_retirement(self):
+        root = self.f.driver.root
+        payload = b"original complete native payload fixture"
+        checkpoint = hashlib.sha256(payload).hexdigest()
+        game, profile = "a" * 32, "b" * 32
+        base = f"files/gcx/profiles/{profile}/"
+        collection = json.dumps({"schema_version": 1, "selected": game, "entries": [{
+            "game_id": game, "profile_id": profile, "checkpoint": checkpoint,
+            "paused": True, "runtime_incomplete": True, "stopped": False,
+            "restart_required": False}]}).encode()
+        files = {"files/gcx/collection.json": collection, base + "save-generation.json": b"generation",
+                 base + "GC/SRAM.raw": b"console", base + "GC/MemoryCardA.USA.raw": b"ordinary save",
+                 base + f"checkpoints/{checkpoint}.gcx": payload}
+        archive = root / "complete.tar"
+        with tarfile.open(archive, "w") as tar:
+            for name, data in files.items():
+                member = tarfile.TarInfo(name); member.size = len(data)
+                tar.addfile(member, io.BytesIO(data))
+        (root / "verified-generation.private.json").write_text(json.dumps({
+            "checkpoint": checkpoint, "archive_sha256": hashlib.sha256(archive.read_bytes()).hexdigest(),
+            "archive_bytes": archive.stat().st_size,
+            "pause_intent": True,
+            "verification": "PASS read-only checkpoint inspection: captured pause intent=true"}))
+        (root / "trusted-binding.private.json").write_text(json.dumps({"profile_id": profile, "game_id": game}))
+        self.f.retirement = {"collection": collection,
+                             "hashes": {p: hashlib.sha256(data).hexdigest() for p, data in files.items()},
+                             "ticks": 777, "logs": "native.pause.end paused\nCheckpoint complete: durable\n"}
+        self.f.resumed = RESUMED.replace(OWN + "/.GcxActivity", "com.example.home/.HomeActivity")
+        self.f.windows = WINDOW.replace(OWN + "/" + OWN + ".GcxActivity", "com.example.home/.HomeActivity")
+        return {"op": "retire_checkpoint", "archive": "complete.tar", "pid": 1000, "start_ticks": 777}
+
+    def test_checkpoint_retirement_requires_verified_backup_background_and_current_process(self):
+        command = self.prepare_retirement()
+        self.f.driver.execute(command)
+        self.assertFalse(self.f.live)
+        self.assertTrue(self.f.driver.receipt["checkpoint_process_retired"])
+        self.assertFalse(self.f.driver.receipt["retirement_is_normal_stop"])
+        self.assertEqual(sum("force-stop" in c for c in self.f.calls), 1)
+
+    def test_retirement_refuses_newer_saves_reused_pid_playing_or_foreground_runtime(self):
+        for case in ("card", "pid", "playing", "foreground"):
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as root:
+                self.f = Fixture(root); command = self.prepare_retirement()
+                if case == "card":
+                    path = next(p for p in self.f.retirement["hashes"] if p.endswith("USA.raw"))
+                    self.f.retirement["hashes"][path] = "0" * 64
+                elif case == "pid":
+                    self.f.retirement["ticks"] = 888
+                elif case == "playing":
+                    self.f.retirement["logs"] += "native.pause.end playing\n"
+                else:
+                    self.f.resumed, self.f.windows = RESUMED, WINDOW
+                with self.assertRaises(packet.Refused):
+                    self.f.driver.execute(command)
+                self.assertTrue(self.f.live)
+                self.assertFalse(any("force-stop" in c for c in self.f.calls))
+                self.assertTrue(self.f.budget.forced_cleanup)
+
+    def test_changed_backup_or_cleanup_flag_cannot_retire_live_runtime(self):
+        command = self.prepare_retirement()
+        command["cleanup"] = True
+        with self.assertRaises(packet.Refused):
+            self.f.driver.execute(command)
+        command.pop("cleanup")
+        with (self.f.driver.root / "complete.tar").open("ab") as file:
+            file.write(b"changed")
+        with self.assertRaises(packet.Refused):
+            self.f.driver.execute(command)
+        self.assertEqual(self.f.calls, [])
 
     def test_earliest_deadline_and_real_cleanup_reserve(self):
         budget = packet.Budget(100, 800)
