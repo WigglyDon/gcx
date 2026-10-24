@@ -474,6 +474,31 @@ class PacketTests(unittest.TestCase):
         self.assertTrue(self.f.driver.receipt["recovery_resolved"])
         self.assertEqual(sum("force-stop" in c for c in self.f.calls), 1)
 
+    def test_verified_new_install_can_close_empty_library_without_claiming_stop(self):
+        self.f.driver.receipt["verified_new_install"] = True
+        invoke = self.f.driver.invoke
+        def new_install(args, timeout):
+            if "cat" in args and "files/gcx/collection.json" in args:
+                return subprocess.CompletedProcess(args, 1, b"", b"cat: No such file or directory")
+            return invoke(args, timeout)
+        self.f.driver.invoke = new_install
+        self.f.driver.finish()
+        self.assertTrue(self.f.driver.receipt["handback"])
+        self.assertTrue(self.f.driver.receipt["new_install_without_game"])
+        self.assertFalse(self.f.driver.receipt["clean_stop_metadata"])
+
+    def test_missing_collection_without_new_install_proof_cannot_retire_client(self):
+        invoke = self.f.driver.invoke
+        def missing(args, timeout):
+            if "cat" in args and "files/gcx/collection.json" in args:
+                return subprocess.CompletedProcess(args, 1, b"", b"cat: No such file or directory")
+            return invoke(args, timeout)
+        self.f.driver.invoke = missing
+        self.f.driver.finish()
+        self.assertFalse(self.f.driver.receipt["handback"])
+        self.assertTrue(self.f.live)
+        self.assertFalse(any("force-stop" in c for c in self.f.calls))
+
 
 if __name__ == "__main__":
     unittest.main()

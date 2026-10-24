@@ -470,13 +470,25 @@ class Driver:
             return
         try:
             result = self.call(["exec-out", "run-as", PACKAGE, "cat", "files/gcx/collection.json"])
-            data = json.loads(result.stdout)
+            # The admitted installer may prove package absence before a new
+            # install. Before any import, that build has no saved collection or
+            # runtime: imports persist the collection before native boot.
+            fresh = self.receipt.get("verified_new_install", False)
+            absent = result.returncode and b"No such file" in result.stderr
+            if absent and fresh:
+                data = {"entries": [], "selected": None}
+            elif result.returncode:
+                raise Refused("collection unavailable; no client retirement")
+            else:
+                data = json.loads(result.stdout)
             entry = next((e for e in data["entries"] if e["game_id"] == data.get("selected")), None)
+            empty = fresh and data["entries"] == [] and data.get("selected") is None
             clean = bool(entry and entry.get("stopped") and not entry.get("runtime_incomplete")
                          and not entry.get("restart_required"))
             self.receipt["clean_stop_metadata"] = clean
+            self.receipt["new_install_without_game"] = empty
             pid = self.call(["shell", "pidof", PACKAGE]).stdout.strip()
-            if pid and clean:
+            if pid and (clean or empty):
                 self.call(["shell", "am", "force-stop", PACKAGE])
                 pid = self.call(["shell", "pidof", PACKAGE]).stdout.strip()
             if pid:
@@ -514,7 +526,7 @@ class Driver:
             self.receipt["recovery_resolved"] = self.receipt["handback"]
             if not self.receipt["handback"]:
                 self.receipt["pending_recovery"] = "physical display/keyguard return not verified"
-        except (Refused, ValueError, subprocess.TimeoutExpired) as error:
+        except (Refused, ValueError, KeyError, TypeError, subprocess.TimeoutExpired) as error:
             self.receipt["pending_recovery"] = str(error)
 
 
@@ -530,6 +542,7 @@ def main():
                               stdin=subprocess.DEVNULL, capture_output=True,
                               timeout=timeout, pass_fds=(fd,))
     driver = Driver(root, budget, invoke)
+    driver.receipt["verified_new_install"] = os.environ.get("GCX_VERIFIED_NEW_INSTALL") == "1"
     task = os.environ["GCX_DEVICE_TASK"]
     if not re.fullmatch(r"gcx-[a-z0-9-]{1,100}", task):
         raise Refused("invalid own task record name")
