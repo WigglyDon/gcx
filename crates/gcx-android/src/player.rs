@@ -604,6 +604,7 @@ fn boot(
             ui.begin_runtime();
         }
         gcx_engine_input_sampler(Some(sample_input));
+        platform::trace_current("boot.engine_init.begin", "");
         if gcx_engine_init(
             user.as_ptr(),
             sys.as_ptr(),
@@ -615,6 +616,7 @@ fn boot(
         {
             return Err("engine initialization rejected".into());
         }
+        platform::trace_current("boot.engine_init.end", "ok");
         let mut runtime = LiveRuntime {
             native_alive: true,
             events,
@@ -640,22 +642,28 @@ fn boot(
             return Err("Choose a supported GameCube disc image (ISO/GCM or RVZ).".into());
         }
         runtime.binding.disc = info.disc;
+        platform::trace_current("boot.media_hash.begin", "");
         runtime.binding.media_sha256 =
             checkpoint::media_digest(platform::open_document(&entry.uri)?)?;
+        platform::trace_current("boot.media_hash.end", "ok");
         if let Some(id) = &entry.checkpoint {
             // No guest has started. Reject mismatches before paused native boot.
+            platform::trace_current("boot.checkpoint_validate.begin", "");
             runtime.pending_restore = Some(checkpoint::load(
                 &runtime._profile.path,
                 id,
                 &runtime.binding,
             )?);
+            platform::trace_current("boot.checkpoint_validate.end", "ok");
         }
         // Initialize without guest execution. The owner loop resumes only a
         // healthy ready runtime after checked image reads/optional state load.
+        platform::trace_current("boot.native_paused.begin", "");
         let admitted = gcx_engine_boot_paused(uri.as_ptr(), window.ptr().as_ptr().cast());
         if admitted == 0 {
             return Err("The native engine could not boot this GameCube game.".into());
         }
+        platform::trace_current("boot.native_paused.end", "ok");
         platform::trace_current("runtime.boot.end", "ready_for_restore_or_play");
         Ok(runtime)
     }

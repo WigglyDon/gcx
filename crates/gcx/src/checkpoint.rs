@@ -185,13 +185,14 @@ pub fn publish(
             "checkpoint requires acknowledged card and console data",
         ));
     }
-    let metadata = serde_json::to_vec(&Metadata {
+    let record = Metadata {
         binding: binding.clone(),
         generation,
         paused,
         payload_sha256: storage::digest(payload),
         payload_length: payload.len(),
-    })?;
+    };
+    let metadata = serde_json::to_vec(&record)?;
     if metadata.len() > HEADER_LIMIT {
         return Err(io::Error::other("checkpoint metadata too large"));
     }
@@ -200,14 +201,44 @@ pub fn publish(
     let id = parts_digest(&parts);
     fs::create_dir_all(directory(profile)?)?;
     storage::atomic_replace_parts(&path(profile, &id)?, &parts)?;
-    // Verify actual persisted bytes before the session may refer to this file.
-    let restored = load(profile, &id, binding)?;
-    if restored.payload != payload || restored.paused != paused {
-        return Err(io::Error::other(
-            "checkpoint readback failed; prior reference retained",
-        ));
-    }
+    // The complete expected container is still borrowed from the paused core.
+    // Compare every persisted byte without allocating/restoring another machine
+    // image or hashing it twice again. Real restore retains all digest/binding
+    // checks in load(). Fsync/rename/directory sync have already completed.
+    verify_publication(profile, &id, &parts, &record.generation)?;
     Ok(id)
+}
+fn verify_publication(
+    profile: &Path,
+    id: &str,
+    parts: &[&[u8]],
+    generation: &SaveGeneration,
+) -> io::Result<()> {
+    let path = path(profile, id)?;
+    if path.symlink_metadata()?.file_type().is_symlink() {
+        return Err(io::Error::other("checkpoint file is a symlink"));
+    }
+    verify_parts(File::open(path)?, parts)?;
+    // Also reject an outside card/SRAM or generation change before acknowledging
+    // publication. Matching checkpoint bytes alone cannot admit older saves.
+    generation.verify(profile)
+}
+fn verify_parts(mut reader: impl Read, parts: &[&[u8]]) -> io::Result<()> {
+    let mut buffer = [0; 65536];
+    for part in parts {
+        for chunk in part.chunks(buffer.len()) {
+            reader.read_exact(&mut buffer[..chunk.len()])?;
+            if &buffer[..chunk.len()] != chunk {
+                return Err(io::Error::other(
+                    "checkpoint readback failed; prior reference retained",
+                ));
+            }
+        }
+    }
+    if reader.read(&mut buffer[..1])? != 0 {
+        return Err(io::Error::other("checkpoint grew during readback"));
+    }
+    Ok(())
 }
 /// Validate all inputs and current ordinary files before native deserialization.
 /// Every error leaves the checkpoint and ordinary saves in place.
@@ -325,6 +356,82 @@ mod tests {
         assert_eq!(
             unsafe { storage::write_card(path.as_ptr(), bytes.as_ptr(), bytes.len()) },
             1
+        );
+    }
+    #[test]
+    fn streamed_readback_rejects_damage_and_newer_saves_without_rewriting_either() {
+        let _serial = storage::STORE_TEST_LOCK.lock().unwrap();
+        let (root, lock, writer, binding) = setup("streamed-readback");
+        let payload = vec![0x37; 131_081]; // cross both part and 64KiB boundaries
+        let id = publish(&root, &binding, true, &payload).unwrap();
+        let checkpoint = path(&root, &id).unwrap();
+        let original = fs::read(&checkpoint).unwrap();
+        let generation = storage::save_generation(&root).unwrap();
+        let parts = [&original[..12], &original[12..100], &original[100..]];
+        verify_publication(&root, &id, &parts, &generation).unwrap();
+        let mut damaged = Vec::new();
+        for offset in [0, 8, 12, 65_536, original.len() - 1] {
+            let mut bytes = original.clone();
+            bytes[offset] ^= 1;
+            damaged.push(bytes);
+        }
+        damaged.push(original[..original.len() - 1].to_vec());
+        damaged.push([original.as_slice(), &[1]].concat());
+        for bytes in damaged {
+            fs::write(&checkpoint, &bytes).unwrap();
+            assert!(verify_publication(&root, &id, &parts, &generation).is_err());
+            assert_eq!(fs::read(&checkpoint).unwrap(), bytes);
+            assert_eq!(storage::save_generation(&root).unwrap(), generation);
+        }
+        fs::write(&checkpoint, &original).unwrap();
+        write(&root.join("GC/MemoryCardA.fixture.raw"), b"newer save");
+        assert!(verify_publication(&root, &id, &parts, &generation).is_err());
+        assert_eq!(fs::read(&checkpoint).unwrap(), original);
+        assert_eq!(
+            fs::read(root.join("GC/MemoryCardA.fixture.raw")).unwrap(),
+            b"newer save"
+        );
+        drop(writer);
+        drop(lock);
+        fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn streamed_readback_propagates_midstream_io_failure() {
+        struct FailedReader {
+            bytes: io::Cursor<Vec<u8>>,
+        }
+        impl Read for FailedReader {
+            fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+                if self.bytes.position() >= 65_536 {
+                    return Err(io::Error::new(io::ErrorKind::PermissionDenied, "fixture"));
+                }
+                self.bytes.read(output)
+            }
+        }
+        let bytes = vec![0x53; 131_072];
+        let parts = [&bytes[..]];
+        verify_parts(io::Cursor::new(&bytes), &parts).unwrap();
+        assert_eq!(
+            verify_parts(
+                FailedReader {
+                    bytes: io::Cursor::new(bytes.clone())
+                },
+                &parts
+            )
+            .unwrap_err()
+            .kind(),
+            io::ErrorKind::PermissionDenied
+        );
+    }
+    #[test]
+    fn media_digest_matches_independent_sha256_vectors_across_read_chunks() {
+        assert_eq!(
+            media_digest(&b"abc"[..]).unwrap(),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+        assert_eq!(
+            media_digest(vec![b'a'; 1_000_000].as_slice()).unwrap(),
+            "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0"
         );
     }
     #[test]

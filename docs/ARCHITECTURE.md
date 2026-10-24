@@ -221,6 +221,16 @@ and metadata, then publish an atomic commit record. Keep a last-known-good
 checkpoint until its replacement is verified. Bound snapshot size and worker
 queues from actual observations; do not carry PS1/PS2 numeric limits over.
 
+While publishing, the paused core still lends the complete expected container.
+After file/rename/directory sync, compare every persisted byte in bounded64KiB
+chunks and reject truncation, extra bytes or read errors, then recheck current
+ordinary-save generation. Do not allocate and deserialize a second machine image
+merely for this write verification. Actual restore still independently validates
+all binding, payload/container digests and current-save identities before native
+mutation. This preserves the existing format/state ABI. ARM64 hashing uses the
+pinned SHA library's runtime-detected acceleration and software fallback; never
+replace media hashing with an untrusted size/mtime cache to reduce startup time.
+
 On restore, validate completeness, compatibility and current durable card state
 before entering the core. If current card generation differs, preserve both and
 refuse automatic stale restore. Offer explicit cold restart with current progress;

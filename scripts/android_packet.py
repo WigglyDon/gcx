@@ -11,6 +11,7 @@ from pathlib import Path
 import re
 import select
 import subprocess
+import struct
 import sys
 import time
 import xml.etree.ElementTree as ET
@@ -86,7 +87,8 @@ def focused_pair(resumed, windows):
     window = component(focus[0])
     if window != activity:
         raise Refused("resumed Activity and focused window do not match")
-    return activity, (display, focus[0].strip())
+    frames = tuple(re.findall(r"DisplayFrames w=(\d+) h=(\d+) r=(\d+)", current[0]))
+    return activity, (display, focus[0].strip(), frames)
 
 
 def own_focus(resumed, windows):
@@ -138,6 +140,7 @@ class Driver:
         self.timeout = False
         self.actions, self.captures, self.received = 0, 0, 0
         self.mismatch = False
+        self.last_capture = None
         self.receipt = {"started": time.time(), "operations": [], "handback": False,
                         "phase": "admitted", "recovery_resolved": False}
 
@@ -169,7 +172,7 @@ class Driver:
 
     def focus(self):
         a = self.call(["shell", "dumpsys activity activities | grep -E 'Display #[0-9]+|mResumedActivity:|topResumedActivity='"])
-        w = self.call(["shell", "dumpsys window displays | grep -E 'Display:|mCurrentFocus=|mTopFocusedDisplayId='"])
+        w = self.call(["shell", "dumpsys window displays | grep -E 'Display:|mCurrentFocus=|mTopFocusedDisplayId=|DisplayFrames'"])
         try:
             return own_focus(a.stdout.decode(), w.stdout.decode())
         except Refused:
@@ -182,6 +185,7 @@ class Driver:
         if self.actions >= 100:
             raise Refused("UI action ceiling reached")
         self.actions += 1
+        self.last_capture = None
         return self.call(args)
 
     def execute(self, command):
@@ -204,14 +208,45 @@ class Driver:
                 self.mismatch = True
                 self.budget.forced_cleanup = True
                 raise Refused("capture discarded: focused window changed")
+            if len(result.stdout) < 24 or result.stdout[:8] != b"\x89PNG\r\n\x1a\n" or result.stdout[12:16] != b"IHDR":
+                raise Refused("capture did not return a PNG")
+            dimensions = struct.unpack(">II", result.stdout[16:24])
             name = command["name"]
             if Path(name).name != name or not name.endswith(".png"):
                 raise Refused("invalid local capture name")
             p = self.root / name
             p.write_bytes(result.stdout)
             p.chmod(0o600)
+            self.last_capture = (name, self.clock(), before, dimensions)
             return {"capture": str(p), "bytes": len(result.stdout)}
-        if op == "gcx_button":
+        if op == "gcx_tap":
+            # Automated native-button checks use an agent-inspected, just-taken
+            # own image. Bind one tap to its live window AND display geometry;
+            # never reuse a guessed historical layout or a batch of points.
+            if command["target"] not in ("Pause", "Start", "A", "B"):
+                raise Refused("unadmitted native control")
+            if cleanup and command["target"] != "Pause":
+                raise Refused("cleanup native input is Pause only")
+            capture = self.last_capture
+            if not capture or capture[0] != command["capture"] or self.clock() - capture[1] > 10:
+                raise Refused("native tap requires a fresh inspected own capture")
+            focus = self.focus()
+            if focus != capture[2]:
+                self.mismatch = True
+                self.budget.forced_cleanup = True
+                raise Refused("native tap aborted: live window/display changed")
+            frames = focus[1][2]
+            if len(frames) != 1 or tuple(map(int, frames[0][:2])) != capture[3]:
+                raise Refused("native capture/display geometry is not coherent")
+            bounds = command["bounds"]
+            if len(bounds) != 4 or any(type(v) is not int for v in bounds):
+                raise Refused("native button requires observed integer bounds")
+            a, b, c, d = bounds
+            width, height = capture[3]
+            if not (0 <= a < c <= width and 0 <= b < d <= height):
+                raise Refused("native button outside current image")
+            result = self.action(["shell", "input", "tap", str((a+c)//2), str((b+d)//2)])
+        elif op == "gcx_button":
             text = command["text"]
             if cleanup and text not in ("Stop game", "Stop current game"):
                 raise Refused("cleanup cannot resume a test")
@@ -232,7 +267,7 @@ class Driver:
             if self.mismatch and not command.get("owner_reconfirmed"):
                 raise Refused("unexpected foreground requires owner clarification")
             a = self.call(["shell", "dumpsys activity activities | grep -E 'Display #[0-9]+|mResumedActivity:|topResumedActivity='"])
-            w = self.call(["shell", "dumpsys window displays | grep -E 'Display:|mCurrentFocus=|mTopFocusedDisplayId='"])
+            w = self.call(["shell", "dumpsys window displays | grep -E 'Display:|mCurrentFocus=|mTopFocusedDisplayId=|DisplayFrames'"])
             current, _ = focused_pair(a.stdout.decode(), w.stdout.decode())
             home = self.call(["shell", "cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME"])
             if current not in (component(home.stdout.decode()), (PACKAGE, PACKAGE + ".GcxActivity")) and not command.get("owner_reconfirmed"):
@@ -313,7 +348,7 @@ class Driver:
             if "Display State=OFF" not in display:
                 home = self.call(["shell", "cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME"]).stdout.decode()
                 resumed = self.call(["shell", "dumpsys activity activities | grep -E 'Display #[0-9]+|mResumedActivity:|topResumedActivity='"]).stdout.decode()
-                windows = self.call(["shell", "dumpsys window displays | grep -E 'Display:|mCurrentFocus=|mTopFocusedDisplayId='"]).stdout.decode()
+                windows = self.call(["shell", "dumpsys window displays | grep -E 'Display:|mCurrentFocus=|mTopFocusedDisplayId=|DisplayFrames'"]).stdout.decode()
                 current, _ = focused_pair(resumed, windows)
                 if current not in (component(home), (PACKAGE, PACKAGE + ".GcxActivity")):
                     raise Refused("unexpected app during return; no screen input")

@@ -1,5 +1,32 @@
 # Direct Dolphin integration
 
+## Responsiveness increment prepared off-device
+
+Checkpoint publication now verifies persisted bytes directly against the borrowed
+complete container in64KiB chunks, retaining sync, byte-exact readback and a final
+ordinary-save generation gate. It avoids a second full-payload allocation and
+two redundant hash passes. Actual restore validation and state format are unchanged.
+One uncontrolled host96MiB synthetic fixture went from3.912s/198,888KiB publication
+high-water RSS to1.741s/100,968KiB; this is not a device speed claim.
+
+The pinned sha2 0.10.9 default uses software SHA256 on ARM64. Its ARM-only asm
+feature now enables runtime HWCAP acceleration with the software fallback. New
+locked dependency sha2-asm0.6.4 (MIT, checksum in Cargo.lock) is retained with its
+source and additional architecture contributor notice; existing cc stays pinned.
+The package supplies the exact NDK assembler/compiler paths. No integrity cache,
+hash omission, native/state ABI or resource change. Independent SHA vectors are
+checked by Rust tests and the bounded cross-compiled checkpoint-cost fixture.
+Prepared probes retain the original and streamed software versions for comparison
+with the accelerated version; no user saves or native game boot are used by them.
+
+The same192-event diagnostic cap now reserves128 lifecycle events,48 geometry/
+ordinary-input samples and16 rejection events, so gesture bursts cannot spend
+Stop/join evidence. Boot stages distinguish engine init, full media hash,
+checkpoint validation and paused native boot. Focused host tests49 and helper
+regressions22 pass, with relevant warnings-denied host/Android lint. The prepared
+behavior still needs automated bounded Pixel4 qualification under exclusive
+admission; installed9953d54c and all recovery material remain protected.
+
 ## Focused diagnostic Pause/Resume and joined Stop, 2026-10-24
 
 Installed diagnostic source `e8821ba` / APK `9953d54c…` under fresh exclusive

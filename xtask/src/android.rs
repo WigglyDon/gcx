@@ -231,6 +231,14 @@ pub fn prepare(root: &Path, source: &Path) -> Result<()> {
             copy(&root.join("LICENSE"), &destination.join("LICENSE"))?;
         } else {
             licenses(base, base, &destination)?;
+            if name == "sha2-asm" {
+                // The architecture source carries an additional contributor's
+                // complete MIT notice, absent from the crate-root LICENSE.
+                copy(
+                    &base.join("src/sha256_aarch64.S"),
+                    &destination.join("src/sha256_aarch64.S"),
+                )?;
+            }
             if let Some(file) = package["license_file"].as_str() {
                 copy(&base.join(file), &destination.join("declared-license.txt"))?;
             }
@@ -435,7 +443,12 @@ pub fn package(root: &Path, source: &Path) -> Result<()> {
             "GCX_ENGINE_LIB_DIR",
             engine.parent().ok_or("missing engine directory")?,
         )
-        .env("CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER", linker))?;
+        .env("CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER", &linker)
+        .env("CC_aarch64_linux_android", &linker)
+        .env(
+            "AR_aarch64_linux_android",
+            ndk.join("toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar"),
+        ))?;
     let out = root.join("build/android-package");
     let payload = out.join("payload");
     if payload.exists() {

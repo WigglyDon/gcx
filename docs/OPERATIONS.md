@@ -74,8 +74,12 @@ focus line in a full window dump: retained ANR snapshots can precede the live
 section. Android13 omits the global top-display ID from this subcommand; one
 live display is unambiguous, while several require an explicit top-display ID.
 Framework button taps use the currently dumped layout, with a second
-focus observation before the single tap. Native Pause uses the owner's real tap,
-not stale guessed coordinates. A mismatch ends new work; unexpected app content
+focus observation before the single tap. Owner-assisted Pause uses a real owner
+tap. For owner-authorized automated checks, one named native button tap is bound
+to a just-captured, agent-inspected own image, matching live display frame/rotation
+and focus, observed bounds, and a ten-second freshness limit. Each tap consumes
+that capture; historical coordinates and batches are refused. Cleanup permits
+only native Pause and framework Stop. A mismatch ends new work; unexpected app content
 is not retained. Home, nonsecure wake and ordinary app entry are separate named
 steps; unexpected foreground requires owner clarification. Raw UI/capture/hash
 batches are refused. Hashing uses nonempty, validated literal own-file arguments,

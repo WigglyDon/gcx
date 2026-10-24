@@ -23,5 +23,10 @@ serde = { version = "=1.0.228", features = ["derive"] }
 serde_json = "=1.0.151"
 sha2 = "=0.10.9"
 
+[target.'cfg(target_arch = "aarch64")'.dependencies]
+# This pinned sha2 release otherwise selects its software SHA256 backend on
+# ARM64. Its asm feature uses runtime HWCAP detection with a software fallback.
+sha2 = { version = "=0.10.9", features = ["asm"] }
+
 [build-dependencies]
 sha2 = "=0.10.9"

@@ -69,10 +69,12 @@ static MENU_GENERATION: AtomicU64 = AtomicU64::new(0);
 static PLAYING: AtomicBool = AtomicBool::new(false);
 // Diagnostic-only: one bounded burst per Activity, never per native pad/frame.
 static TRACE_START: OnceLock<std::time::Instant> = OnceLock::new();
-static TRACE_EVENTS: gcx::lifecycle::DiagnosticBudget = gcx::lifecycle::DiagnosticBudget::new(192);
+// The same192-event cap reserves lifecycle/rejection evidence for Stop.
+static TRACE_EVENTS: gcx::lifecycle::DiagnosticBudget = gcx::lifecycle::DiagnosticBudget::new(128);
+static TRACE_SAMPLES: gcx::lifecycle::DiagnosticBudget = gcx::lifecycle::DiagnosticBudget::new(48);
 static TRACE_INPUT: gcx::lifecycle::DiagnosticBudget = gcx::lifecycle::DiagnosticBudget::new(32);
 static TRACE_INPUT_FAILURES: gcx::lifecycle::DiagnosticBudget =
-    gcx::lifecycle::DiagnosticBudget::new(8);
+    gcx::lifecycle::DiagnosticBudget::new(16);
 static TRACE_GEOMETRY: gcx::lifecycle::DiagnosticBudget = gcx::lifecycle::DiagnosticBudget::new(24);
 static TRACE_RUNTIME: AtomicU64 = AtomicU64::new(0);
 
@@ -81,15 +83,26 @@ pub fn trace_runtime(runtime: u64) {
 }
 pub fn trace(runtime: u64, menu: u64, stage: &str, detail: &str) {
     if TRACE_EVENTS.take() {
-        let elapsed = TRACE_START
-            .get_or_init(std::time::Instant::now)
-            .elapsed()
-            .as_micros();
-        diagnostic(&format!(
-            "Lifecycle +{elapsed}us a={} r={runtime} m={menu} {stage} {detail}",
-            EPOCH.load(Ordering::Acquire)
-        ));
+        emit_trace(runtime, menu, stage, detail);
     }
+}
+fn emit_trace(runtime: u64, menu: u64, stage: &str, detail: &str) {
+    let elapsed = TRACE_START
+        .get_or_init(std::time::Instant::now)
+        .elapsed()
+        .as_micros();
+    diagnostic(&format!(
+        "Lifecycle +{elapsed}us a={} r={runtime} m={menu} {stage} {detail}",
+        EPOCH.load(Ordering::Acquire)
+    ));
+}
+fn emit_current(stage: &str, detail: &str) {
+    emit_trace(
+        TRACE_RUNTIME.load(Ordering::Relaxed),
+        MENU_GENERATION.load(Ordering::Acquire),
+        stage,
+        detail,
+    );
 }
 pub fn trace_current(stage: &str, detail: &str) {
     trace(
@@ -100,26 +113,25 @@ pub fn trace_current(stage: &str, detail: &str) {
     );
 }
 pub fn trace_input(detail: &str) {
-    if TRACE_INPUT.take() {
-        trace_current("input.down", detail);
+    if TRACE_INPUT.take() && TRACE_SAMPLES.take() {
+        emit_current("input.down", detail);
     }
 }
 pub fn trace_input_problem(detail: &str) {
     if TRACE_INPUT_FAILURES.take() {
-        trace_current("input.down", detail);
+        emit_current("input.down", detail);
     }
 }
 pub fn trace_focus() {
-    // A normal gesture burst cannot consume the failure samples for reentry.
-    // The overall Activity event cap still applies across all focus transitions.
+    // Per-focus samples share a fixed Activity budget; they cannot spend
+    // lifecycle or rejection reserves.
     TRACE_INPUT.reset(32);
-    TRACE_INPUT_FAILURES.reset(8);
     TRACE_GEOMETRY.reset(24);
     trace_current("activity.focus", "gained");
 }
 pub fn trace_geometry(detail: &str) {
-    if TRACE_GEOMETRY.take() {
-        trace_current("geometry", detail);
+    if TRACE_GEOMETRY.take() && TRACE_SAMPLES.take() {
+        emit_current("geometry", detail);
     }
 }
 
@@ -173,9 +185,10 @@ pub fn commands() -> Vec<Command> {
 }
 pub fn init(app: &AndroidApp) -> Result<()> {
     EPOCH.fetch_add(1, Ordering::AcqRel);
-    TRACE_EVENTS.reset(192);
+    TRACE_EVENTS.reset(128);
+    TRACE_SAMPLES.reset(48);
     TRACE_INPUT.reset(32);
-    TRACE_INPUT_FAILURES.reset(8);
+    TRACE_INPUT_FAILURES.reset(16);
     TRACE_GEOMETRY.reset(24);
     trace_runtime(0);
     trace_current("activity.init", "");

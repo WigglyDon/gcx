@@ -3,6 +3,7 @@
 import importlib.util
 from pathlib import Path
 import subprocess
+import struct
 import tempfile
 import unittest
 
@@ -12,7 +13,7 @@ packet = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(packet)
 OWN = packet.PACKAGE
 RESUMED = f"Display #0 (activities):\nmResumedActivity: ActivityRecord{{1 u0 {OWN}/.GcxActivity t1}}"
-WINDOW = f"Display: mDisplayId=0 rootTasks=1\nmCurrentFocus=Window{{1 u0 {OWN}/{OWN}.GcxActivity}}\nmTopFocusedDisplayId=0"
+WINDOW = f"Display: mDisplayId=0 rootTasks=1\nmCurrentFocus=Window{{1 u0 {OWN}/{OWN}.GcxActivity}}\nDisplayFrames w=800 h=400 r=0\nmTopFocusedDisplayId=0"
 OTHER = "com.example.other/.OtherActivity"
 XML = f'''<?xml version="1.0"?><hierarchy><node bounds="[0,0][800,400]">
 <node text="Resume" package="{OWN}" class="android.widget.Button"
@@ -58,7 +59,7 @@ class Fixture:
             if self.after_dump:
                 self.windows = self.after_dump
         elif args == ["exec-out", "screencap", "-p"]:
-            out = b"unrelated pixels must not survive"
+            out = b"\x89PNG\r\n\x1a\n" + b"\0\0\0\rIHDR" + struct.pack(">II", 800, 400)
             if self.after_capture:
                 self.windows = self.after_capture
         elif "collection.json" in joined:
@@ -160,6 +161,28 @@ class PacketTests(unittest.TestCase):
         with self.assertRaises(packet.Refused):
             self.f.driver.execute({"op": "capture", "name": "discard.png"})
         self.assertFalse(list(Path(self.temp.name).glob("*.png")))
+
+    def test_native_tap_is_single_use_and_bound_to_current_inspected_image(self):
+        self.f.driver.execute({"op": "capture", "name": "native.png"})
+        tap = {"op": "gcx_tap", "capture": "native.png", "target": "Pause",
+               "bounds": [30, 300, 90, 390]}
+        self.f.driver.execute(tap)
+        self.assertEqual(self.f.calls[-1], ["shell", "input", "tap", "60", "345"])
+        with self.assertRaises(packet.Refused):
+            self.f.driver.execute(tap)
+
+    def test_native_tap_refuses_stale_or_rotated_capture(self):
+        self.f.driver.execute({"op": "capture", "name": "native.png"})
+        tap = {"op": "gcx_tap", "capture": "native.png", "target": "Pause",
+               "bounds": [30, 300, 90, 390]}
+        self.f.now += 11
+        with self.assertRaises(packet.Refused):
+            self.f.driver.execute(tap)
+        self.f.now -= 11
+        self.f.windows = WINDOW.replace("w=800 h=400 r=0", "w=400 h=800 r=1")
+        with self.assertRaises(packet.Refused):
+            self.f.driver.execute(tap)
+        self.assertFalse(any("input" in c for c in self.f.calls))
 
     def test_each_button_uses_fresh_observed_bounds_and_focus(self):
         self.f.driver.execute({"op": "gcx_button", "text": "Resume"})
