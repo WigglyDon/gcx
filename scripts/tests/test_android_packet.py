@@ -175,13 +175,28 @@ class PacketTests(unittest.TestCase):
         self.f.driver.execute({"op": "capture", "name": "native.png"})
         tap = {"op": "gcx_tap", "capture": "native.png", "target": "Pause",
                "bounds": [30, 300, 90, 390]}
-        self.f.now += 11
+        self.f.now += 31
         with self.assertRaises(packet.Refused):
             self.f.driver.execute(tap)
-        self.f.now -= 11
+        self.f.now -= 31
         self.f.windows = WINDOW.replace("w=800 h=400 r=0", "w=400 h=800 r=1")
         with self.assertRaises(packet.Refused):
             self.f.driver.execute(tap)
+        self.assertFalse(any("input" in c for c in self.f.calls))
+
+    def test_native_image_age_is_rechecked_at_dispatch_after_slow_focus_queries(self):
+        self.f.driver.execute({"op": "capture", "name": "native.png"})
+        self.f.now += 10
+        invoke = self.f.driver.invoke
+        def slow_focus(args, timeout):
+            result = invoke(args, timeout)
+            if "dumpsys window displays" in " ".join(args):
+                self.f.now += 25
+            return result
+        self.f.driver.invoke = slow_focus
+        with self.assertRaises(packet.Refused):
+            self.f.driver.execute({"op": "gcx_tap", "capture": "native.png", "target": "Pause",
+                                   "bounds": [30, 300, 90, 390]})
         self.assertFalse(any("input" in c for c in self.f.calls))
 
     def test_each_button_uses_fresh_observed_bounds_and_focus(self):

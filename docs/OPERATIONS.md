@@ -77,7 +77,7 @@ Framework button taps use the currently dumped layout, with a second
 focus observation before the single tap. Owner-assisted Pause uses a real owner
 tap. For owner-authorized automated checks, one named native button tap is bound
 to a just-captured, agent-inspected own image, matching live display frame/rotation
-and focus, observed bounds, and a ten-second freshness limit. Each tap consumes
+and focus, observed bounds, and a thirty-second freshness limit. Each tap consumes
 that capture; historical coordinates and batches are refused. Cleanup permits
 only native Pause and framework Stop. A mismatch ends new work; unexpected app content
 is not retained. Home, nonsecure wake and ordinary app entry are separate named

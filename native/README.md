@@ -1,5 +1,56 @@
 # Direct Dolphin integration
 
+## Automated responsiveness fixture and bounded native pass, 2026-10-24
+
+Fresh owner reassignment and exclusive Pixel4 admission reconciled the current
+qualified stock build, nonsecure screenOFF state and originalUSB adb mode, without
+replaying another task's stale undo. Current installed9953d54c and all ordinary
+files matched protected backups. Responsiveness APK99018690/source1c50f105 was
+installed compatibly, with unchanged collection and exact APK readback.
+
+The three isolated96MiB original fixtures passed on Pixel4: original publication
+2.305s/199,572KiB peak RSS, streamed/software1.433s/101,232KiB, accelerated
+0.773s/101,252KiB. Restore validation was0.834/0.980/0.239s respectively; the
+accelerated payload digest equals the host reference and independent vectors
+passed. Single synthetic samples, not game latency, FPS or overall speed claims.
+An initial relative fixture path was rejected by ordinary-data validation and
+was replaced with the proper absolute app-cache path; no owner profile was used.
+
+Native output reached WW's title/attract sequence. The ten-second screenshot age
+gate refused three Start attempts because the capture/model/tool round trip
+exceeded it; no game input was sent. A tested thirty-second bound with fresh
+live frame/rotation/focus, single-use images and a final dispatch-age check replaces
+it. The helper was reloaded within the original deadline after a complete
+false-intent generation was independently verified/protected. The same process
+returned from Home, ran the attract sequence and accepted one actual Pause tap.
+Its menu was visually inspected; a second true-intent generation validated too.
+Each payload is93,382,166bytes, complete archive110,169,600bytes, accepted by the
+unchanged legacy inspector. This is not interactive-world or fresh-process return.
+
+Actual stage times: boot setup1.506s including full media hash1.276s; native
+paused-boot call48ms; Pause acceptance→dialog shown25ms; native capture plus Rust
+payload publication0.950–1.227s; Stop command→joined/durable/profile-released586ms.
+The trace retained final Stop evidence (142 total events). No touch-to-photon,
+steady-state control latency, owner feel/audibility or matched-scene speed pass.
+Explicit menu Resume/world setup/fresh-process qualification stayed UNRUN when
+the original new-work cutoff arrived. No late test extension or owner prompt.
+
+Normal Stop joined workers, published clean metadata and released both profiles
+(active lock busy beforehand, both free afterward). Both entries are cleanly
+stopped. Both ordinary cards stayed unchanged; current WW SRAM/generation was
+retained. Final complete save backup combines fresh final metadata/SRAM with card
+copies individually matched to fresh actual final hashes; no data was restored.
+Exact candidates, signer, all scene/ordinary histories and raw scoped evidence
+stay private. Readback APK hash is exact. Current helper regressions24 pass.
+
+Verified return2026-10-24 20:03:25UTC: own app absent, physical displayOFF,
+nonsecure keyguard, probe files removed and lease release. Final small fixture
+cleanup ran in the original return reserve after the interactive helper cutoff;
+all pending own records were reconciled with originals retained. Five images /
+256,321,782collected bytes below256MiB, before the original17-minute hard deadline.
+Fold/launcher settings/sibling work untouched. The next pass uses the installed
+candidate, with no unchanged rebuild or reinstall.
+
 ## Responsiveness increment prepared off-device
 
 Checkpoint publication now verifies persisted bytes directly against the borrowed

@@ -232,7 +232,7 @@ class Driver:
             if cleanup and command["target"] != "Pause":
                 raise Refused("cleanup native input is Pause only")
             capture = self.last_capture
-            if not capture or capture[0] != command["capture"] or self.clock() - capture[1] > 10:
+            if not capture or capture[0] != command["capture"] or self.clock() - capture[1] > 30:
                 raise Refused("native tap requires a fresh inspected own capture")
             focus = self.focus()
             if focus != capture[2]:
@@ -242,6 +242,8 @@ class Driver:
             frames = focus[1][2]
             if len(frames) != 1 or tuple(map(int, frames[0][:2])) != capture[3]:
                 raise Refused("native capture/display geometry is not coherent")
+            if self.clock() - capture[1] > 30:
+                raise Refused("native capture expired during focus verification")
             bounds = command["bounds"]
             if len(bounds) != 4 or any(type(v) is not int for v in bounds):
                 raise Refused("native button requires observed integer bounds")
