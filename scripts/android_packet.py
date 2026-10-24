@@ -272,10 +272,21 @@ class Driver:
                 and "PASS read-only checkpoint inspection:" in record["verification"]
                 and f"captured pause intent={intent}" in record["verification"]):
             raise Refused("backup lacks a matching independently validated live checkpoint")
-        current, _ = self.observe_focus()
-        home = self.call(["shell", "cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME"])
-        if current != component(home.stdout.decode()):
-            raise Refused("checkpoint retirement requires the observed Home foreground")
+        # Cleanup can arrive at an already screen-off keyguard. Android then
+        # reports NotificationShade and no resumed Activity; do not wake it just
+        # to manufacture a Home component. No UI is touched on this path.
+        locked = False
+        if command["op"] in ("recover_checkpoint", "recover_pending_restore"):
+            display = self.call(["shell", "dumpsys display | grep -E 'Display State=|mState='"]).stdout.decode()
+            policy = self.call(["shell", "dumpsys window policy | grep -E 'secure=|showing='"]).stdout.decode()
+            locked = "Display State=OFF" in display and "showing=true" in policy
+            if locked:
+                self.receipt["retirement_background"] = "physical_display_off_and_keyguard_showing"
+        if not locked:
+            current, _ = self.observe_focus()
+            home = self.call(["shell", "cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME"])
+            if current != component(home.stdout.decode()):
+                raise Refused("checkpoint retirement requires observed Home or locked screen-off cleanup")
         actual = self.call(hash_arguments(sorted(hashes)))
         lines = [line.split() for line in actual.stdout.decode().splitlines()]
         if actual.returncode or any(len(line) != 2 for line in lines) or {p: h for h, p in lines} != hashes:
@@ -289,7 +300,9 @@ class Driver:
         stat = self.call(["shell", "cat", f"/proc/{pid}/stat"]).stdout.decode()
         if stat.rsplit(")", 1)[-1].split()[19] != ticks:
             raise Refused("runtime process start changed")
-        logs = self.call(["shell", f"logcat -d --pid={pid} -s gcx:I '*:S' | tail -64"]).stdout.decode()
+        pending_restore = command["op"] == "recover_pending_restore"
+        lines = 192 if pending_restore else 64
+        logs = self.call(["shell", f"logcat -d --pid={pid} -s gcx:I '*:S' | tail -{lines}"]).stdout.decode()
         states = re.findall(r"native\.pause\.end (paused|playing)", logs)
         observations = self.receipt.setdefault("retirement_observations", [])
         if len(observations) >= 8:
@@ -302,7 +315,22 @@ class Driver:
                  "pid": pid, "start_ticks": ticks, "quiescence": str(evidence)}
         observations.append(proof)
         self.save()
-        if not states or states[-1] != "paused" or "Checkpoint complete:" not in logs:
+        if pending_restore:
+            # A departure before FIRST restore has no new capture to publish.
+            # Retire only a fully traced paused bootstrap, with the existing
+            # independently inspected checkpoint and every ordinary file still
+            # matching the complete backup above. Never use this after play,
+            # partial restore, trace truncation or another runtime boot.
+            markers = ("activity.init", "boot.checkpoint_validate.end ok",
+                       "boot.native_paused.end ok", "runtime.boot.end ready_for_restore_or_play")
+            publication = (all(marker in logs for marker in markers)
+                           and logs.count("runtime.boot.begin") == 1
+                           and not any(marker in logs for marker in
+                                       ("restore.validate.begin", "restore.load", "native.pause.end playing",
+                                        "checkpoint.capture.begin", "runtime.stop")))
+        else:
+            publication = "Checkpoint complete:" in logs
+        if not states or states[-1] != "paused" or not publication:
             raise Refused("current runtime quiescence/publication not observed")
         self.receipt["retirement_validation"] = proof
         self.save()
@@ -428,14 +456,15 @@ class Driver:
                 raise Refused("unadmitted system UI step")
         elif op == "hash_files":
             result = self.call(hash_arguments(command["paths"]))
-        elif op in ("retire_checkpoint", "recover_checkpoint"):
+        elif op in ("retire_checkpoint", "recover_checkpoint", "recover_pending_restore"):
             if op == "retire_checkpoint" and cleanup:
                 raise Refused("checkpoint test retirement is not cleanup Stop")
-            if op == "recover_checkpoint" and not cleanup:
+            if op in ("recover_checkpoint", "recover_pending_restore") and not cleanup:
                 raise Refused("bounded quiescent recovery must be explicitly marked cleanup")
             try:
                 result = self.retire_checkpoint(command)
-                self.receipt["quiescent_recovery"] = op == "recover_checkpoint"
+                self.receipt["quiescent_recovery"] = op != "retire_checkpoint"
+                self.receipt["pending_restore_recovery"] = op == "recover_pending_restore"
             except (OSError, ValueError, TypeError, KeyError, IndexError, StopIteration, tarfile.TarError, Refused) as error:
                 self.budget.forced_cleanup = True
                 raise Refused(str(error)) from error

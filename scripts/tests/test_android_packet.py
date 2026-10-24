@@ -211,6 +211,29 @@ class PacketTests(unittest.TestCase):
         budget.forced_cleanup = True
         self.assertEqual(budget.input_boundary(101, True), 101)
 
+    def test_pre_restore_recovery_requires_full_bootstrap_trace_and_refuses_any_restore_or_play(self):
+        bootstrap = "activity.init\nruntime.boot.begin\nboot.checkpoint_validate.end ok\nboot.native_paused.end ok\nruntime.boot.end ready_for_restore_or_play\nnative.pause.end paused\n"
+        for suffix in ("", "restore.validate.begin\n", "restore.load.end ok_paused\n", "native.pause.end playing\n", "runtime.boot.begin\n"):
+            with self.subTest(suffix=suffix), tempfile.TemporaryDirectory() as root:
+                self.f=Fixture(root);command=self.prepare_retirement();command.update(op="recover_pending_restore",cleanup=True)
+                self.f.retirement["logs"]=bootstrap+suffix
+                if suffix:
+                    with self.assertRaises(packet.Refused):self.f.driver.execute(command)
+                    self.assertTrue(self.f.live)
+                else:
+                    self.f.driver.execute(command);self.assertFalse(self.f.live)
+                    self.assertTrue(self.f.driver.receipt["pending_restore_recovery"])
+                    self.assertFalse(self.f.driver.receipt["retirement_is_normal_stop"])
+
+    def test_cleanup_at_locked_screen_off_needs_no_resumed_activity_or_wake(self):
+        command=self.prepare_retirement();command.update(op="recover_checkpoint",cleanup=True)
+        self.f.windows="Display: mDisplayId=0\nmCurrentFocus=Window{1 u0 NotificationShade}"
+        self.f.resumed="Display #0 (activities):"
+        self.f.driver.execute(command)
+        self.assertFalse(self.f.live)
+        self.assertEqual(self.f.driver.receipt["retirement_background"],"physical_display_off_and_keyguard_showing")
+        self.assertFalse(any("input" in c or "wake" in c for c in self.f.calls))
+
     def test_earliest_deadline_and_real_cleanup_reserve(self):
         budget = packet.Budget(100, 800)
         self.assertEqual((budget.hard_end, budget.cleanup_at, budget.commands_end),
