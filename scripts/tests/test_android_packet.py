@@ -159,6 +159,19 @@ class PacketTests(unittest.TestCase):
         with self.assertRaises(packet.Refused):
             packet.button_center(XML, "missing stale button")
 
+    def test_same_package_new_window_invalidates_the_observed_button_layout(self):
+        self.f.after_dump = WINDOW.replace("Window{1", "Window{2")
+        with self.assertRaises(packet.Refused):
+            self.f.driver.execute({"op": "gcx_button", "text": "Resume"})
+        self.assertFalse(any("input" in c for c in self.f.calls))
+
+    def test_focused_app_without_a_current_focused_window_is_not_admission(self):
+        self.f.windows = f"mFocusedApp=ActivityRecord{{1 u0 {OWN}/.GcxActivity t1}}"
+        with self.assertRaises(packet.Refused):
+            self.f.driver.execute({"op": "capture", "name": "missing-focus.png"})
+        self.assertFalse(any("screencap" in c for c in self.f.calls))
+        self.assertFalse(list(Path(self.temp.name).glob("*.png")))
+
     def test_raw_batches_and_option_variants_cannot_bypass_guards(self):
         for args in (["shell", "input", "--display", "0", "tap", "1", "2"],
                      ["shell", "input tap 1 2; input keyevent HOME"],
