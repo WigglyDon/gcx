@@ -52,8 +52,9 @@ unqualified. Rust GameId links and pin-request code are implemented. See
 The first alpha presentation adds the sibling green-A identity, a cleaner native
 library and pause flow, and Rust-owned touch-layout editing with a separate input
 test. Opacity, dead zone, following sticks and haptics are configurable; positions
-are saved separately for each screen. The new alpha is being qualified off-device;
-its Fold installation and hardware results are not yet earned.
+are saved separately for each screen. The Alpha 1 APK is built, privately preserved and installed on the Fold. Its
+native library and control editor rendered on the inner display. Fold gameplay,
+audio, ordinary saves, resume and posture transitions remain unqualified.
 
 GameCube is the initial scope. Dolphin's Wii capability is not a promise of Wii
 support in gcx. A Wii expansion, iOS implementation and multiple resident games

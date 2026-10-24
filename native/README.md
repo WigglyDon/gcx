@@ -1,15 +1,55 @@
 # Direct Dolphin integration
 
-## Current: alpha presentation off-device; Pixel4 return resolved
+## Current: Alpha 1 installed; bounded Fold UI pass only
 
-Owner requested gcx's first showable alpha before Fold admission, using public
-PSX as a sibling-product reference. Original/adapted MIT green-A branding, native
-library/pause presentation and original Rust per-screen touch-control editing,
-resize/reset, isolated input test, opacity/dead-zone/following/haptics are in the
-new source. Save/Cancel stays visible. Engine/native state ABI8/1 is unchanged;
-existing exact candidates and all data remain protected. New alpha device results
-are still unearned. The owner took the Fold back for laptop charging and asked
-for another offer when the built candidate is ready. No Fold query/window occurred.
+Alpha 1 product source is `a9acbe21cb34b184577ea7436b5abe361bdaf653`, APK SHA256
+`7c5522f29b143013d1ff5cc280119685f2ef79c0f104bd9e439572fea3acd217`
+(15,853,708 bytes). The private candidate retains corresponding-source bundles,
+shallow boundaries, locked Cargo vendor inputs, tool identities and reconstruction
+instructions. All preservation checksums passed. Package checks cover ARM64/JNI,
+16KiB ELF/ZIP alignment, signature, manifest, notices and resource inventory.
+Version is `0.1.0-alpha.1`, versionCode1; the separate gcx signer/data path is
+unchanged. Native ABI8/state ABI1, engine, all595 engine/runtime/Sys entries and
+resource-index/hash assets match the protected responsiveness candidate. No
+unchanged engine rebuild or accepted gameplay campaign was repeated.
+
+The Rust alpha adds sibling green-A branding, native library/pause presentation,
+per-screen touch-layout editing, resize/reset, isolated input test and configurable
+opacity/dead-zone/following/haptics. Save/Cancel stays visible. Public PSX reference
+and MIT provenance are recorded in PSX_TRANSFER.58 host library tests, relevant
+host/Android/xtask warnings-denied lints, formatting, source and packaging checks
+passed. These are build/host evidence, not hardware feel or latency acceptance.
+
+A fresh authorized20-minute Fold window installed that exact APK with readback.
+The pre-existing gcx package was absent; no existing gcx data was overwritten.
+Stock ARM64 Android17/API37 with4KiB pages was observed. Own native library and
+editor images were opened on the2076×2152 inner panel. Fixed editor footer and
+GameCube labels/colors rendered. A guarded editor drag and subsequent Save
+returned success, but the deadline finalized before settings readback: persistent
+placement and reopening are UNQUALIFIED. The synthetic Pause placement may remain
+in app preferences; preserve/read it and reset only that test change in the next
+fresh window. No game was imported/booted, and no card/checkpoint was created.
+Fold gameplay, audio, ordinary save/reload, pause/resume/joined Stop, automatic
+return, fold transitions and full controls remain unqualified.
+
+Operational failures were retained: exec-out merged a missing collection error
+into successful stdout; ambiguous default multi-panel capture failed PNG validation;
+one expired editor gesture refused. Continuations kept the earliest original
+budget and counters. Text collection reads now use shell-v2. Active-panel capture
+selects the focused logical display's current local physical viewport, separates
+stderr and rechecks panel/focus before retaining pixels. Return requires ALL
+physical display states OFF, not one inactive panel.43 offline helper regressions
+pass. No tool-only change caused an APK rebuild.
+
+Automatic finalization closed only the proven empty fresh-install client, without
+claiming native Stop. Both physical displays OFF and keyguard were verified at
+2026-10-24 22:09:06UTC. The exact existing kernel lease was subsequently audited
+released host-only, and own earlier pending receipts reconciled with failed
+originals retained. Fold is returned; no Pixel4 or sibling operation occurred.
+Further phone work requires a fresh owner window. The next prepared packet uses
+the unchanged installed APK and scoped SAF selection of the already supplied Wind
+Waker, then bounded native graphics/input/pause/resume/Stop checks with cleanup
+reserve. Automated audio-track evidence alone will not be called audible sound.
 
 Pixel4's last pending return was resolved under explicit peer coordination. The
 current process had fully validated the existing checkpoint and booted paused,

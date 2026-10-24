@@ -19,6 +19,7 @@ OWN = packet.PACKAGE
 RESUMED = f"Display #0 (activities):\nmResumedActivity: ActivityRecord{{1 u0 {OWN}/.GcxActivity t1}}"
 WINDOW = f"Display: mDisplayId=0 rootTasks=1\nmCurrentFocus=Window{{1 u0 {OWN}/{OWN}.GcxActivity}}\nDisplayFrames w=800 h=400 r=0\nmTopFocusedDisplayId=0"
 OTHER = "com.example.other/.OtherActivity"
+VIEWPORT = "DisplayViewport{type=INTERNAL, valid=true, isActive=true, displayId=0, uniqueId='local:123', orientation=0}"
 XML = f'''<?xml version="1.0"?><hierarchy><node bounds="[0,0][800,400]">
 <node text="Resume" package="{OWN}" class="android.widget.Button"
 enabled="true" clickable="true" bounds="[40,80][300,160]"/>
@@ -34,6 +35,8 @@ class Fixture:
         self.timeouts = []
         self.resumed, self.windows = RESUMED, WINDOW
         self.after_capture = None
+        self.viewports = VIEWPORT
+        self.after_viewports = None
         self.after_dump = None
         self.fail = False
         self.live = True
@@ -65,10 +68,14 @@ class Fixture:
             out = XML.encode()
             if self.after_dump:
                 self.windows = self.after_dump
-        elif args == ["exec-out", "screencap", "-p"]:
+        elif args[:4] == ["shell", "-T", "screencap", "-d"]:
             out = b"\x89PNG\r\n\x1a\n" + b"\0\0\0\rIHDR" + struct.pack(">II", 800, 400)
             if self.after_capture:
                 self.windows = self.after_capture
+            if self.after_viewports is not None:
+                self.viewports = self.after_viewports
+        elif "DisplayViewport{" in joined:
+            out = self.viewports.encode()
         elif "collection.json" in joined and "sha256sum" not in args:
             if self.retirement:
                 return subprocess.CompletedProcess(args, 0, self.retirement["collection"], b"")
@@ -98,6 +105,43 @@ class Fixture:
 
 
 class PacketTests(unittest.TestCase):
+    def test_every_fold_display_must_be_off_and_policy_mstate_is_not_physical_state(self):
+        self.assertFalse(packet.physical_displays_off("Display State=ON\nDisplay State=OFF\nmState=OFF"))
+        self.assertTrue(packet.physical_displays_off("Display State=OFF\nDisplay State=OFF\nmState=AUTO_BRIGHTNESS_ENABLED"))
+        self.assertFalse(packet.physical_displays_off("mState=OFF"))
+        self.assertFalse(packet.physical_displays_off("Display State=DOZE\nDisplay State=OFF"))
+        self.assertFalse(packet.physical_displays_off("Display State=ON_SUSPEND\nDisplay State=OFF"))
+
+    def test_capture_resolves_only_active_local_panel_for_focused_display(self):
+        self.f.viewports += "\n" + VIEWPORT.replace("isActive=true", "isActive=false").replace("local:123", "local:456")
+        self.f.viewports += "\n" + VIEWPORT.replace("displayId=0", "displayId=3").replace("local:123", "local:789")
+        self.f.driver.execute({"op": "capture", "name": "fold.png"})
+        self.assertIn(["shell", "-T", "screencap", "-d", "123", "-p"], self.f.calls)
+        self.assertTrue((Path(self.temp.name) / "fold.png").exists())
+
+    def test_capture_refuses_missing_inactive_remote_or_ambiguous_panels_before_pixels(self):
+        for views in ("", VIEWPORT.replace("isActive=true", "isActive=false"),
+                      VIEWPORT.replace("valid=true", "valid=false"),
+                      VIEWPORT.replace("local:123", "virtual:123"),
+                      VIEWPORT.replace("displayId=0", "displayId=3"),
+                      VIEWPORT + VIEWPORT.replace("local:123", "local:456")):
+            with self.subTest(views=views):
+                self.f.viewports = views
+                with self.assertRaises(packet.Refused):
+                    self.f.driver.execute({"op": "capture", "name": "refused.png"})
+                self.assertFalse(any("screencap" in c for c in self.f.calls))
+
+    def test_capture_panel_change_discards_pixels_and_enters_cleanup(self):
+        for after in ("", VIEWPORT.replace("local:123", "local:456")):
+            with self.subTest(after=after):
+                self.f.viewports = VIEWPORT
+                self.f.after_viewports = after
+                with self.assertRaises(packet.Refused):
+                    self.f.driver.execute({"op": "capture", "name": "discard.png"})
+                self.assertTrue(self.f.budget.forced_cleanup)
+                self.assertFalse(list(Path(self.temp.name).glob("*.png")))
+                self.f.budget.forced_cleanup = False
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
@@ -502,6 +546,7 @@ class PacketTests(unittest.TestCase):
         invoke = self.f.driver.invoke
         def new_install(args, timeout):
             if "cat" in args and "files/gcx/collection.json" in args:
+                self.assertEqual(args, ["shell", "run-as", OWN, "cat", "files/gcx/collection.json"])
                 return subprocess.CompletedProcess(args, 1, b"", b"cat: No such file or directory")
             return invoke(args, timeout)
         self.f.driver.invoke = new_install
@@ -509,6 +554,19 @@ class PacketTests(unittest.TestCase):
         self.assertTrue(self.f.driver.receipt["handback"])
         self.assertTrue(self.f.driver.receipt["new_install_without_game"])
         self.assertFalse(self.f.driver.receipt["clean_stop_metadata"])
+
+    def test_missing_file_message_in_success_stdout_is_not_empty_install_proof(self):
+        self.f.driver.receipt["verified_new_install"] = True
+        invoke = self.f.driver.invoke
+        def merged_error(args, timeout):
+            if "cat" in args and "files/gcx/collection.json" in args:
+                return subprocess.CompletedProcess(args, 0, b"cat: No such file or directory", b"")
+            return invoke(args, timeout)
+        self.f.driver.invoke = merged_error
+        self.f.driver.finish()
+        self.assertFalse(self.f.driver.receipt["handback"])
+        self.assertTrue(self.f.live)
+        self.assertFalse(any("force-stop" in c for c in self.f.calls))
 
     def test_missing_collection_without_new_install_proof_cannot_retire_client(self):
         invoke = self.f.driver.invoke

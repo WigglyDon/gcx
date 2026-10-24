@@ -165,3 +165,13 @@ publication requirement. At an already observed physical screenOFF/keyguard,
 cleanup needs no wake or fabricated Home component. It is controlled process
 retirement, never normal Stop/join acceptance. Keep original failed receipts and
 reconcile them only after actual physical and kernel-lease return observations.
+
+Fold captures must resolve the focused logical display to exactly one valid active
+local physical viewport, then recheck it and focus after shell-v2 capture. No
+first/default-panel fallback; discard pixels after a panel change. Keep numeric
+physical IDs private. Return and screen-off recovery require every observed
+physical `Display State` to be OFF; an inactive outer panel is insufficient.
+Collection text uses shell-v2 status/stderr: a successful exec-out stream containing
+a missing-file message is not proof of an absent collection. The current helper
+has43 offline regressions covering these gates. The installed Alpha 1 APK is
+unchanged by test-helper repairs.

@@ -28,6 +28,28 @@ class Refused(RuntimeError):
     pass
 
 
+def physical_displays_off(text):
+    states = re.findall(r"\bDisplay State=([A-Z_]+)\b", text)
+    return bool(states) and all(state == "OFF" for state in states)
+
+
+def active_physical_viewport(text, logical):
+    """Resolve only the focused logical display's currently active local panel."""
+    panels = set()
+    for view in re.findall(r"DisplayViewport\{[^}]+\}", text):
+        if not all(re.search(r"\b" + field + r"=true\b", view)
+                   for field in ("valid", "isActive")):
+            continue
+        if not re.search(r"\bdisplayId=" + re.escape(str(logical)) + r"\b", view):
+            continue
+        panel = re.search(r"\buniqueId='local:([0-9]+)'", view)
+        if panel:
+            panels.add(panel.group(1))
+    if len(panels) != 1:
+        raise Refused("active physical viewport for focused display missing or ambiguous")
+    return panels.pop()
+
+
 class Budget:
     def __init__(self, now, outer_end, helper_seconds=1020, cleanup_seconds=300,
                  return_seconds=60):
@@ -225,6 +247,31 @@ class Driver:
         self.last_capture = None
         return self.call(args)
 
+    def capture_panel(self, focus):
+        query = ["shell", "dumpsys display | grep 'DisplayViewport{' "]
+        before = self.call(query)
+        if before.returncode:
+            raise Refused("active viewport query failed")
+        panel = active_physical_viewport(before.stdout.decode(), focus[1][0])
+        # shell-v2 keeps multi-panel warnings on stderr, outside the PNG stream.
+        result = self.call(["shell", "-T", "screencap", "-d", panel, "-p"])
+        after = self.call(query)
+        evidence = self.root / f"capture-viewport-{self.captures}.private.txt"
+        evidence.write_bytes(before.stdout + b"\nAFTER\n" + after.stdout +
+                             b"\nCAPTURE_STDERR\n" + result.stderr)
+        evidence.chmod(0o600)
+        try:
+            unchanged = (after.returncode == 0 and
+                         active_physical_viewport(after.stdout.decode(), focus[1][0]) == panel)
+        except Refused:
+            unchanged = False
+        if not unchanged:
+            self.budget.forced_cleanup = True
+            raise Refused("capture discarded: active physical viewport changed")
+        if result.returncode:
+            raise Refused("physical-panel capture failed")
+        return result
+
     def retire_checkpoint(self, command):
         """Retire only our backed-up quiescent runtime; never claim joined Stop."""
         name = command["archive"]
@@ -279,7 +326,7 @@ class Driver:
         if command["op"] in ("recover_checkpoint", "recover_pending_restore"):
             display = self.call(["shell", "dumpsys display | grep -E 'Display State=|mState='"]).stdout.decode()
             policy = self.call(["shell", "dumpsys window policy | grep -E 'secure=|showing='"]).stdout.decode()
-            locked = "Display State=OFF" in display and "showing=true" in policy
+            locked = physical_displays_off(display) and "showing=true" in policy
             if locked:
                 self.receipt["retirement_background"] = "physical_display_off_and_keyguard_showing"
         if not locked:
@@ -355,7 +402,7 @@ class Driver:
                 raise Refused("image ceiling reached")
             self.captures += 1
             before = self.focus()
-            result = self.call(["exec-out", "screencap", "-p"])
+            result = self.capture_panel(before)
             # Discard rather than save/return an image if focus changed during it.
             if self.focus() != before:
                 self.mismatch = True
@@ -498,7 +545,10 @@ class Driver:
             self.receipt["pending_recovery"] = "command timed out; no further device commands"
             return
         try:
-            result = self.call(["exec-out", "run-as", PACKAGE, "cat", "files/gcx/collection.json"])
+            # Collection is text: shell-v2 preserves the remote exit status and
+            # stderr. exec-out merges a missing-file error into stdout and may
+            # return zero, which is not evidence of a readable collection.
+            result = self.call(["shell", "run-as", PACKAGE, "cat", "files/gcx/collection.json"])
             # The admitted installer may prove package absence before a new
             # install. Before any import, that build has no saved collection or
             # runtime: imports persist the collection before native boot.
@@ -533,7 +583,7 @@ class Driver:
             # Screen-off is an explicit return step, only from gcx or the observed
             # current Home. No unrelated-app screenshot or touch is used.
             display = self.call(["shell", "dumpsys display | grep -E 'Display State=|mState='"]).stdout.decode()
-            if "Display State=OFF" not in display:
+            if not physical_displays_off(display):
                 home = self.call(["shell", "cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME"]).stdout.decode()
                 current, _ = self.observe_focus()
                 if current not in (component(home), (PACKAGE, PACKAGE + ".GcxActivity")):
@@ -545,7 +595,7 @@ class Driver:
             for attempt in range(4):
                 display = self.call(["shell", "dumpsys display | grep -E 'Display State=|mState='"]).stdout.decode()
                 keyguard = self.call(["shell", "dumpsys window policy | grep -E 'secure=|showing='"]).stdout.decode()
-                self.receipt["display_off"] = "Display State=OFF" in display
+                self.receipt["display_off"] = physical_displays_off(display)
                 self.receipt["keyguard_showing"] = "showing=true" in keyguard
                 if self.receipt["display_off"] and self.receipt["keyguard_showing"]:
                     break
