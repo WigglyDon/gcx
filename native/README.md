@@ -61,6 +61,14 @@ See [complete results and limits](https://github.com/WigglyDon/gcx/issues/2#issu
 Cold scene return, human feel/audio, full trigger/multitouch coverage, A/B/A,
 actual shortcuts and a new ordinary-save/reload row remain due on ABI8.
 
+A fresh admission under Master6378475271 verified the same installed ABI8 and
+unchanged complete protected backup. The owner clarified he was away immediately
+after being asked to take controls. No game was started and no new test result is
+claimed. gcx closed and Pixel4 returned at2026-10-24 02:04:12UTC with clean
+metadata, app absent, displayOFF/keyguard observed and lease released. The helper
+now exposes usable command time and reserves five command minutes after closing
+new test steps. See [follow-up handback](https://github.com/WigglyDon/gcx/issues/2#issuecomment-6378530501).
+
 Rust now supplies a complete18-channel packet at Dolphin's actual pad read.
 The maintained GPL change is an optional `Pad::GetStatus` callback under the
 controller state lock. ABI8's `gcx_engine_input_sampler` registers a synchronous
