@@ -1,6 +1,38 @@
 # Direct Dolphin integration
 
-## Pixel4 scene return, 2026-10-23
+## Pixel4 ABI8 scene return, 2026-10-24
+
+Unchanged source `0e5417e328383e0ba7ff0d3b0d5cf01bb3f5b744` / installed APK
+`c7194951d9420e45622c7eefb29baaa5365fec694e6cefa015a7049dc724e5c9` earned the
+bounded intentional-pause cold-process return under Master6378475271. The owner
+changed the unsaved bridge position/camera, then Pause/Home durably published the
+complete generation. Its93,250,868byte payload and110,038,528byte complete backup
+passed independent read-only verification against trusted bindings before
+controlled process retirement. Different PID/start identity, paused restore
+acknowledgment/menu, explicit Resume and matching actual Vulkan scene were observed.
+No Stop/Restart or post-restart card-menu loading substituted for restore.
+
+The owner initially reported a sound problem, corrected it to FINE, and then
+explicitly confirmed restored sound, movement/action, C Stick and control feel
+were all fine. No remaining sound defect is inferred from the retracted response.
+External Pause-dispatch→durable-ack bound was2.620s; launch-dispatch→restore-ack
+was6.925s, including adb/scheduling. Internal phases, measured audio interruption,
+touch-to-photon and steady-state latency remain unqualified. Post-restore delivery
+summary observed48 updates/43 batches with maximum dispatch→pad24,193us and
+largest active poll gap187,079us; the latter is unattributed, not a latency pass.
+
+Final normal Stop joined workers while retaining the writer, durably published
+clean metadata and released the profile. The final22,556,160byte backup verified,
+ordinary16MiB card stayed unchanged and updated68byte SRAM was retained. All prior
+candidates and the exact restored generation remain protected. Verified return
+2026-10-24 04:13:50UTC: app absent, physical displayOFF/keyguard showing and lease
+released, before the usable command deadline. Eight captures/161,609,958collected
+bytes, no install/rebuild/settings change. Fold/siblings untouched.
+See [source-bound handback](https://github.com/WigglyDon/gcx/issues/2#issuecomment-6379745602).
+Automatic paused=false return, new ABI8 ordinary-save/reload, full control matrix,
+Wind Waker→Twilight Princess→Wind Waker and actual launcher pins/taps remain unrun.
+
+## Earlier Pixel4 ABI7 scene return, 2026-10-23
 
 Preserved ABI7 source `dae7e3f1326fb320a231efa5ffd89c853482f417` / APK
 `261a4976606117c29b70df2a7485f48188a64067d6224c5d1721b546c3763b75` now has a
@@ -58,8 +90,9 @@ nonsecure keyguard showing, app absent and lease released. Wakefulness was Dozin
 the physical display readback establishes OFF. Original pending evidence is retained
 alongside the resolved canonical receipt. Fold/siblings were untouched.
 See [complete results and limits](https://github.com/WigglyDon/gcx/issues/2#issuecomment-6378376203).
-Cold scene return, human feel/audio, full trigger/multitouch coverage, A/B/A,
-actual shortcuts and a new ordinary-save/reload row remain due on ABI8.
+At that first handback, cold scene return and human feel/audio were still due;
+the later ABI8 pass above earns those bounded observations. Full trigger/multitouch
+coverage, A/B/A, actual shortcuts and a new ordinary-save/reload row remain due.
 
 A fresh admission under Master6378475271 verified the same installed ABI8 and
 unchanged complete protected backup. The owner clarified he was away immediately

@@ -30,9 +30,11 @@ and Fold play remain unqualified. Rust-owned coherent
 machine/card checkpoints passed actual native restore/failure fixtures and an
 ABI7 Pixel4 fresh-process return to unsaved scenes, with owner-confirmed sound,
 controls and retained pause intent. The newer ABI8 input/UI build rendered its
-controls, ran the existing quest and produced a privately backed-up, validated
-checkpoint on Pixel4; its fresh-process scene return and human control feel/audio
-remain due. The automatic unpaused-return variant remains unqualified.
+controls and restored an unsaved Wind Waker scene in a genuinely new process on
+Pixel4, with intentional pause retained until Resume. The owner confirmed sound,
+movement/action, C Stick and control feel after restore. Its validated checkpoint
+generation and ordinary saves are privately backed up. The automatic unpaused-return
+variant, full control matrix and two-game return remain unqualified.
 A Rust saved-game list, validated
 GameId launcher links and system pin-request code are also built off-device;
 physical library and launcher tests remain due. See

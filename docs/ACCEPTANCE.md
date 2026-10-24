@@ -52,6 +52,20 @@ will always run before process death. Preserve the last accepted checkpoint.
 
 ## Earned scene return and next guarded qualification
 
+ABI8 source `0e5417e328383e0ba7ff0d3b0d5cf01bb3f5b744`, installed APK
+`c7194951d9420e45622c7eefb29baaa5365fec694e6cefa015a7049dc724e5c9`, subsequently
+earned the bounded Pixel4 intentional-pause cold-process scene return on2026-10-24.
+Its93,250,868byte payload and complete coherent generation were independently
+validated/backed up before retirement. New PID/start identity, paused restore until
+Resume and matching unsaved bridge position/camera were verified. The owner
+explicitly confirmed restored sound, movement/action, C Stick and control feel.
+Normal Stop occurred only for final cleanup after this evidence. Final backup,
+unchanged ordinary card, clean joined Stop and verified return are recorded in
+[the ABI8 handback](https://github.com/WigglyDon/gcx/issues/2#issuecomment-6379745602).
+This supersedes ABI8's earlier unqualified scene-return status, while preserving
+the historical ABI7 evidence below. Automatic paused=false return, two-game library
+return, real shortcuts, full controls and a new ABI8 ordinary-save/reload remain due.
+
 ABI7 source `dae7e3f1326fb320a231efa5ffd89c853482f417`, APK
 `261a4976606117c29b70df2a7485f48188a64067d6224c5d1721b546c3763b75`, earned
 the bounded Pixel4 intentional-pause cold-process scene return on2026-10-23.
@@ -70,9 +84,10 @@ accepts the preserved ABI7 increment for qualification, not completed GCX-2
 acceptance or phone custody. Keep the existing prepared runtime and backups;
 unchanged binaries and completed host campaigns need no rerun.
 
-After a fresh owner Pixel4 offer and successful exclusive admission, qualify the
-changed input/UI candidate separately and continue the remaining library/shortcut
-rows. Preserve the earned ABI7 pair and backups. A new candidate's resume check
+The unchanged ABI8 candidate has now earned its separate single-scene row above.
+After a fresh owner Pixel4 offer and successful exclusive admission, continue the
+remaining library/shortcut rows without repeating that completed row. Preserve
+both earned pairs and backups. Any future changed candidate's resume check
 still requires checkpoint → genuinely new process → exact controllable scene return.
 Verify completed payload and durable session-reference publication, then back up
 the quiescent generation before controlled process retirement. Confirm actual
