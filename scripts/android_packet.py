@@ -20,6 +20,8 @@ import xml.etree.ElementTree as ET
 
 PACKAGE = "com.machinerhythm.gcx"
 ACTIVITY = PACKAGE + "/.GcxActivity"
+FOCUS_QUERY = ("dumpsys window displays | grep -E 'Display:|mCurrentFocus=|mTopFocusedDisplayId=|DisplayFrames'; "
+               "dumpsys activity activities | grep -E 'Display #[0-9]+|mResumedActivity:|topResumedActivity='")
 
 
 class Refused(RuntimeError):
@@ -50,6 +52,14 @@ class Budget:
         if self.cleanup(now):
             raise Refused("CLEANUP_REQUIRED; owner feedback cannot extend the window")
         return max(0, min(15, seconds, self.cleanup_at - now))
+
+    def input_boundary(self, now, automated):
+        # An unattended packet must enter its finalizer without waiting for the
+        # agent to notice stdout. Its existing same-transaction recovery script
+        # gets the ORIGINAL remaining reserve, never a renewed deadline.
+        if automated and self.cleanup(now):
+            return now
+        return self.commands_end if self.cleanup(now) else self.cleanup_at
 
 
 def component(text):
@@ -175,10 +185,10 @@ class Driver:
         return result
 
     def focus(self):
-        a = self.call(["shell", "dumpsys activity activities | grep -E 'Display #[0-9]+|mResumedActivity:|topResumedActivity='"])
-        w = self.call(["shell", "dumpsys window displays | grep -E 'Display:|mCurrentFocus=|mTopFocusedDisplayId=|DisplayFrames'"])
         try:
-            observed = own_focus(a.stdout.decode(), w.stdout.decode())
+            observed = self.observe_focus()
+            if observed[0] != (PACKAGE, PACKAGE + ".GcxActivity"):
+                raise Refused("expected gcx Activity AND focused window do not match")
             self.own_ui_observed = True
             return observed
         except Refused:
@@ -186,6 +196,16 @@ class Driver:
             self.budget.forced_cleanup = True
             self.receipt["foreground_mismatch"] = True
             raise
+
+    def observe_focus(self):
+        # Both current metadata views share one wrapped ADB invocation. This
+        # retains target/lease checks and avoids repeating costly USB admission
+        # for each read; differing Activity/window/display still refuses.
+        result = self.call(["shell", FOCUS_QUERY])
+        if result.returncode:
+            raise Refused("current focus metadata query failed")
+        data = result.stdout.decode()
+        return focused_pair(data, data)
 
     def action(self, args):
         if self.actions >= 100:
@@ -241,9 +261,7 @@ class Driver:
                 and "PASS read-only checkpoint inspection:" in record["verification"]
                 and f"captured pause intent={intent}" in record["verification"]):
             raise Refused("backup lacks a matching independently validated live checkpoint")
-        a = self.call(["shell", "dumpsys activity activities | grep -E 'Display #[0-9]+|mResumedActivity:|topResumedActivity='"])
-        w = self.call(["shell", "dumpsys window displays | grep -E 'Display:|mCurrentFocus=|mTopFocusedDisplayId=|DisplayFrames'"])
-        current, _ = focused_pair(a.stdout.decode(), w.stdout.decode())
+        current, _ = self.observe_focus()
         home = self.call(["shell", "cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME"])
         if current != component(home.stdout.decode()):
             raise Refused("checkpoint retirement requires the observed Home foreground")
@@ -264,6 +282,14 @@ class Driver:
         states = re.findall(r"native\.pause\.end (paused|playing)", logs)
         if not states or states[-1] != "paused" or "Checkpoint complete:" not in logs:
             raise Refused("current runtime quiescence/publication not observed")
+        evidence = self.root / f"retirement-quiescence-{len(self.receipt['operations'])}.private.txt"
+        with evidence.open("xb") as file:
+            file.write(logs.encode())
+        evidence.chmod(0o600)
+        self.receipt["retirement_validation"] = {"archive_sha256": record["archive_sha256"],
+                                                "actual_file_sha256": hashes, "pid": pid,
+                                                "start_ticks": ticks, "quiescence": str(evidence)}
+        self.save()
         result = self.action(["shell", "am", "force-stop", PACKAGE])
         if result.returncode or self.call(["shell", "pidof", PACKAGE]).stdout.strip():
             raise Refused("checkpoint retirement did not reach process absence")
@@ -312,7 +338,8 @@ class Driver:
                 raise Refused("cleanup native input is Pause only")
             capture = self.last_capture
             if not capture or capture[0] != command["capture"] or self.clock() - capture[1] > 30:
-                raise Refused("native tap requires a fresh inspected own capture")
+                age = None if not capture else round(self.clock() - capture[1], 3)
+                raise Refused(f"native tap requires a fresh inspected own capture; age_seconds={age}")
             focus = self.focus()
             if focus != capture[2]:
                 self.mismatch = True
@@ -322,7 +349,7 @@ class Driver:
             if len(frames) != 1 or tuple(map(int, frames[0][:2])) != capture[3]:
                 raise Refused("native capture/display geometry is not coherent")
             if self.clock() - capture[1] > 30:
-                raise Refused("native capture expired during focus verification")
+                raise Refused(f"native capture expired during focus verification; age_seconds={self.clock()-capture[1]:.3f}")
             bounds = command["bounds"]
             if len(bounds) != 4 or any(type(v) is not int for v in bounds):
                 raise Refused("native button requires observed integer bounds")
@@ -330,7 +357,14 @@ class Driver:
             width, height = capture[3]
             if not (0 <= a < c <= width and 0 <= b < d <= height):
                 raise Refused("native button outside current image")
-            result = self.action(["shell", "input", "tap", str((a+c)//2), str((b+d)//2)])
+            press = command.get("press_ms", 0)
+            if type(press) is not int or not 0 <= press <= 250:
+                raise Refused("test press duration must be 0..250ms")
+            if press and command["target"] == "Pause":
+                raise Refused("Pause opens a new window; held contact is game controls only")
+            x, y = str((a+c)//2), str((b+d)//2)
+            result = self.action(["shell", "input", "swipe", x, y, x, y, str(press)] if press else
+                                 ["shell", "input", "tap", x, y])
         elif op == "gcx_button":
             text = command["text"]
             if cleanup and text not in ("Stop game", "Stop current game"):
@@ -351,9 +385,7 @@ class Driver:
         elif op == "launch":
             if self.mismatch and not command.get("owner_reconfirmed"):
                 raise Refused("unexpected foreground requires owner clarification")
-            a = self.call(["shell", "dumpsys activity activities | grep -E 'Display #[0-9]+|mResumedActivity:|topResumedActivity='"])
-            w = self.call(["shell", "dumpsys window displays | grep -E 'Display:|mCurrentFocus=|mTopFocusedDisplayId=|DisplayFrames'"])
-            current, _ = focused_pair(a.stdout.decode(), w.stdout.decode())
+            current, _ = self.observe_focus()
             home = self.call(["shell", "cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME"])
             initial = (command.get("initial_entry") and not self.launched
                        and not self.own_ui_observed and not self.mismatch)
@@ -380,11 +412,14 @@ class Driver:
                 raise Refused("unadmitted system UI step")
         elif op == "hash_files":
             result = self.call(hash_arguments(command["paths"]))
-        elif op == "retire_checkpoint":
-            if cleanup:
+        elif op in ("retire_checkpoint", "recover_checkpoint"):
+            if op == "retire_checkpoint" and cleanup:
                 raise Refused("checkpoint test retirement is not cleanup Stop")
+            if op == "recover_checkpoint" and not cleanup:
+                raise Refused("bounded quiescent recovery must be explicitly marked cleanup")
             try:
                 result = self.retire_checkpoint(command)
+                self.receipt["quiescent_recovery"] = op == "recover_checkpoint"
             except (OSError, ValueError, TypeError, KeyError, IndexError, StopIteration, tarfile.TarError, Refused) as error:
                 self.budget.forced_cleanup = True
                 raise Refused(str(error)) from error
@@ -443,9 +478,7 @@ class Driver:
             display = self.call(["shell", "dumpsys display | grep -E 'Display State=|mState='"]).stdout.decode()
             if "Display State=OFF" not in display:
                 home = self.call(["shell", "cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME"]).stdout.decode()
-                resumed = self.call(["shell", "dumpsys activity activities | grep -E 'Display #[0-9]+|mResumedActivity:|topResumedActivity='"]).stdout.decode()
-                windows = self.call(["shell", "dumpsys window displays | grep -E 'Display:|mCurrentFocus=|mTopFocusedDisplayId=|DisplayFrames'"]).stdout.decode()
-                current, _ = focused_pair(resumed, windows)
+                current, _ = self.observe_focus()
                 if current not in (component(home), (PACKAGE, PACKAGE + ".GcxActivity")):
                     raise Refused("unexpected app during return; no screen input")
                 self.action(["shell", "input", "keyevent", "KEYCODE_SLEEP"])
@@ -475,6 +508,7 @@ def main():
     root.mkdir(mode=0o700, parents=True, exist_ok=False)
     fd = int(os.environ["CODEX_ANDROID_LEASE_FD"])
     budget = Budget(time.monotonic(), float(os.environ["GCX_OUTER_DEADLINE_MONO"]))
+    automated = os.environ.get("GCX_AUTOMATED_PACKET") == "1"
     def invoke(args, timeout):
         return subprocess.run(["android-device", "adb", alias, "--", *args],
                               stdin=subprocess.DEVNULL, capture_output=True,
@@ -491,7 +525,8 @@ def main():
                  return_observations_pending=not driver.receipt["handback"], source_evidence=str(root))
         canonical.write_text(json.dumps(r, indent=2)); canonical.chmod(0o600)
     driver.save(); canonical_pending()
-    print("LEASE_ACQUIRED; new work stops at earliest deadline minus300s; return reserve60s", flush=True)
+    print("LEASE_ACQUIRED; new work stops at earliest deadline minus300s; return reserve60s; "
+          f"automatic_cleanup={automated}", flush=True)
     cleanup_announced = False
     try:
         while time.monotonic() < budget.commands_end:
@@ -500,7 +535,9 @@ def main():
                 driver.receipt["cleanup_entered"] = time.time()
                 print("CLEANUP_REQUIRED; owner waiting ended; cleanup operations only", flush=True)
                 cleanup_announced = True
-            boundary = budget.commands_end if budget.cleanup(now) else budget.cleanup_at
+            boundary = budget.input_boundary(now, automated)
+            if boundary <= now:
+                break
             ready, _, _ = select.select([sys.stdin], [], [], min(15, max(0, boundary-now)))
             if not ready:
                 continue

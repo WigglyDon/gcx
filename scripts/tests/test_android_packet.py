@@ -55,7 +55,9 @@ class Fixture:
             raise subprocess.TimeoutExpired(args, timeout)
         joined = " ".join(args)
         out = b""
-        if "dumpsys activity" in joined:
+        if args == ["shell", packet.FOCUS_QUERY]:
+            out = (self.windows + "\n" + self.resumed).encode()
+        elif "dumpsys activity" in joined:
             out = self.resumed.encode()
         elif "dumpsys window displays |" in joined:
             out = self.windows.encode()
@@ -171,6 +173,28 @@ class PacketTests(unittest.TestCase):
             self.f.driver.execute(command)
         self.assertEqual(self.f.calls, [])
 
+    def test_bounded_quiescent_recovery_keeps_all_proofs_and_is_never_joined_stop(self):
+        command = self.prepare_retirement()
+        command.update(op="recover_checkpoint", cleanup=True)
+        self.f.budget.forced_cleanup = True
+        self.f.driver.execute(command)
+        self.assertFalse(self.f.live)
+        self.assertTrue(self.f.driver.receipt["quiescent_recovery"])
+        self.assertFalse(self.f.driver.receipt["retirement_is_normal_stop"])
+        proof = self.f.driver.receipt["retirement_validation"]
+        self.assertEqual((proof["pid"], proof["start_ticks"]), ("1000", "777"))
+        self.assertIn("native.pause.end paused", Path(proof["quiescence"]).read_text())
+        self.assertEqual(proof["actual_file_sha256"], self.f.retirement["hashes"])
+
+    def test_automated_cutoff_finalizes_instead_of_waiting_through_cleanup(self):
+        budget = self.f.budget
+        self.assertEqual(budget.input_boundary(budget.cleanup_at - 1, True), budget.cleanup_at)
+        self.assertEqual(budget.input_boundary(budget.cleanup_at, True), budget.cleanup_at)
+        self.assertEqual(budget.input_boundary(budget.cleanup_at + 1, True), budget.cleanup_at + 1)
+        self.assertEqual(budget.input_boundary(budget.cleanup_at, False), budget.commands_end)
+        budget.forced_cleanup = True
+        self.assertEqual(budget.input_boundary(101, True), 101)
+
     def test_earliest_deadline_and_real_cleanup_reserve(self):
         budget = packet.Budget(100, 800)
         self.assertEqual((budget.hard_end, budget.cleanup_at, budget.commands_end),
@@ -253,6 +277,38 @@ class PacketTests(unittest.TestCase):
         self.assertEqual(self.f.calls[-1], ["shell", "input", "tap", "60", "345"])
         with self.assertRaises(packet.Refused):
             self.f.driver.execute(tap)
+
+    def test_focus_metadata_is_batched_without_dropping_either_observation(self):
+        self.f.driver.focus()
+        self.assertEqual(self.f.calls, [["shell", packet.FOCUS_QUERY]])
+        self.f.resumed = RESUMED.replace(OWN + "/.GcxActivity", OTHER)
+        with self.assertRaises(packet.Refused):
+            self.f.driver.focus()
+        self.assertTrue(self.f.driver.mismatch)
+
+    def test_held_test_stimulus_is_one_bounded_stationary_contact(self):
+        self.f.driver.execute({"op": "capture", "name": "native.png"})
+        self.f.driver.execute({"op": "gcx_tap", "capture": "native.png", "target": "Start",
+                               "bounds": [30, 300, 90, 390], "press_ms": 120})
+        self.assertEqual(self.f.calls[-1], ["shell", "input", "swipe", "60", "345", "60", "345", "120"])
+        with self.assertRaises(packet.Refused):
+            self.f.driver.execute({"op": "gcx_tap", "capture": "native.png", "target": "Start",
+                                   "bounds": [30, 300, 90, 390], "press_ms": 120})
+
+    def test_held_test_stimulus_refuses_invalid_duration_before_input(self):
+        self.f.driver.execute({"op": "capture", "name": "native.png"})
+        for invalid in (-1, 251, True, "120", 0.5):
+            with self.assertRaises(packet.Refused):
+                self.f.driver.execute({"op": "gcx_tap", "capture": "native.png", "target": "Start",
+                                       "bounds": [30, 300, 90, 390], "press_ms": invalid})
+        self.assertFalse(any("input" in c for c in self.f.calls))
+
+    def test_pause_cannot_hold_contact_across_opening_a_dialog_window(self):
+        self.f.driver.execute({"op": "capture", "name": "native.png"})
+        with self.assertRaises(packet.Refused):
+            self.f.driver.execute({"op": "gcx_tap", "capture": "native.png", "target": "Pause",
+                                   "bounds": [30, 300, 90, 390], "press_ms": 120})
+        self.assertFalse(any("input" in c for c in self.f.calls))
 
     def test_native_tap_refuses_stale_or_rotated_capture(self):
         self.f.driver.execute({"op": "capture", "name": "native.png"})

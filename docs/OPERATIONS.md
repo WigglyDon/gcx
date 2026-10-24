@@ -67,8 +67,16 @@ before the outer timeout starts. Run it only inside the existing exclusive
 It does not grant custody. The earlier of the outer deadline and the helper's
 17-minute limit controls a five-minute cleanup reserve, including one minute
 reserved for final return. New tests and owner waiting end at the cleanup cutoff.
+For unattended packets set `GCX_AUTOMATED_PACKET=1`: the input loop immediately
+enters its finalizer at that cutoff (or forced cleanup), without waiting for an
+agent response. The prepared task-local wrapper may then run the existing bounded
+recovery inside the SAME transaction and ORIGINAL hard deadline, preserving the
+pending receipt first. It must leave real backup/validation/return time and refuse
+recovery after a timed-out transport. There is no renewed lease or deadline.
 
-Own UI input/captures require freshly matching resumed Activity and focused
+The two focus metadata reads share one wrapped ADB call, reducing repeated USB
+wrapper overhead without caching either observation. Own UI input/captures require
+freshly matching resumed Activity and focused
 window on the current live display. Use `dumpsys window displays`, not the first
 focus line in a full window dump: retained ANR snapshots can precede the live
 section. Android13 omits the global top-display ID from this subcommand; one
@@ -79,7 +87,9 @@ tap. For owner-authorized automated checks, one named native button tap is bound
 to a just-captured, agent-inspected own image, matching live display frame/rotation
 and focus, observed bounds, and a thirty-second freshness limit. Each tap consumes
 that capture; historical coordinates and batches are refused. Cleanup permits
-only native Pause and framework Stop. A mismatch ends new work; unexpected app content
+only native Pause and framework Stop. Optional `press_ms` of0..250 is a bounded
+stationary game-button test contact, not product input dwell; Pause cannot hold
+across the new dialog window. A mismatch ends new work; unexpected app content
 is not retained. Home, nonsecure wake and ordinary app entry are separate named
 steps. An admitted autonomous packet may explicitly authorize its initial ordinary
 gcx entry from the freshly observed foreground, preserving that app's state; this
@@ -96,7 +106,9 @@ matching intent/game/profile/checkpoint, fresh hashes of the actual checkpoint,
 card, SRAM, generation and collection, observed Home foreground, exact current
 PID/start identity and paused/publication evidence. Only then may it retire the
 own process. It records that this is not normal Stop; cleanup cannot invoke it
-as a substitute. Any changed data/process or missing quiescence refuses before
+as a substitute. A separately named cleanup-only `recover_checkpoint` keeps all
+those proof gates and records controlled recovery, never normal Stop. Save actual
+current hash/process/quiescence observations before retirement. Any changed data/process or missing quiescence refuses before
 retirement and ends new test work. Raw process/UI batches remain refused.
 Timeout means no further device commands from that helper. Clean Stop metadata,
 native join/profile release, own-client absence and physical display/keyguard

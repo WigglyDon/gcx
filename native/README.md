@@ -1,5 +1,38 @@
 # Direct Dolphin integration
 
+## Short automated follow-up and recovered return, 2026-10-24
+
+The installed99018690 APK was read back unchanged. A fresh12-minute exclusive
+Pixel4 window reached title/intro graphics, but world setup, explicit menu Resume
+and fresh-process return did not qualify. Two injected Start contacts were
+reported captured; their game phases/readiness and zero-duration stimulus were
+not isolated, so no emulator input-loss diagnosis follows. Further Start/Pause
+attempts correctly refused images that expired during model/focus work. Seven
+own-app images were retained; no unrelated capture or product change.
+
+Operator overhead consumed the cleanup reserve. The original hard return deadline
+was missed. A separate bounded recovery independently validated and protected the
+latest complete false-intent generation (93,382,166byte payload), current cards,
+SRAM and generation metadata, then proved current matching files, exact process
+identity, Home foreground and native quiescence before controlled own-process
+retirement. This was NOT normal Stop or native joined teardown. Current WW remains
+paused=false/stopped=false/runtime_incomplete=true/restart_required=false with its
+checkpoint reference retained; no metadata was rewritten to claim completion.
+TP ordinary data remains protected. Verified recovered return was20:30:22UTC:
+app absent, physical displayOFF/nonsecure keyguard, actual lease released. Original
+failed/pending records remain alongside the reconciled return.
+
+Off-device helper correction batches both current focus metadata views through
+one wrapped ADB invocation, retaining all Activity/window/display/rotation gates.
+An optional0..250ms stationary game-button contact isolates test stimulus duration;
+Pause remains a short tap because it opens a different window. This changes no
+product input dwell, smoothing or pad policy. Capture age is checked again at
+actual dispatch. Retirement retains its full current-hash/process/quiescence
+proof privately and remains explicitly separate from Stop.33 helper regressions
+pass. Automated packets finalize immediately at their cleanup cutoff; the existing
+same-transaction bounded recovery receives only the original remaining deadline,
+so delayed model work cannot silently renew custody or reserve. No new APK build.
+
 ## Automated responsiveness fixture and bounded native pass, 2026-10-24
 
 Fresh owner reassignment and exclusive Pixel4 admission reconciled the current
