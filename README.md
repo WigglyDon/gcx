@@ -35,10 +35,12 @@ Pixel4, with intentional pause retained until Resume. The owner confirmed sound,
 movement/action, C Stick and control feel after restore. Its validated checkpoint
 generation and ordinary saves are privately backed up. Actual library switching
 Wind Waker → Twilight Princess → Wind Waker returned the unsaved scene with
-owner-confirmed sound, controls and no audio bleed. Twilight Princess rendered its
-opening dialogue; its interactive world and own saved-scene return remain untested.
-Automatic unpaused return, the full control matrix and real launcher pins/taps
-remain unqualified. Rust GameId links and pin-request code are implemented. See
+owner-confirmed sound, controls and no audio bleed. Twilight Princess also returned
+to its saved opening dialogue in a later process, with owner-confirmed sound and
+A input; its interactive world remains untested. Actual Add to Home testing found
+the current launcher reports pinning unsupported, so OS pins and physical taps
+remain blocked. Automatic unpaused return and the full control matrix remain
+unqualified. Rust GameId links and pin-request code are implemented. See
 [native reproduction and limits](native/README.md).
 
 GameCube is the initial scope. Dolphin's Wii capability is not a promise of Wii

@@ -67,6 +67,18 @@ Real pin acceptance, OS pin observation and physical cold/warm/repeated/other-ga
 taps remain separate and unrun. Qualify them after a fresh authorized window;
 do not repeat the completed WW single-game row. TP's own saved dialogue is retained.
 
+The [separate shortcut follow-up](https://github.com/WigglyDon/gcx/issues/2#issuecomment-6380557925)
+observed actual Add to Home failing at the current launcher's negative pin-support
+capability check. No accepted request, OS pin or physical-tap behavior is earned;
+no launcher role/settings/sibling change was made. This row needs a pin-capable
+current launcher under an authorized arrangement before fresh device qualification.
+During the admitted follow-up, TP's exact saved waterfall dialogue returned via
+the Library in a later process, with owner-confirmed sound and A input. Its updated
+complete generation and both final ordinary-card/console-data copies were verified
+and protected before normal Stop/return. This earns TP's own dialogue return, not
+interactive gameplay or same-process B→A→B. Both entries are now cleanly stopped;
+complete historical generations remain privately backed up.
+
 ABI8 source `0e5417e328383e0ba7ff0d3b0d5cf01bb3f5b744`, installed APK
 `c7194951d9420e45622c7eefb29baaa5365fec694e6cefa015a7049dc724e5c9`, subsequently
 earned the bounded Pixel4 intentional-pause cold-process scene return on2026-10-24.

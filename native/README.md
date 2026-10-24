@@ -1,5 +1,35 @@
 # Direct Dolphin integration
 
+## Actual pin capability and TP saved-dialogue return, 2026-10-24
+
+A separately granted window kept the same installed ABI8 pair. Actual WW
+Add game to Home screen reached `isRequestPinShortcutSupported=false`; the owner
+confirmed the unsupported-launcher message. The current default Home component
+does not advertise the pin-confirmation action; a different installed launcher
+does. No role/settings/package/sibling change was attempted. No request acceptance,
+OS pin or physical cold/warm/repeated/other-game shortcut tap is earned. Resume
+that row only with a pin-capable current launcher under its own authorized
+arrangement and a fresh Pixel4 window; no unchanged rebuild or WW cold rerun.
+
+TP's previously validated complete generation was freshly hash-matched, then
+selected through the actual Library in this new app process. Native restore and
+real Vulkan output returned to the exact waterfall opening dialogue without title
+or file-menu loading. The owner confirmed the same dialogue, sound and A advancing
+a line. This earns TP's own saved-dialogue return, not interactive-world movement,
+same-process B→A→B or a physical shortcut. Explicit game selection requests Resume;
+this does not qualify automatic paused=false cold return.
+
+The updated93,239,574byte TP payload/110,027,264byte complete generation passed
+independent verification and backup before final normal Stop. Both entries are now
+cleanly stopped; active references were cleared by explicit Stop, while all complete
+WW/TP historical generations remain protected privately. Final33,566,720byte
+archive of both current cards/console data/collection/save-generation verified;
+both16MiB ordinary cards unchanged and current68byte SRAM retained. Verified
+return2026-10-24 05:47:34UTC: app absent, displayOFF/keyguard and released lease,
+one capture/144,851,930collected bytes, finished within9m29s. No Fold/sibling,
+settings/security, install or rebuild action.
+See [shortcut capability and TP handback](https://github.com/WigglyDon/gcx/issues/2#issuecomment-6380557925).
+
 ## Pixel4 ABI8 actual library switching, 2026-10-24
 
 The unchanged ABI8 pair below completed actual gcx library
@@ -31,8 +61,9 @@ Verified return2026-10-24 05:34:10UTC: app absent, displayOFF/keyguard and lease
 released, seven captures/248,890,850collected bytes, within the existing packet.
 All prior candidates/backups remain protected. Fold/siblings untouched.
 See [library handback](https://github.com/WigglyDon/gcx/issues/2#issuecomment-6380451946).
-TP's own scene return/B→A→B, real shortcut pins/taps, automatic paused=false cold
-return and a new ABI8 ordinary-save round trip remain unrun.
+At that handback TP's own scene return was still due; the follow-up above earns
+its later-process dialogue return. Same-process B→A→B, real shortcut pins/taps,
+automatic paused=false cold return and a new ABI8 ordinary-save round trip remain due.
 
 ## Pixel4 ABI8 scene return, 2026-10-24
 
