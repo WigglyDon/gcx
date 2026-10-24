@@ -169,8 +169,9 @@ class Driver:
         if op == "wait_owner":
             self.sleep(self.budget.owner_wait(self.clock(), command.get("seconds", 15)))
             return {"cleanup_required": self.budget.cleanup(self.clock())}
-        self.budget.admit(self.clock(), cleanup, min(30, command.get("timeout", 30)))
-        self.operation_end = min(self.budget.commands_end, self.clock() + 30)
+        seconds = max(0, min(30, command.get("timeout", 30)))
+        self.budget.admit(self.clock(), cleanup, seconds)
+        self.operation_end = min(self.budget.commands_end, self.clock() + seconds)
         if op == "capture":
             if self.captures >= 8:
                 raise Refused("image ceiling reached")

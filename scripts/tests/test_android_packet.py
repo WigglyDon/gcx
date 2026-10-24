@@ -26,6 +26,7 @@ class Fixture:
     def __init__(self, root):
         self.now = 100
         self.calls = []
+        self.timeouts = []
         self.resumed, self.windows = RESUMED, WINDOW
         self.after_capture = None
         self.after_dump = None
@@ -41,6 +42,7 @@ class Fixture:
 
     def invoke(self, args, timeout):
         self.calls.append(args)
+        self.timeouts.append(timeout)
         if self.fail:
             raise subprocess.TimeoutExpired(args, timeout)
         joined = " ".join(args)
@@ -107,6 +109,13 @@ class PacketTests(unittest.TestCase):
         with self.assertRaises(packet.Refused):
             self.f.driver.execute({"op": "gcx_button", "text": "Resume", "cleanup": True})
         self.assertEqual(self.f.calls, [])
+
+    def test_requested_short_timeout_is_also_the_actual_operation_deadline(self):
+        self.f.now = self.f.budget.cleanup_at - 2
+        self.f.driver.execute({"op": "hash_files", "paths": ["files/gcx/card.raw"],
+                               "timeout": 1})
+        self.assertEqual(self.f.driver.operation_end, self.f.budget.cleanup_at - 1)
+        self.assertEqual(self.f.timeouts, [1])
 
     def test_resumed_and_focused_must_both_be_own_activity(self):
         for resumed, windows in ((RESUMED, f"mCurrentFocus=Window{{1 u0 {OTHER}}}"),

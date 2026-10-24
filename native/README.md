@@ -23,6 +23,19 @@ complete false-intent generation remain protected. Only a fresh authorized
 Pixel4 Pause → Resume → normal joined Stop can qualify the diagnostic candidate;
 accepted boot, library, TP and cold-return campaigns are not repeated.
 
+Diagnostic source `e8821ba9f485b318dea9180f8586b5eeaeb76a4e` produced private APK
+`9953d54c95b0186ceb5de1500fa8ba84b4ed69da7aaa26de67d4c91d9b56bc54`.
+Packaging, ARM64 ABI/JNI/dependency and 16KiB checks, signature, manifest,
+notices/resource audits and corresponding-source preservation passed. Compared
+with exact recovery APK `c7194951…`, 596 engine/C++ runtime/Sys/resource-inventory
+entries are byte-identical. Unstripped native fingerprint remains `d1280e0f…`,
+resource binding `9dd2e4e0…`, native ABI8/state ABI1; the separately preserved signer
+also matches. The latest protected generation again passed read-only validation
+with playing intent false. This proves binding compatibility, not a new device
+restore or Pause/Stop result. Original candidate, complete scene and ordinary-card
+archives are unchanged. Tests: 46 Rust library cases, warnings-denied host/Android
+lint, formatting and the helper's simulated foreground/deadline/hash regressions.
+
 ## Playing-intent Home return observed; later cleanup defect open
 
 Under Master6380607155, unchanged ABI8 directly left a playable unsaved WW
