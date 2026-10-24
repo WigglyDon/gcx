@@ -27,6 +27,17 @@ regressions22 pass, with relevant warnings-denied host/Android lint. The prepare
 behavior still needs automated bounded Pixel4 qualification under exclusive
 admission; installed9953d54c and all recovery material remain protected.
 
+Private source `1c50f105cdc84360a16a41cfbb0d93c5b8562930` / candidate APK
+`9901869071d82f5138f5b509fdc6ff9fdf0a0796d2cb9a8b50084d171704b889`
+(15,689,566bytes) passed package/ABI/alignment/signature/notices/resource audits
+and corresponding-source preservation. Its596 engine/runtime/resource entries
+are byte-identical to installed9953d54c; ABI8/stateABI1 and signer unchanged.
+Operator helper61d016e supports a fresh-image-bound single native button tap and
+one explicitly authorized initial ordinary app entry, with23 offline regressions.
+No new candidate installation or phone result: the latest shared receipt reports
+another task's reassignment and unverified return. No lease attempt or device
+query was made for this candidate, and no source/binary rebuild was repeated.
+
 ## Focused diagnostic Pause/Resume and joined Stop, 2026-10-24
 
 Installed diagnostic source `e8821ba` / APK `9953d54c…` under fresh exclusive
