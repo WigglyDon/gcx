@@ -52,6 +52,21 @@ will always run before process death. Preserve the last accepted checkpoint.
 
 ## Earned scene return and next guarded qualification
 
+[Master6379842357](https://github.com/WigglyDon/gcx/issues/2#issuecomment-6379842357)
+accepted the bounded ABI8 single-game evidence below and directed actual library
+switching next, without a repeated cold-return campaign or unchanged rebuild.
+The subsequent [library handback](https://github.com/WigglyDon/gcx/issues/2#issuecomment-6380451946)
+records actual scoped TP import and Wind Waker→Twilight Princess→Wind Waker in the
+same app process, with checkpoint/join before each next native owner, independent
+profiles/complete validated backups and direct return to WW's unsaved bridge/camera.
+The owner confirmed returned controls/sound and no audio bleed. TP title/menu and
+3D opening dialogue were observed; its interactive world and own scene return
+were not earned. Both final card identities and current metadata/SRAM were verified
+before app absence/displayOFF/keyguard/lease return. No Stop between switching steps.
+Real pin acceptance, OS pin observation and physical cold/warm/repeated/other-game
+taps remain separate and unrun. Qualify them after a fresh authorized window;
+do not repeat the completed WW single-game row. TP's own saved dialogue is retained.
+
 ABI8 source `0e5417e328383e0ba7ff0d3b0d5cf01bb3f5b744`, installed APK
 `c7194951d9420e45622c7eefb29baaa5365fec694e6cefa015a7049dc724e5c9`, subsequently
 earned the bounded Pixel4 intentional-pause cold-process scene return on2026-10-24.

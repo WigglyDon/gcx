@@ -1,5 +1,39 @@
 # Direct Dolphin integration
 
+## Pixel4 ABI8 actual library switching, 2026-10-24
+
+The unchanged ABI8 pair below completed actual gcx library
+Wind Waker→Twilight Princess→Wind Waker in one process. Initial ordinary quest
+loading was setup only. After capturing the unsaved side-on bridge/camera, gcx's
+Library/Import opened the stock scoped picker and the owner selected the TP RVZ
+already supplied on Pixel4. No Fold copy, new media, collection edit or reinstall.
+Distinct GameIds/SaveProfiles and checkpoint→native-join departures were observed
+before the next native owner. TP rendered its health screen and3D opening dialogue;
+owner confirmed title/menu sound/input, not interactive-world gameplay. Returning
+through the actual Library restored WW's captured unsaved scene directly, with
+owner-confirmed movement/action/C Stick, sound and no TP audio bleed. No Stop,
+Restart, game-menu load or process restart occurred between the games.
+
+Both complete generations were independently validated and protected before final
+cleanup: WW93,382,166byte payload/110,170,112byte archive; TP93,239,574byte
+payload/110,027,264byte archive. TP's expected media hash came from its protected
+transfer receipt and matched a fresh actual-file hash; its disc number was read
+independently from the RVZ disc header. Final actual card lengths/hashes matched
+the protected distinct16MiB card copies. Current collection/save-generation and
+both68byte SRAM files were captured in a7,168byte delta without repeating large
+snapshot transfers. The WW ordinary card stayed unchanged; TP progress was retained.
+
+TP boot/intro summaries contained unattributed outliers:613,091us source→dispatch,
+1,527,587us dispatch→pad and1,965,895us active poll gap. This is not steady-state
+latency or a smoothness pass. No speculative dwell/smoothing policy was added.
+Final normal Stop joined/released WW, leaving TP's dormant scene reference intact.
+Verified return2026-10-24 05:34:10UTC: app absent, displayOFF/keyguard and lease
+released, seven captures/248,890,850collected bytes, within the existing packet.
+All prior candidates/backups remain protected. Fold/siblings untouched.
+See [library handback](https://github.com/WigglyDon/gcx/issues/2#issuecomment-6380451946).
+TP's own scene return/B→A→B, real shortcut pins/taps, automatic paused=false cold
+return and a new ABI8 ordinary-save round trip remain unrun.
+
 ## Pixel4 ABI8 scene return, 2026-10-24
 
 Unchanged source `0e5417e328383e0ba7ff0d3b0d5cf01bb3f5b744` / installed APK

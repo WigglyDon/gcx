@@ -33,11 +33,12 @@ controls and retained pause intent. The newer ABI8 input/UI build rendered its
 controls and restored an unsaved Wind Waker scene in a genuinely new process on
 Pixel4, with intentional pause retained until Resume. The owner confirmed sound,
 movement/action, C Stick and control feel after restore. Its validated checkpoint
-generation and ordinary saves are privately backed up. The automatic unpaused-return
-variant, full control matrix and two-game return remain unqualified.
-A Rust saved-game list, validated
-GameId launcher links and system pin-request code are also built off-device;
-physical library and launcher tests remain due. See
+generation and ordinary saves are privately backed up. Actual library switching
+Wind Waker → Twilight Princess → Wind Waker returned the unsaved scene with
+owner-confirmed sound, controls and no audio bleed. Twilight Princess rendered its
+opening dialogue; its interactive world and own saved-scene return remain untested.
+Automatic unpaused return, the full control matrix and real launcher pins/taps
+remain unqualified. Rust GameId links and pin-request code are implemented. See
 [native reproduction and limits](native/README.md).
 
 GameCube is the initial scope. Dolphin's Wii capability is not a promise of Wii
