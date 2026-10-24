@@ -1,5 +1,29 @@
 # Direct Dolphin integration
 
+## Latest autonomous admission: return pending, 2026-10-24
+
+A fresh exclusive Pixel4 admission verified the unchanged installed99018690 APK,
+qualified stock build, collection and every file of the protected generation.
+Ordinary entry was scheduled, but the first capture refused missing/ambiguous
+focus metadata before retaining any image or issuing game input. The automatic
+cutoff correctly entered finalization on that refusal. Its existing private
+recovery script then hit a local existing-directory setup error; that error was
+repaired off-device without changing the deadline. The subsequent bounded return
+attempt independently verified/backed the current complete generation and both
+ordinary profiles (159,442,105 combined collected bytes), then REFUSED retirement
+because current-process native quiescence/publication was not established. No
+kill, normal Stop, joined teardown or safe physical return is claimed. Another
+actual transaction then owned Pixel4; the next diagnostic admission refused
+without querying it. Current gcx return remains pending. Do not preempt or call
+archive validation a completed handback.
+
+The source-only follow-up uses stock launch-wait within the same command timeout,
+retains bounded filtered focus-refusal metadata, and saves failed quiescence
+observations as well as successful proof before retirement.34 offline regressions
+pass. These improve the next diagnosis; absent original focus/log observations
+are not reconstructed or assigned a speculative cause. No new APK build, game
+input, launcher/Fold/sibling mutation or accepted-campaign repetition.
+
 ## Short automated follow-up and recovered return, 2026-10-24
 
 The installed99018690 APK was read back unchanged. A fresh12-minute exclusive

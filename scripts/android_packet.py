@@ -205,7 +205,18 @@ class Driver:
         if result.returncode:
             raise Refused("current focus metadata query failed")
         data = result.stdout.decode()
-        return focused_pair(data, data)
+        try:
+            return focused_pair(data, data)
+        except Refused:
+            failures = self.receipt.setdefault("focus_refusals", [])
+            if len(failures) < 8:
+                evidence = self.root / f"focus-refusal-{len(failures)}.private.txt"
+                with evidence.open("xb") as file:
+                    file.write(result.stdout)
+                evidence.chmod(0o600)
+                failures.append(str(evidence))
+                self.save()
+            raise
 
     def action(self, args):
         if self.actions >= 100:
@@ -280,15 +291,20 @@ class Driver:
             raise Refused("runtime process start changed")
         logs = self.call(["shell", f"logcat -d --pid={pid} -s gcx:I '*:S' | tail -64"]).stdout.decode()
         states = re.findall(r"native\.pause\.end (paused|playing)", logs)
-        if not states or states[-1] != "paused" or "Checkpoint complete:" not in logs:
-            raise Refused("current runtime quiescence/publication not observed")
-        evidence = self.root / f"retirement-quiescence-{len(self.receipt['operations'])}.private.txt"
+        observations = self.receipt.setdefault("retirement_observations", [])
+        if len(observations) >= 8:
+            raise Refused("retirement observation ceiling reached")
+        evidence = self.root / f"retirement-quiescence-{len(observations)}.private.txt"
         with evidence.open("xb") as file:
             file.write(logs.encode())
         evidence.chmod(0o600)
-        self.receipt["retirement_validation"] = {"archive_sha256": record["archive_sha256"],
-                                                "actual_file_sha256": hashes, "pid": pid,
-                                                "start_ticks": ticks, "quiescence": str(evidence)}
+        proof = {"archive_sha256": record["archive_sha256"], "actual_file_sha256": hashes,
+                 "pid": pid, "start_ticks": ticks, "quiescence": str(evidence)}
+        observations.append(proof)
+        self.save()
+        if not states or states[-1] != "paused" or "Checkpoint complete:" not in logs:
+            raise Refused("current runtime quiescence/publication not observed")
+        self.receipt["retirement_validation"] = proof
         self.save()
         result = self.action(["shell", "am", "force-stop", PACKAGE])
         if result.returncode or self.call(["shell", "pidof", PACKAGE]).stdout.strip():
@@ -393,7 +409,7 @@ class Driver:
                 self.mismatch = True
                 self.budget.forced_cleanup = True
                 raise Refused("unexpected app before launch; owner clarification required")
-            result = self.action(["shell", "am", "start", "--user", "0", "-a",
+            result = self.action(["shell", "am", "start", "-W", "--user", "0", "-a",
                                   "android.intent.action.MAIN", "-c",
                                   "android.intent.category.LAUNCHER", "-n", ACTIVITY])
             self.launched |= result.returncode == 0

@@ -186,6 +186,22 @@ class PacketTests(unittest.TestCase):
         self.assertIn("native.pause.end paused", Path(proof["quiescence"]).read_text())
         self.assertEqual(proof["actual_file_sha256"], self.f.retirement["hashes"])
 
+    def test_failed_quiescence_is_retained_without_retirement_then_retry_is_distinct(self):
+        command = self.prepare_retirement()
+        self.f.retirement["logs"] += "native.pause.end playing\n"
+        with self.assertRaises(packet.Refused):
+            self.f.driver.execute(command)
+        proof = self.f.driver.receipt["retirement_observations"][0]
+        self.assertIn("native.pause.end playing", Path(proof["quiescence"]).read_text())
+        self.assertNotIn("retirement_validation", self.f.driver.receipt)
+        self.assertFalse(any("force-stop" in c for c in self.f.calls))
+        self.f.retirement["logs"] += "native.pause.end paused\nCheckpoint complete: durable\n"
+        command.update(op="recover_checkpoint", cleanup=True)
+        self.f.driver.execute(command)
+        latest = self.f.driver.receipt["retirement_validation"]
+        self.assertNotEqual(latest["quiescence"], proof["quiescence"])
+        self.assertEqual(len(self.f.driver.receipt["retirement_observations"]), 2)
+
     def test_automated_cutoff_finalizes_instead_of_waiting_through_cleanup(self):
         budget = self.f.budget
         self.assertEqual(budget.input_boundary(budget.cleanup_at - 1, True), budget.cleanup_at)
@@ -366,6 +382,9 @@ class PacketTests(unittest.TestCase):
             self.f.driver.execute({"op": "capture", "name": "missing-focus.png"})
         self.assertFalse(any("screencap" in c for c in self.f.calls))
         self.assertFalse(list(Path(self.temp.name).glob("*.png")))
+        proof = self.f.driver.receipt["focus_refusals"]
+        self.assertEqual(len(proof), 1)
+        self.assertIn("mFocusedApp=", Path(proof[0]).read_text())
 
     def test_raw_batches_and_option_variants_cannot_bypass_guards(self):
         for args in (["shell", "input", "--display", "0", "tap", "1", "2"],
@@ -391,6 +410,7 @@ class PacketTests(unittest.TestCase):
         self.f.windows = WINDOW.replace(OWN + "/" + OWN + ".GcxActivity", OTHER)
         self.f.driver.execute({"op": "launch", "initial_entry": True})
         self.assertEqual(sum("am" in c for c in self.f.calls), 1)
+        self.assertIn("-W", next(c for c in self.f.calls if "am" in c))
         with self.assertRaises(packet.Refused):
             self.f.driver.execute({"op": "launch", "initial_entry": True})
         self.assertEqual(sum("am" in c for c in self.f.calls), 1)

@@ -97,6 +97,9 @@ exception is consumed by a launch or own-UI observation and never overrides a
 later mismatch. Subsequent unexpected foreground ends new work. Raw UI/capture/hash
 batches are refused. Hashing uses nonempty, validated literal own-file arguments,
 never a quoted `sh -c` string or an input-less hash command.
+Ordinary entry uses stock `am start -W` within the operation timeout, rather than
+assuming that a scheduled launch already has a focused window. Missing/ambiguous
+focus still refuses; retain at most eight filtered metadata failures privately.
 
 The helper does not kill an unverified live writer to simulate Stop. It records
 pending recovery before releasing custody if normal cleanup cannot complete.
@@ -110,6 +113,9 @@ as a substitute. A separately named cleanup-only `recover_checkpoint` keeps all
 those proof gates and records controlled recovery, never normal Stop. Save actual
 current hash/process/quiescence observations before retirement. Any changed data/process or missing quiescence refuses before
 retirement and ends new test work. Raw process/UI batches remain refused.
+Keep failed quiescence observations too, with distinct bounded evidence names;
+missing proof must leave the writer intact and its return pending. A successful
+archive inspection alone never authorizes process retirement or safe handback.
 Timeout means no further device commands from that helper. Clean Stop metadata,
 native join/profile release, own-client absence and physical display/keyguard
 return are separate observations; a helper flag alone is not acceptance. Confirm
