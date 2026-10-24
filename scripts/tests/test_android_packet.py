@@ -232,6 +232,15 @@ class PacketTests(unittest.TestCase):
             self.f.driver.execute({"op": "launch"})
         self.assertFalse(any("am" in c for c in self.f.calls))
 
+    def test_authorized_initial_own_entry_cannot_override_later_mismatch(self):
+        self.f.resumed = RESUMED.replace(OWN + "/.GcxActivity", OTHER)
+        self.f.windows = WINDOW.replace(OWN + "/" + OWN + ".GcxActivity", OTHER)
+        self.f.driver.execute({"op": "launch", "initial_entry": True})
+        self.assertEqual(sum("am" in c for c in self.f.calls), 1)
+        with self.assertRaises(packet.Refused):
+            self.f.driver.execute({"op": "launch", "initial_entry": True})
+        self.assertEqual(sum("am" in c for c in self.f.calls), 1)
+
     def test_hashing_always_has_literal_file_arguments(self):
         paths = ["files/gcx/profiles/fixture/cards/MemoryCardA.USA.raw"]
         args = packet.hash_arguments(paths)

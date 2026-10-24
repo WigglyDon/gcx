@@ -141,6 +141,8 @@ class Driver:
         self.actions, self.captures, self.received = 0, 0, 0
         self.mismatch = False
         self.last_capture = None
+        self.own_ui_observed = False
+        self.launched = False
         self.receipt = {"started": time.time(), "operations": [], "handback": False,
                         "phase": "admitted", "recovery_resolved": False}
 
@@ -174,7 +176,9 @@ class Driver:
         a = self.call(["shell", "dumpsys activity activities | grep -E 'Display #[0-9]+|mResumedActivity:|topResumedActivity='"])
         w = self.call(["shell", "dumpsys window displays | grep -E 'Display:|mCurrentFocus=|mTopFocusedDisplayId=|DisplayFrames'"])
         try:
-            return own_focus(a.stdout.decode(), w.stdout.decode())
+            observed = own_focus(a.stdout.decode(), w.stdout.decode())
+            self.own_ui_observed = True
+            return observed
         except Refused:
             self.mismatch = True
             self.budget.forced_cleanup = True
@@ -270,13 +274,16 @@ class Driver:
             w = self.call(["shell", "dumpsys window displays | grep -E 'Display:|mCurrentFocus=|mTopFocusedDisplayId=|DisplayFrames'"])
             current, _ = focused_pair(a.stdout.decode(), w.stdout.decode())
             home = self.call(["shell", "cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME"])
-            if current not in (component(home.stdout.decode()), (PACKAGE, PACKAGE + ".GcxActivity")) and not command.get("owner_reconfirmed"):
+            initial = (command.get("initial_entry") and not self.launched
+                       and not self.own_ui_observed and not self.mismatch)
+            if current not in (component(home.stdout.decode()), (PACKAGE, PACKAGE + ".GcxActivity")) and not (initial or command.get("owner_reconfirmed")):
                 self.mismatch = True
                 self.budget.forced_cleanup = True
                 raise Refused("unexpected app before launch; owner clarification required")
             result = self.action(["shell", "am", "start", "--user", "0", "-a",
                                   "android.intent.action.MAIN", "-c",
                                   "android.intent.category.LAUNCHER", "-n", ACTIVITY])
+            self.launched |= result.returncode == 0
         elif op == "system":
             step = command["step"]
             if step == "home":

@@ -81,7 +81,10 @@ and focus, observed bounds, and a ten-second freshness limit. Each tap consumes
 that capture; historical coordinates and batches are refused. Cleanup permits
 only native Pause and framework Stop. A mismatch ends new work; unexpected app content
 is not retained. Home, nonsecure wake and ordinary app entry are separate named
-steps; unexpected foreground requires owner clarification. Raw UI/capture/hash
+steps. An admitted autonomous packet may explicitly authorize its initial ordinary
+gcx entry from the freshly observed foreground, preserving that app's state; this
+exception is consumed by a launch or own-UI observation and never overrides a
+later mismatch. Subsequent unexpected foreground ends new work. Raw UI/capture/hash
 batches are refused. Hashing uses nonempty, validated literal own-file arguments,
 never a quoted `sh -c` string or an input-less hash command.
 
