@@ -366,10 +366,10 @@ extern "C" fn draw(phase: u32, width: f32, height: f32, aspect: f32) -> Rect {
                 ui.stick_center(gcx::Control::StickX),
                 ui.stick_center(gcx::Control::CX),
             ];
-            (geometry, pad, centers, fresh)
+            (geometry, pad, centers, fresh, ui.controls_opacity())
         })
     };
-    let Some((geometry, pad, centers, fresh)) = observed else {
+    let Some((geometry, pad, centers, fresh, opacity)) = observed else {
         if !MISSING_PRESENT_REPORTED.swap(true, Ordering::Relaxed) {
             platform::trace_geometry("present.unavailable");
         }
@@ -396,19 +396,33 @@ extern "C" fn draw(phase: u32, width: f32, height: f32, aspect: f32) -> Rect {
         let value = |control: gcx::Control| pad.values()[control as usize] as f32;
         // SAFETY: called on the video thread with the donor ImGui frame active.
         unsafe {
+            let circle =
+                |x, y, r, color| gcx_ui_circle(x, y, r, gcx::presentation::opacity(color, opacity));
+            let rectangle = |l, t, r, b, color| {
+                gcx_ui_rect(l, t, r, b, gcx::presentation::opacity(color, opacity))
+            };
+            let text = |x, y, font, label, color| {
+                gcx_ui_text(
+                    x,
+                    y,
+                    font,
+                    label,
+                    gcx::presentation::opacity(color, opacity),
+                )
+            };
             for zone in &layout.zones {
                 let a = zone.area;
                 let (x, y) = a.center();
-                let radius = (a.right - a.left) * 0.5;
+                let radius = (a.right - a.left).min(a.bottom - a.top) * 0.5;
                 match zone.target {
                     Target::Stick(cx, cy) => {
                         let (x, y) = centers[usize::from(cx == gcx::Control::CX)].unwrap_or((x, y));
-                        gcx_ui_circle(x, y, radius, 0x708f9298);
-                        gcx_ui_circle(x, y, radius - 1.5 * geometry.density, 0xc026292e);
+                        circle(x, y, radius, 0x708f9298);
+                        circle(x, y, radius - 1.5 * geometry.density, 0xc026292e);
                         let reach = radius * 0.64;
                         let knob_x = x + value(cx) * reach;
                         let knob_y = y - value(cy) * reach;
-                        gcx_ui_circle(
+                        circle(
                             knob_x,
                             knob_y,
                             radius * 0.36,
@@ -420,7 +434,7 @@ extern "C" fn draw(phase: u32, width: f32, height: f32, aspect: f32) -> Rect {
                         );
                         if cx == gcx::Control::CX {
                             let font = radius * 0.4;
-                            gcx_ui_text(
+                            text(
                                 knob_x - font * 0.3,
                                 knob_y - font * 0.5,
                                 font,
@@ -432,21 +446,71 @@ extern "C" fn draw(phase: u32, width: f32, height: f32, aspect: f32) -> Rect {
                     }
                     Target::Button(control) => {
                         let color = zone.target.color();
-                        let color = if value(control) > 0.0 {
-                            0xffeeeeee
+                        if matches!(control, gcx::Control::X | gcx::Control::Y) {
+                            // Original GameCube auxiliary-cap silhouettes,
+                            // inside the same generous rectangular hit target.
+                            let (w, h) = if control == gcx::Control::X {
+                                ((a.right - a.left) * 0.72, a.bottom - a.top)
+                            } else {
+                                (a.right - a.left, (a.bottom - a.top) * 0.72)
+                            };
+                            let pill = |w: f32, h: f32, color| {
+                                let r = w.min(h) * 0.5;
+                                if w > h {
+                                    rectangle(
+                                        x - w / 2.0 + r,
+                                        y - h / 2.0,
+                                        x + w / 2.0 - r,
+                                        y + h / 2.0,
+                                        color,
+                                    );
+                                    circle(x - w / 2.0 + r, y, r, color);
+                                    circle(x + w / 2.0 - r, y, r, color);
+                                } else {
+                                    rectangle(
+                                        x - w / 2.0,
+                                        y - h / 2.0 + r,
+                                        x + w / 2.0,
+                                        y + h / 2.0 - r,
+                                        color,
+                                    );
+                                    circle(x, y - h / 2.0 + r, r, color);
+                                    circle(x, y + h / 2.0 - r, r, color);
+                                }
+                            };
+                            pill(
+                                w,
+                                h,
+                                if value(control) > 0.0 {
+                                    0xffeeeeee
+                                } else {
+                                    0xa0d1d4db
+                                },
+                            );
+                            pill(
+                                w - 2.4 * geometry.density,
+                                h - 2.4 * geometry.density,
+                                color,
+                            );
+                        } else if (a.right - a.left - (a.bottom - a.top)).abs() < 1.0 {
+                            circle(
+                                x,
+                                y,
+                                radius,
+                                if value(control) > 0.0 {
+                                    0xffeeeeee
+                                } else {
+                                    0xa0d1d4db
+                                },
+                            );
+                            circle(x, y, radius - 1.2 * geometry.density, color);
                         } else {
-                            color
-                        };
-                        if (a.right - a.left - (a.bottom - a.top)).abs() < 1.0 {
-                            gcx_ui_circle(x, y, radius, 0xa0d1d4db);
-                            gcx_ui_circle(x, y, radius - 1.2 * geometry.density, color);
-                        } else {
-                            gcx_ui_rect(a.left, a.top, a.right, a.bottom, color);
+                            rectangle(a.left, a.top, a.right, a.bottom, color);
                         }
                     }
                     Target::Travel(control) => {
-                        gcx_ui_rect(a.left, a.top, a.right, a.bottom, 0xe0475057);
-                        gcx_ui_rect(
+                        rectangle(a.left, a.top, a.right, a.bottom, 0xe0475057);
+                        rectangle(
                             a.left,
                             a.bottom - (a.bottom - a.top) * 0.25,
                             a.left + (a.right - a.left) * value(control),
@@ -456,7 +520,7 @@ extern "C" fn draw(phase: u32, width: f32, height: f32, aspect: f32) -> Rect {
                     }
                     Target::Dpad => {
                         let step = (a.right - a.left) / 3.0;
-                        gcx_ui_rect(
+                        rectangle(
                             a.left + step,
                             a.top + step,
                             a.right - step,
@@ -469,7 +533,7 @@ extern "C" fn draw(phase: u32, width: f32, height: f32, aspect: f32) -> Rect {
                             (gcx::Control::Left, a.left, a.top + step),
                             (gcx::Control::Right, a.right - step, a.top + step),
                         ] {
-                            gcx_ui_rect(
+                            rectangle(
                                 left,
                                 top,
                                 left + step,
@@ -483,14 +547,14 @@ extern "C" fn draw(phase: u32, width: f32, height: f32, aspect: f32) -> Rect {
                         }
                         continue;
                     }
-                    Target::Pause => gcx_ui_rect(a.left, a.top, a.right, a.bottom, 0xb03c3b3a),
+                    Target::Pause => rectangle(a.left, a.top, a.right, a.bottom, 0xb03c3b3a),
                 }
                 let count = zone.label.to_bytes().len() as f32;
                 let density = geometry.density;
                 let font = ((a.bottom - a.top) * 0.4)
                     .min((a.right - a.left) / (count * 0.65 + 1.0))
                     .clamp(10.0 * density, 32.0 * density);
-                gcx_ui_text(
+                text(
                     x - count * font * 0.3,
                     y - font * 0.5,
                     font,
@@ -690,6 +754,19 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
         .ok_or("private storage unavailable")?
         .join("gcx");
     std::fs::create_dir_all(&root)?;
+    match gcx::controls::Settings::load(&root) {
+        Ok(settings) => {
+            if let Ok(mut ui) = UI.lock() {
+                ui.configure_controls(settings);
+            }
+        }
+        Err(_) => {
+            if let Ok(mut ui) = UI.lock() {
+                ui.configure_controls(gcx::controls::Settings::default());
+            }
+            platform::push(Command::Notice("Could not load touch controls. Defaults are in use; the original settings file is retained.".into()));
+        }
+    }
     let sys = resources(app, &root)?;
     platform::diagnostic("Resources ready; loading collection");
     let mut collection = load_collection(&root)?;
@@ -894,6 +971,11 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                                     }
                                     // No UI lock crosses JNI menu posting or native quiescence.
                                     if let Some(hit) = report {
+                                        if matches!(hit, DownReport::Captured | DownReport::Pause)
+                                            && UI.lock().is_ok_and(|ui| ui.haptics())
+                                        {
+                                            platform::haptic(app);
+                                        }
                                         let detail = format!("admitted result={hit:?}");
                                         if hit == DownReport::Captured {
                                             platform::trace_input(&detail);
@@ -982,6 +1064,56 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
             };
             match command {
                 Command::NativeError { .. } | Command::Game(_) => continue,
+                Command::Controls(menu, width, height) => {
+                    if !platform::menu_current(menu) {
+                        continue;
+                    }
+                    hidden = false;
+                    if let Some(index) = selected.filter(|_| runtime.is_some()) {
+                        collection.entries[index].paused = true;
+                    }
+                    pause_for_background(
+                        &root,
+                        &mut runtime,
+                        &mut collection,
+                        selected,
+                        &mut native_paused,
+                    );
+                    let settings = UI
+                        .lock()
+                        .map(|ui| ui.controls())
+                        .map_err(|_| "controls lock poisoned")?;
+                    platform::controls_menu(
+                        app,
+                        runtime.as_ref().map_or(0, |r| r.events.epoch),
+                        width,
+                        height,
+                        settings,
+                    );
+                }
+                Command::ApplyControls(menu, settings) => {
+                    if !platform::menu_current(menu) {
+                        continue;
+                    }
+                    if settings.save(&root).is_ok() {
+                        if let Ok(mut ui) = UI.lock() {
+                            ui.configure_controls(settings);
+                        }
+                        platform::push(Command::Library);
+                    } else {
+                        platform::notice(app,"Could not confirm saved controls. Your game is paused and your draft is kept so you can retry.".into());
+                    }
+                }
+                Command::ControlsBack(menu) => {
+                    if platform::menu_current(menu) {
+                        platform::push(Command::Library);
+                    }
+                }
+                Command::About(menu) => {
+                    if platform::menu_current(menu) {
+                        platform::about_menu(app);
+                    }
+                }
                 Command::Library => {
                     hidden = false;
                     if let Some(index) = selected.filter(|_| runtime.is_some()) {
@@ -999,7 +1131,22 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                         collection
                             .entries
                             .iter()
-                            .map(|e| (e.game_id.0.clone(), e.title.clone()))
+                            .map(|e| {
+                                let status = if e.restart_required {
+                                    "Needs attention"
+                                } else if e.checkpoint.is_some() && !e.stopped {
+                                    "Resume saved scene"
+                                } else {
+                                    "Play · in-game saves kept"
+                                };
+                                (
+                                    e.game_id.0.clone(),
+                                    format!(
+                                        "{}\n{status}",
+                                        gcx::presentation::game_title(&e.title)
+                                    ),
+                                )
+                            })
                             .collect(),
                         runtime.as_ref().map(|r| r.events.epoch),
                         selected.is_some_and(|i| !collection.entries[i].restart_required),

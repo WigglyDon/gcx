@@ -307,3 +307,27 @@ Multiple paused resident processes are future optimization, not the baseline.
 Declare bounded Android components only if justified; each worker gets one core
 and exclusive storage. Android may reclaim them. Checkpoint recovery must work
 without residency. No fake foreground audio, silent service or security weakening.
+
+## First alpha controls and presentation
+
+Rust owns the branded native menu, per-screen control editor and independent test
+pad. Small Java View/Canvas/SeekBar callbacks forward platform data only. Editor
+state is guarded by Activity/menu generations. It cannot feed LiveRuntime; native
+pause/checkpoint ownership remains with the existing Rust runtime owner.
+
+`controls.json` is app preference data, separate from SavedSession/SaveProfile.
+Validated, bounded profiles address named GameCube targets using normalized
+control-safe rectangles. A whole valid profile is admitted at presentation;
+unknown/colliding/tiny overrides fall back together. Apply atomically saves before
+changing the active settings; it cancels old input and requires fresh geometry.
+Save checks the current measured screen on Android's main thread, without
+mistaking dialog focus loss for a change of physical display. Layout edits remain
+separate for different screen sizes. Reset removes only this screen's overrides.
+Corrupt settings stay intact and are reported; a settings failure does not reset
+cards/checkpoints or silently restart a game.
+
+Opacity is decorative. Adjustable radial dead zone and following-stick policy
+retain the GameCube gate, independent analog travel/clicks and actual native-poll
+press consumption. No smoothing/dwell or visual animation delays logical input.
+Haptic requests respect Android's own preference and require no extra permission.
+The render/input hot path does not clone persisted profiles each frame.

@@ -18,6 +18,8 @@ use std::{
 };
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+#[path = "controls_ui.rs"]
+mod controls_ui;
 #[link(name = "log")]
 unsafe extern "C" {
     fn __android_log_write(priority: i32, tag: *const c_char, text: *const c_char) -> i32;
@@ -147,6 +149,10 @@ pub enum Command {
     Stop(u64),
     Open,
     Library,
+    Controls(u64, f32, f32),
+    ApplyControls(u64, gcx::controls::Settings),
+    ControlsBack(u64),
+    About(u64),
     Game(String),
     PinCurrent,
     Selected(String),
@@ -741,19 +747,27 @@ pub fn menu(app: &AndroidApp, show: bool, message: Option<String>) {
         actions.push((2, "Restart with current saves".to_owned()));
     }
     actions.push((6, "Library".to_owned()));
-    actions.push((1, "Import a GameCube game".to_owned()));
+    actions.push((1, "Add game".to_owned()));
+    actions.push((8, "Touch controls".to_owned()));
+    actions.push((9, "About gcx".to_owned()));
     render_menu(
         app,
         show,
-        message.unwrap_or_else(|| "gcx\n\nChoose a GameCube game".into()),
+        message.unwrap_or_else(|| {
+            "Your games\nAdd a GameCube game. Your progress stays with it.".into()
+        }),
         actions,
         0,
     );
 }
 pub fn unloaded_menu(app: &AndroidApp, title: &str, error: Option<String>) {
     let recovery = error.is_some();
-    let text =
-        error.unwrap_or_else(|| format!("gcx\n\n{title}\n\nGame stopped · in-game saves kept"));
+    let text = error.unwrap_or_else(|| {
+        format!(
+            "{}\nGame stopped · in-game saves kept",
+            gcx::presentation::game_title(title)
+        )
+    });
     render_menu(
         app,
         true,
@@ -769,7 +783,8 @@ pub fn unloaded_menu(app: &AndroidApp, title: &str, error: Option<String>) {
             ),
             (7, "Add game to Home screen".into()),
             (6, "Library".into()),
-            (1, "Import a GameCube game".into()),
+            (1, "Add game".into()),
+            (8, "Touch controls".into()),
         ],
         0,
     );
@@ -778,7 +793,7 @@ pub fn player_menu(app: &AndroidApp, runtime: u64, can_resume: bool, error: Opti
     let mut text = error
         .map(|s| format!("Paused\n\n{s}"))
         .unwrap_or_else(|| "Paused".into());
-    text.push_str("\n\nStop game discards this resume point. Save in-game first to keep progress.");
+    text.push_str("\nYour place is kept while paused. Stop game discards this resume point; save in-game to keep progress.");
     let mut actions = Vec::new();
     if can_resume {
         actions.push((3, "Resume".into()));
@@ -788,10 +803,140 @@ pub fn player_menu(app: &AndroidApp, runtime: u64, can_resume: bool, error: Opti
     actions.push((4, "Stop game".into()));
     actions.push((7, "Add game to Home screen".into()));
     actions.push((6, "Library".into()));
+    actions.push((8, "Touch controls".into()));
     render_menu(app, true, text, actions, runtime);
 }
 pub fn menu_current(generation: u64) -> bool {
     MENU_GENERATION.load(Ordering::Acquire) == generation
+}
+pub fn haptic(app: &AndroidApp) {
+    let epoch = EPOCH.load(Ordering::Acquire);
+    app.run_on_java_main_thread(Box::new(move || {
+        if EPOCH.load(Ordering::Acquire) != epoch {
+            return;
+        }
+        let result = with_env(|env, activity| {
+            let window = env
+                .call_method(activity, "getWindow", "()Landroid/view/Window;", &[])?
+                .l()?;
+            let view = env
+                .call_method(window, "getDecorView", "()Landroid/view/View;", &[])?
+                .l()?;
+            if env.call_method(&view, "hasWindowFocus", "()Z", &[])?.z()? {
+                // VIRTUAL_KEY respects the system's own feedback preference.
+                env.call_method(view, "performHapticFeedback", "(I)Z", &[JValue::Int(1)])?;
+            }
+            Ok(())
+        });
+        if result.is_err() {
+            let _ = with_env(|env, _| {
+                env.exception_clear()?;
+                Ok(())
+            });
+        }
+    }));
+}
+fn menu_caption(
+    env: &mut JNIEnv<'_>,
+    activity: &JObject<'_>,
+    parent: &JObject<'_>,
+    text: &str,
+    size: f32,
+    color: u32,
+) -> Result<()> {
+    let view = env.new_object(
+        "android/widget/TextView",
+        "(Landroid/content/Context;)V",
+        &[JValue::Object(activity)],
+    )?;
+    let text = env.new_string(text)?;
+    env.call_method(
+        &view,
+        "setText",
+        "(Ljava/lang/CharSequence;)V",
+        &[JValue::Object(&text)],
+    )?;
+    env.call_method(&view, "setTextSize", "(F)V", &[JValue::Float(size)])?;
+    env.call_method(&view, "setTextColor", "(I)V", &[JValue::Int(color as i32)])?;
+    env.call_method(
+        parent,
+        "addView",
+        "(Landroid/view/View;)V",
+        &[JValue::Object(&view)],
+    )?;
+    Ok(())
+}
+fn menu_background(
+    env: &mut JNIEnv<'_>,
+    view: &JObject<'_>,
+    color: u32,
+    density: f32,
+) -> Result<()> {
+    let shape = env.new_object("android/graphics/drawable/GradientDrawable", "()V", &[])?;
+    env.call_method(&shape, "setColor", "(I)V", &[JValue::Int(color as i32)])?;
+    env.call_method(
+        &shape,
+        "setCornerRadius",
+        "(F)V",
+        &[JValue::Float(16. * density)],
+    )?;
+    let colors = env
+        .call_static_method(
+            "android/content/res/ColorStateList",
+            "valueOf",
+            "(I)Landroid/content/res/ColorStateList;",
+            &[JValue::Int(0x287fba87)],
+        )?
+        .l()?;
+    let ripple=env.new_object("android/graphics/drawable/RippleDrawable","(Landroid/content/res/ColorStateList;Landroid/graphics/drawable/Drawable;Landroid/graphics/drawable/Drawable;)V",&[JValue::Object(&colors),JValue::Object(&shape),JValue::Object(&JObject::null())])?;
+    env.call_method(
+        view,
+        "setBackground",
+        "(Landroid/graphics/drawable/Drawable;)V",
+        &[JValue::Object(&ripple)],
+    )?;
+    Ok(())
+}
+fn menu_game_label<'a>(env: &mut JNIEnv<'a>, text: &str) -> Result<JObject<'a>> {
+    let value = env.new_string(text)?;
+    let rich = env.new_object(
+        "android/text/SpannableString",
+        "(Ljava/lang/CharSequence;)V",
+        &[JValue::Object(&value)],
+    )?;
+    if let Some((title, _)) = text.split_once('\n') {
+        let end = title.encode_utf16().count() as i32;
+        let length = text.encode_utf16().count() as i32;
+        let weight = env.new_object("android/text/style/StyleSpan", "(I)V", &[JValue::Int(1)])?;
+        let color = env.new_object(
+            "android/text/style/ForegroundColorSpan",
+            "(I)V",
+            &[JValue::Int(gcx::presentation::MUTED as i32)],
+        )?;
+        let size = env.new_object(
+            "android/text/style/RelativeSizeSpan",
+            "(F)V",
+            &[JValue::Float(0.875)],
+        )?;
+        for (span, start, finish) in [
+            (&weight, 0, end),
+            (&color, end + 1, length),
+            (&size, end + 1, length),
+        ] {
+            env.call_method(
+                &rich,
+                "setSpan",
+                "(Ljava/lang/Object;III)V",
+                &[
+                    JValue::Object(span),
+                    JValue::Int(start),
+                    JValue::Int(finish),
+                    JValue::Int(33),
+                ],
+            )?;
+        }
+    }
+    Ok(rich)
 }
 fn render_menu(
     app: &AndroidApp,
@@ -800,7 +945,7 @@ fn render_menu(
     actions: Vec<(i32, String)>,
     runtime: u64,
 ) {
-    render_menu_with_games(app, show, text, actions, runtime, Vec::new());
+    render_menu_with_games(app, show, text, actions, runtime, Vec::new(), None);
 }
 pub fn library_menu(
     app: &AndroidApp,
@@ -809,22 +954,48 @@ pub fn library_menu(
     can_resume: bool,
 ) {
     let mut actions = Vec::new();
+    actions.push((8, "Touch controls".into()));
+    actions.push((9, "About gcx".into()));
     if let Some(epoch) = runtime {
         if can_resume {
             actions.push((3, "Resume current game".into()));
         }
         actions.push((4, "Stop current game".into()));
-        actions.push((1, "Import a GameCube game".into()));
-        render_menu_with_games(app, true, "gcx library".into(), actions, epoch, games);
+        actions.push((1, "Add game".into()));
+        render_menu_with_games(
+            app,
+            true,
+            "Your games\nPick up where you left off.".into(),
+            actions,
+            epoch,
+            games,
+            None,
+        );
     } else {
-        actions.push((1, "Import a GameCube game".into()));
+        actions.push((1, "Add game".into()));
         let text = if games.is_empty() {
-            "gcx library\n\nImport a local GameCube game to begin."
+            "Your games\nAdd a GameCube game. Your progress stays with it."
         } else {
-            "gcx library"
+            "Your games\nPick up where you left off."
         };
-        render_menu_with_games(app, true, text.into(), actions, 0, games);
+        render_menu_with_games(app, true, text.into(), actions, 0, games, None);
     }
+}
+pub fn controls_menu(
+    app: &AndroidApp,
+    runtime: u64,
+    width: f32,
+    height: f32,
+    settings: gcx::controls::Settings,
+) {
+    controls_ui::show(
+        app,
+        runtime,
+        gcx::controls::Editor::new(width, height, settings),
+    );
+}
+pub fn about_menu(app: &AndroidApp) {
+    render_menu(app,true,"gcx\nAlpha 1 · GameCube\n\nYour games. Open, play, leave, return.\nMade by Machine Rhythm.\n\nBuilt with Dolphin. Original gcx work is MIT; Dolphin and the combined distribution retain GPL-2.0-or-later terms.\nSource and notices: github.com/WigglyDon/gcx".into(),vec![(6,"Back to your games".into())],0);
 }
 fn render_menu_with_games(
     app: &AndroidApp,
@@ -833,9 +1004,12 @@ fn render_menu_with_games(
     actions: Vec<(i32, String)>,
     runtime: u64,
     games: Vec<(String, String)>,
+    controls: Option<gcx::controls::Editor>,
 ) {
     let epoch = EPOCH.load(Ordering::Acquire);
     let generation = MENU_GENERATION.fetch_add(1, Ordering::AcqRel) + 1;
+    let editing = controls.is_some();
+    controls_ui::bind(controls, generation, epoch);
     trace(
         runtime,
         generation,
@@ -913,14 +1087,31 @@ fn render_menu_with_games(
                     "(Landroid/content/Context;)V",
                     &[JValue::Object(activity)],
                 )?;
-                let text = env.new_string(text)?;
+                menu_caption(
+                    env,
+                    activity,
+                    &view,
+                    "gcx   /   ALPHA 1",
+                    30.0,
+                    gcx::presentation::TEXT,
+                )?;
+                menu_caption(
+                    env,
+                    activity,
+                    &view,
+                    "Machine Rhythm · GameCube",
+                    13.0,
+                    gcx::presentation::MUTED,
+                )?;
+                let (heading, detail) = text.split_once('\n').unwrap_or((&text, ""));
+                let text = env.new_string(heading)?;
                 env.call_method(
                     &label,
                     "setText",
                     "(Ljava/lang/CharSequence;)V",
                     &[JValue::Object(&text)],
                 )?;
-                env.call_method(&label, "setTextSize", "(F)V", &[JValue::Float(18.0)])?;
+                env.call_method(&label, "setTextSize", "(F)V", &[JValue::Float(23.0)])?;
                 env.call_method(&label, "setGravity", "(I)V", &[JValue::Int(3)])?;
                 env.call_method(
                     &label,
@@ -944,9 +1135,49 @@ fn render_menu_with_games(
                     &view,
                     "setBackgroundColor",
                     "(I)V",
-                    &[JValue::Int(0xff11161c_u32 as i32)],
+                    &[JValue::Int(gcx::presentation::BACKGROUND as i32)],
                 )?;
+                if !detail.is_empty() {
+                    menu_caption(
+                        env,
+                        activity,
+                        &view,
+                        detail.trim(),
+                        14.0,
+                        gcx::presentation::MUTED,
+                    )?;
+                }
+                if editing {
+                    controls_ui::append(env, activity, &view, density, generation)?;
+                }
+                let footer = if editing {
+                    let row = env.new_object(
+                        "android/widget/LinearLayout",
+                        "(Landroid/content/Context;)V",
+                        &[JValue::Object(activity)],
+                    )?;
+                    env.call_method(&row, "setOrientation", "(I)V", &[JValue::Int(0)])?;
+                    row
+                } else {
+                    JObject::null()
+                };
                 // Public PSX's game-first column: entries precede auxiliary actions.
+                let first_add = games.is_empty()
+                    && runtime == 0
+                    && !actions.iter().any(|(a, _)| matches!(a, 3 | 5 | 10));
+                let mut actions = actions;
+                if !editing {
+                    actions.sort_by_key(|(a, _)| match a {
+                        3 | 5 => 0,
+                        1 => 1,
+                        6 => 2,
+                        8 => 3,
+                        9 => 4,
+                        7 => 5,
+                        4 => 9,
+                        _ => 6,
+                    });
+                }
                 let rows = games
                     .into_iter()
                     .map(|(game, title)| (None, Some(game), title))
@@ -967,33 +1198,90 @@ fn render_menu_with_games(
                         env.call_method(&button, "setAllCaps", "(Z)V", &[JValue::Bool(0)])?;
                         env.call_method(&button, "setTextSize", "(F)V", &[JValue::Float(16.0)])?;
                         env.call_method(&button, "setMinHeight", "(I)V", &[JValue::Int(dp(56.0))])?;
+                        let primary =
+                            matches!(action, Some(3 | 5 | 10)) || (first_add && action == Some(1));
+                        let color = if primary {
+                            gcx::presentation::ACCENT
+                        } else {
+                            gcx::presentation::SURFACE
+                        };
+                        let ink = if primary {
+                            gcx::presentation::INK
+                        } else if action == Some(4) {
+                            gcx::presentation::DANGER
+                        } else {
+                            gcx::presentation::TEXT
+                        };
                         env.call_method(
                             &button,
                             "setTextColor",
                             "(I)V",
-                            &[JValue::Int(0xffeef2f6_u32 as i32)],
+                            &[JValue::Int(ink as i32)],
                         )?;
-                        let color = match action {
-                            Some(3 | 5) => 0xff315b64_u32,
-                            Some(4) => 0xff57363e,
-                            _ if game.is_some() => 0xff253c45,
-                            _ => 0xff26313b,
-                        };
-                        let tint = env
-                            .call_static_method(
-                                "android/content/res/ColorStateList",
-                                "valueOf",
-                                "(I)Landroid/content/res/ColorStateList;",
-                                &[JValue::Int(color as i32)],
-                            )?
-                            .l()?;
+                        env.call_method(&button, "setGravity", "(I)V", &[JValue::Int(3 | 16)])?;
                         env.call_method(
                             &button,
-                            "setBackgroundTintList",
-                            "(Landroid/content/res/ColorStateList;)V",
-                            &[JValue::Object(&tint)],
+                            "setPadding",
+                            "(IIII)V",
+                            &[
+                                JValue::Int(dp(20.)),
+                                JValue::Int(dp(12.)),
+                                JValue::Int(dp(20.)),
+                                JValue::Int(dp(12.)),
+                            ],
                         )?;
-                        let text = env.new_string(text)?;
+                        let tag = env.new_string(format!("gcx-action-{}", action.unwrap_or(0)))?;
+                        env.call_method(
+                            &button,
+                            "setTag",
+                            "(Ljava/lang/Object;)V",
+                            &[JValue::Object(&tag)],
+                        )?;
+                        menu_background(env, &button, color, density)?;
+                        let footer_action = editing && matches!(action, Some(10 | 11));
+                        let params = if footer_action {
+                            env.new_object(
+                                "android/widget/LinearLayout$LayoutParams",
+                                "(IIF)V",
+                                &[JValue::Int(0), JValue::Int(-2), JValue::Float(1.0)],
+                            )?
+                        } else {
+                            env.new_object(
+                                "android/widget/LinearLayout$LayoutParams",
+                                "(II)V",
+                                &[JValue::Int(-1), JValue::Int(-2)],
+                            )?
+                        };
+                        env.call_method(
+                            &params,
+                            "setMargins",
+                            "(IIII)V",
+                            &[
+                                JValue::Int(0),
+                                JValue::Int(dp(5.)),
+                                JValue::Int(0),
+                                JValue::Int(dp(5.)),
+                            ],
+                        )?;
+                        env.call_method(
+                            &button,
+                            "setLayoutParams",
+                            "(Landroid/view/ViewGroup$LayoutParams;)V",
+                            &[JValue::Object(&params)],
+                        )?;
+                        if game.is_some() {
+                            env.call_method(
+                                &button,
+                                "setMinHeight",
+                                "(I)V",
+                                &[JValue::Int(dp(84.))],
+                            )?;
+                        }
+                        let text: JObject = if game.is_some() {
+                            menu_game_label(env, &text)?
+                        } else {
+                            env.new_string(text)?.into()
+                        };
                         env.call_method(
                             &button,
                             "setText",
@@ -1040,7 +1328,7 @@ fn render_menu_with_games(
                             &[JValue::Object(&listener)],
                         )?;
                         env.call_method(
-                            &view,
+                            if footer_action { &footer } else { &view },
                             "addView",
                             "(Landroid/view/View;)V",
                             &[JValue::Object(&button)],
@@ -1058,7 +1346,7 @@ fn render_menu_with_games(
                     &scroll,
                     "setBackgroundColor",
                     "(I)V",
-                    &[JValue::Int(0xff11161c_u32 as i32)],
+                    &[JValue::Int(gcx::presentation::BACKGROUND as i32)],
                 )?;
                 let parent_window = env
                     .call_method(activity, "getWindow", "()Landroid/view/Window;", &[])?
@@ -1092,6 +1380,51 @@ fn render_menu_with_games(
                     "(Landroid/view/View;)V",
                     &[JValue::Object(&view)],
                 )?;
+                let content = if editing {
+                    let content = env.new_object(
+                        "android/widget/LinearLayout",
+                        "(Landroid/content/Context;)V",
+                        &[JValue::Object(activity)],
+                    )?;
+                    env.call_method(&content, "setOrientation", "(I)V", &[JValue::Int(1)])?;
+                    env.call_method(
+                        &content,
+                        "setBackgroundColor",
+                        "(I)V",
+                        &[JValue::Int(gcx::presentation::BACKGROUND as i32)],
+                    )?;
+                    let params = env.new_object(
+                        "android/widget/LinearLayout$LayoutParams",
+                        "(IIF)V",
+                        &[JValue::Int(-1), JValue::Int(0), JValue::Float(1.0)],
+                    )?;
+                    env.call_method(
+                        &content,
+                        "addView",
+                        "(Landroid/view/View;Landroid/view/ViewGroup$LayoutParams;)V",
+                        &[JValue::Object(&scroll), JValue::Object(&params)],
+                    )?;
+                    env.call_method(
+                        &footer,
+                        "setPadding",
+                        "(IIII)V",
+                        &[
+                            JValue::Int(side),
+                            JValue::Int(dp(4.0)),
+                            JValue::Int(side),
+                            JValue::Int(dp(8.0)),
+                        ],
+                    )?;
+                    env.call_method(
+                        &content,
+                        "addView",
+                        "(Landroid/view/View;)V",
+                        &[JValue::Object(&footer)],
+                    )?;
+                    content
+                } else {
+                    scroll
+                };
                 // NativeActivity owns the root drawing surface. Views added to
                 // that hierarchy can receive input while remaining unpainted.
                 // This app-owned dialog has a framework-rendered window; the
@@ -1109,7 +1442,7 @@ fn render_menu_with_games(
                     &dialog,
                     "setContentView",
                     "(Landroid/view/View;)V",
-                    &[JValue::Object(&scroll)],
+                    &[JValue::Object(&content)],
                 )?;
                 trace(runtime, generation, "dialog.show.begin", "");
                 env.call_method(&dialog, "show", "()V", &[])?;
@@ -1124,6 +1457,9 @@ fn render_menu_with_games(
                     &[JValue::Int(-1), JValue::Int(-1)],
                 )?;
                 *MENU.lock().map_err(|_| "menu lock poisoned")? = Some(env.new_global_ref(dialog)?);
+                if editing {
+                    controls_ui::refresh(env, generation)?;
+                }
                 trace(runtime, generation, "dialog.ready", "framework_window");
             }
             update_window(env, activity);
@@ -1131,9 +1467,19 @@ fn render_menu_with_games(
         });
         if result.is_err() {
             trace(runtime, generation, "menu.error", "jni_or_window");
-            push(Command::Error(
-                "Could not prepare the player surface.".into(),
-            ));
+            if editing {
+                // An editor-view failure is not evidence of a broken machine
+                // checkpoint. Return to the ordinary library without changing
+                // game recovery flags or applying the draft.
+                push(Command::Notice(
+                    "Could not open touch controls. Your game and saved controls are kept.".into(),
+                ));
+                push(Command::Library);
+            } else {
+                push(Command::Error(
+                    "Could not prepare the player surface.".into(),
+                ));
+            }
         } else if !show {
             trace(runtime, generation, "menu.hidden.post", "");
             push(Command::MenuHidden(generation));
@@ -1169,7 +1515,7 @@ extern "system" fn Java_com_machinerhythm_gcx_GcxActivity_beforeDestroy(
 
 #[unsafe(no_mangle)]
 extern "system" fn Java_com_machinerhythm_gcx_GcxActivity_uiAction(
-    env: JNIEnv<'_>,
+    mut env: JNIEnv<'_>,
     activity: JObject<'_>,
     action: jint,
     menu: jlong,
@@ -1198,6 +1544,44 @@ extern "system" fn Java_com_machinerhythm_gcx_GcxActivity_uiAction(
         5 => push(Command::Open),
         6 => push(Command::Library),
         7 => push(Command::PinCurrent),
+        8 => {
+            // UI hierarchy reads stay on Android's main thread. Dialog focus
+            // neutralizes gameplay geometry, so never infer editor dimensions
+            // from a retained/missing presentation on the emulation owner.
+            match measure(&mut env, &activity)
+                .ok()
+                .and_then(|g| g.control_size())
+            {
+                Some((w, h)) => push(Command::Controls(menu as u64, w, h)),
+                None => {
+                    let _ = env.exception_clear();
+                    push(Command::Notice(
+                        "The display is changing. Try Touch controls again when it settles.".into(),
+                    ));
+                }
+            }
+        }
+        9 => push(Command::About(menu as u64)),
+        10 => {
+            let actual = measure(&mut env, &activity)
+                .ok()
+                .and_then(|g| g.control_size())
+                .map(|(w, h)| gcx::controls::display_key(w, h));
+            if actual.is_none() || actual != controls_ui::display(menu as u64) {
+                let _ = env.exception_clear();
+                push(Command::Notice("The screen changed while editing. Your draft is retained; cancel and reopen Touch controls for the current screen.".into()));
+                return;
+            }
+            if let Some(settings) = controls_ui::applied(menu as u64) {
+                push(Command::ApplyControls(menu as u64, settings));
+            } else {
+                push(Command::Notice("Could not save this layout. The previous controls are retained. Reset this screen’s layout or cancel to continue.".into()));
+            }
+        }
+        11 => push(Command::ControlsBack(menu as u64)),
+        20..=25 if controls_ui::action(&mut env, action, menu as u64).is_err() => {
+            let _ = env.exception_clear();
+        }
         _ => {}
     }
 }
@@ -1324,7 +1708,7 @@ pub fn pin_game(id: &str, title: &str) -> Result<bool> {
             "(Landroid/content/Context;Ljava/lang/String;)V",
             &[JValue::Object(activity), JValue::Object(&id)],
         )?;
-        let label = env.new_string(title)?;
+        let label = env.new_string(gcx::presentation::game_title(title))?;
         env.call_method(
             &builder,
             "setShortLabel",

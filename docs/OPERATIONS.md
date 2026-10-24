@@ -149,3 +149,19 @@ than a claim of completion. Do not stop merely because borrowed source needs a f
 Escalate a major new engine campaign, unresolved rights/security model, insufficient
 resource authority or data-loss risk. No public binary release/store submission,
 spending, account enrollment or weakened approval configuration is authorized.
+
+The first alpha helper also recognizes a verified fresh install with no imported
+game/collection, so closing the empty library does not require or claim native
+Stop. The installer must prove package absence before setting
+`GCX_VERIFIED_NEW_INSTALL=1`; never use it to relabel existing application data.
+
+A cleanup-only `recover_pending_restore` covers a fully traced single paused
+bootstrap that departed before its first restore/play. It keeps all matching
+complete-archive/current-file/PID/start gates, requires checkpoint validation and
+paused native boot, and refuses any restore attempt, playing state, capture,
+second boot or truncated trace. It does not require a new capture that the product
+correctly skips while restore is pending. Ordinary post-play recovery keeps its
+publication requirement. At an already observed physical screenOFF/keyguard,
+cleanup needs no wake or fabricated Home component. It is controlled process
+retirement, never normal Stop/join acceptance. Keep original failed receipts and
+reconcile them only after actual physical and kernel-lease return observations.

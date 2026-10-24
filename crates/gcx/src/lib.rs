@@ -6,13 +6,15 @@ use std::os::fd::AsRawFd;
 use std::path::Path;
 
 pub mod checkpoint;
+pub mod controls;
 #[cfg(feature = "native-engine")]
 pub mod engine;
 pub mod lifecycle;
+pub mod presentation;
 pub mod touch;
 pub mod viewport;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[repr(usize)]
 pub enum Control {
     A,

@@ -33,6 +33,14 @@ pub struct WindowGeometry {
     pub density: f32,
 }
 impl WindowGeometry {
+    /// Measured control-safe points, also used by the non-emulating editor.
+    pub fn control_size(self) -> Option<(f32, f32)> {
+        let safe = self.control_bounds()?;
+        Some((
+            (safe.right - safe.left) / self.density,
+            (safe.bottom - safe.top) / self.density,
+        ))
+    }
     fn control_bounds(self) -> Option<Area> {
         let i = self.clearance;
         if !valid(self.window)
@@ -96,6 +104,14 @@ pub struct Geometry {
 }
 impl Geometry {
     pub fn new(window: WindowGeometry, width: f32, height: f32) -> Option<Self> {
+        Self::with_controls(window, width, height, None)
+    }
+    pub fn with_controls(
+        window: WindowGeometry,
+        width: f32,
+        height: f32,
+        settings: Option<&crate::controls::Settings>,
+    ) -> Option<Self> {
         let safe = window.control_bounds()?;
         if !width.is_finite() || !height.is_finite() || width < 2.0 || height < 2.0 {
             return None;
@@ -110,10 +126,11 @@ impl Geometry {
         }
         // Intersect rectangles in one space before transforming: an already
         // inset surface/content is never charged the same inset twice.
-        let mut layout = Layout::for_display(
+        let mut layout = Layout::for_controls(
             safe.right - safe.left,
             safe.bottom - safe.top,
             window.density,
+            settings,
         );
         let sx = width / (window.surface.right - window.surface.left);
         let sy = height / (window.surface.bottom - window.surface.top);
@@ -219,6 +236,7 @@ pub struct PlayerView {
     window: Option<WindowGeometry>,
     presented: Option<Arc<Geometry>>,
     touch: TouchPad,
+    controls: Option<Arc<crate::controls::Settings>>,
 }
 impl PlayerView {
     pub const fn new() -> Self {
@@ -226,7 +244,26 @@ impl PlayerView {
             window: None,
             presented: None,
             touch: TouchPad::new(),
+            controls: None,
         }
+    }
+    pub fn configure_controls(&mut self, settings: crate::controls::Settings) {
+        self.touch
+            .configure(settings.dead_zone, settings.floating_sticks);
+        self.controls = Some(Arc::new(settings));
+        self.invalidate();
+    }
+    pub fn controls(&self) -> crate::controls::Settings {
+        self.controls.as_deref().cloned().unwrap_or_default()
+    }
+    pub fn controls_opacity(&self) -> u8 {
+        self.controls.as_deref().map_or(85, |s| s.opacity)
+    }
+    pub fn haptics(&self) -> bool {
+        self.controls.as_deref().is_none_or(|s| s.haptics)
+    }
+    pub fn control_display(&self) -> Option<(f32, f32)> {
+        self.window?.control_size()
     }
     pub fn measure(&mut self, window: Option<WindowGeometry>) {
         if self.window != window {
@@ -259,7 +296,7 @@ impl PlayerView {
             self.invalidate();
             self.presented = self
                 .window
-                .and_then(|w| Geometry::new(w, width, height))
+                .and_then(|w| Geometry::with_controls(w, width, height, self.controls.as_deref()))
                 .map(Arc::new);
         }
         self.presented.as_ref()
@@ -315,6 +352,48 @@ impl Default for PlayerView {
 mod tests {
     use super::*;
     use crate::{Control, touch::Target};
+    #[test]
+    fn custom_control_uses_one_presented_draw_hit_geometry_and_setting_change_releases_input() {
+        let mut view = PlayerView::new();
+        let w = window();
+        view.measure(Some(w));
+        let (width, height) = view.control_display().unwrap();
+        let mut editor =
+            crate::controls::Editor::new(width, height, crate::controls::Settings::default());
+        // Move Pause into the clear centre using the actual display's editor.
+        let a = editor
+            .layout
+            .zones
+            .iter()
+            .find(|z| z.target == Target::Pause)
+            .unwrap()
+            .area;
+        let (x, y) = a.center();
+        editor.down(1, x, y);
+        editor.moved(1, width / 2., height / 2.);
+        editor.up(1);
+        view.configure_controls(editor.finish().unwrap());
+        assert_eq!(view.down_report(1, x, y), DownReport::NoGeometry);
+        let g = view.present(2280., 1080.).unwrap().clone();
+        let (sx, sy) = g.pause_screen_area().unwrap().center();
+        assert_eq!(
+            view.down_report(1, sx - w.input_origin.0, sy - w.input_origin.1),
+            DownReport::Pause
+        );
+        let a = g
+            .layout
+            .zones
+            .iter()
+            .find(|z| z.target == Target::Button(Control::A))
+            .unwrap()
+            .area;
+        let (x, y) = a.center();
+        view.down_report(2, x, y);
+        assert_eq!(view.pad().values()[Control::A as usize], 1.);
+        view.configure_controls(crate::controls::Settings::default());
+        assert_eq!(view.sample_pad().values(), &[0.; 18]);
+        assert!(!view.has_presented_geometry());
+    }
     fn rect(left: f32, top: f32, right: f32, bottom: f32) -> Area {
         Area {
             left,

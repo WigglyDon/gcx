@@ -1,6 +1,35 @@
 # Direct Dolphin integration
 
-## Latest autonomous admission: return pending, 2026-10-24
+## Current: alpha presentation off-device; Pixel4 return resolved
+
+Owner requested gcx's first showable alpha before Fold admission, using public
+PSX as a sibling-product reference. Original/adapted MIT green-A branding, native
+library/pause presentation and original Rust per-screen touch-control editing,
+resize/reset, isolated input test, opacity/dead-zone/following/haptics are in the
+new source. Save/Cancel stays visible. Engine/native state ABI8/1 is unchanged;
+existing exact candidates and all data remain protected. New alpha device results
+are still unearned. The owner took the Fold back for laptop charging and asked
+for another offer when the built candidate is ready. No Fold query/window occurred.
+
+Pixel4's last pending return was resolved under explicit peer coordination. The
+current process had fully validated the existing checkpoint and booted paused,
+then departed before any restore/play. Pending-restore capture is intentionally
+skipped. The initial cleanup refused screenOFF NotificationShade/no resumed
+Activity. A narrowly tested cleanup branch now requires full single-bootstrap
+trace, native pause, no restore/play/capture and the exact inspected archive and
+current checkpoint/card/SRAM/generation/collection hashes and PID/start. It also
+observes screenOFF/keyguard without waking the phone.38 helper regressions pass.
+
+A fresh coordinated2-minute cleanup completed in16.552s: controlled pre-restore
+retirement, both ordinary profiles backed up and compared to current selected
+hashes; incomplete metadata and the existing false-intent checkpoint retained.
+App absent, physical displayOFF/keyguard and actual kernel lease release verified
+2026-10-24 21:12:48UTC. Original failed/pending records retained and reconciled;
+authorized peer received the verified return before its own fresh admission.
+This is NOT normal Stop/native join. See GCX-2 comment6389615387. Older pending
+sections below retain the incident history, not current custody.
+
+## Earlier autonomous admission: initially pending, 2026-10-24
 
 A fresh exclusive Pixel4 admission verified the unchanged installed99018690 APK,
 qualified stock build, collection and every file of the protected generation.

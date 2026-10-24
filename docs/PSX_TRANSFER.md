@@ -128,3 +128,36 @@ Fixed16-pointer storage, immutable shared geometry and equivalent-inset capture
 retention remove avoidable allocation/cancellation work. Bounded per-runtime
 timing separates Android event age, dispatch-to-pad delay and native poll cadence
 from game/display behavior. Tests and future hardware results remain source-bound.
+
+## First alpha presentation and control tools, 2026-10-24
+
+Owner clarified that gcx is the app to polish and that these emulators are product
+siblings. Read public psx at `123e831e4afb6c7cec2d8e05a030e3cd82a72bba`:
+MIT LICENSE `b7f230132ee7f02cf3a70d97da95362132e6a6fb`, ui.rs
+`6e9e13c8570e08ed0606f7f6272fc0ac07bcccbd`, input.rs
+`c3d90f7ca21e1a18b1f945cef999287af054ec9c`, settings.rs
+`a05874320ab63366e7c0e9cb14a56f9a6a4dc284`, brand README
+`1cc40f6c4fac2d834ef9454a7b16ffe8edfed7fc` and icon.svg
+`b3f50733cfcc8bce7a780cb5f839b9bd285ac98a`.
+
+The green A icon adapts the public MIT icon's warm-plastic/button composition;
+gcx's A path, green cap and themed vectors are drawn here. LICENSE retains the
+Machine Rhythm attribution and the APK retains that notice. No console logo,
+startup artwork or private asset is used. Lowercase gcx, restrained dark surfaces,
+game-first rows and a centered column give the apps a family resemblance.
+
+The source review selected editor affordances (move/resize, a separate input
+preview, per-screen persistence, reset and explicit save/cancel), square-display
+shoulder docking and visual feedback that does not delay logical input. gcx's
+editor/settings implementation is original Rust and uses its own named GameCube
+controls. No PSX editor, masks, emulation, storage, game data or entire frontend
+was copied. The Java additions only forward View/Canvas/SeekBar callbacks; all
+state, drawing decisions, validation and persistence remain Rust-owned.
+
+The narrow legacy layout clipped bottom targets and overlapped C Stick targets.
+A bounded shared GameCube deck replaces it; tall Fold surfaces dock shoulders in
+the middle and keep the primary stick near A. Both sticks, Z, Start, eight-way
+D-pad and separate L/R travel/clicks remain independent. Saved overrides address
+logical targets in normalized control-safe coordinates; drawing and input share
+the admitted geometry. Editing/test input never reaches the emulating machine.
+These are source/host observations until the new alpha earns its device results.

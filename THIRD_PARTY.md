@@ -5,6 +5,8 @@ The foundation's supplied xbx bootstrap attribution remains intact. Landscape
 geometry adapts selected public PSX MIT layout concepts at
 `4277d4ca651a4c9c2e8e88113a0ef092e330f01c`; its copyright notice is retained in
 LICENSE and the packaged MIT notice. See [transfer review](docs/PSX_TRANSFER.md).
+The alpha icon also adapts the public PSX MIT button composition at
+`123e831e4afb6c7cec2d8e05a030e3cd82a72bba`; the same notice is retained.
 No private sibling data or emulation/persistence code is reused.
 
 The engine is official [Dolphin](https://github.com/dolphin-emu/dolphin), pinned at

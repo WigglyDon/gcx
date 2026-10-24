@@ -30,3 +30,14 @@ The ABI7 host configuration identity additionally records checked-profile-read1;
 resource bytes remain the pinned selection. Native saved-image reads use Rust's
 owned profile paths and exact expected image bytes rather than an unacknowledged
 native fallback. This adds no packaged BIOS, firmware or startup artwork.
+
+## First-party alpha identity
+
+Android `res/` adds only reviewed original/adapted MIT vector/adaptive icons,
+colors and app-local themes. The green A artwork follows the public PSX MIT
+button composition with its own geometry/colors; provenance is in
+`assets/brand/README.md` and `docs/PSX_TRANSFER.md`. No console logo, IPL artwork,
+game cover or new Dolphin Sys resource is admitted. Android's own fonts render
+menus and editor text. aapt2 compiles these source XML inputs; source inventory
+and the actual APK/resource table must include them. Sys bytes and engine/state
+binding remain separate from presentation resources.

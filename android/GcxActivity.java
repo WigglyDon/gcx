@@ -14,6 +14,59 @@ public final class GcxActivity extends android.app.NativeActivity {
     private native void beforeDestroy();
     private native void windowChanged();
     private native void windowFocus(boolean focused);
+    private native void controlsDraw(android.graphics.Canvas canvas, int width, int height, long menu);
+    private native boolean controlsTouch(int action, int pointer, float x, float y, int width, int height, long menu);
+    private native void controlsValue(android.widget.TextView label, int setting, int value, long menu);
+
+    // Mechanical View/SeekBar callbacks only. Rust owns editor state, drawing,
+    // validation, settings, hit testing and all actions.
+    public static final class ControlsView extends android.view.View {
+        private final GcxActivity activity;
+        private final long menu;
+        public ControlsView(GcxActivity activity, long menu) {
+            super(activity); this.activity = activity; this.menu = menu;
+        }
+        @Override protected void onDraw(android.graphics.Canvas canvas) {
+            activity.controlsDraw(canvas, getWidth(), getHeight(), menu);
+        }
+        @Override public void onWindowFocusChanged(boolean focused) {
+            super.onWindowFocusChanged(focused);
+            if (!focused) activity.controlsTouch(android.view.MotionEvent.ACTION_CANCEL, -1, 0, 0, getWidth(), getHeight(), menu);
+        }
+        @Override protected void onDetachedFromWindow() {
+            activity.controlsTouch(android.view.MotionEvent.ACTION_CANCEL, -1, 0, 0, getWidth(), getHeight(), menu);
+            super.onDetachedFromWindow();
+        }
+        @Override public boolean onTouchEvent(android.view.MotionEvent event) {
+            boolean handled = false;
+            int action = event.getActionMasked();
+            if (action == android.view.MotionEvent.ACTION_MOVE) {
+                for (int i = 0; i < event.getPointerCount(); ++i) {
+                    handled |= activity.controlsTouch(action, event.getPointerId(i), event.getX(i), event.getY(i), getWidth(), getHeight(), menu);
+                }
+            } else {
+                int i = event.getActionIndex();
+                handled = activity.controlsTouch(action, event.getPointerId(i), event.getX(i), event.getY(i), getWidth(), getHeight(), menu);
+            }
+            if (handled) { getParent().requestDisallowInterceptTouchEvent(true); invalidate(); }
+            return handled;
+        }
+        @Override public boolean performClick() { return super.performClick(); }
+    }
+    public static final class ControlValue implements android.widget.SeekBar.OnSeekBarChangeListener {
+        private final GcxActivity activity;
+        private final android.widget.TextView label;
+        private final int setting;
+        private final long menu;
+        public ControlValue(GcxActivity activity, android.widget.TextView label, int setting, long menu) {
+            this.activity = activity; this.label = label; this.setting = setting; this.menu = menu;
+        }
+        @Override public void onProgressChanged(android.widget.SeekBar bar, int value, boolean user) {
+            if (user) activity.controlsValue(label, setting, value, menu);
+        }
+        @Override public void onStartTrackingTouch(android.widget.SeekBar bar) { }
+        @Override public void onStopTrackingTouch(android.widget.SeekBar bar) { }
+    }
 
     public static final class Insets implements android.view.View.OnApplyWindowInsetsListener {
         private final GcxActivity activity;

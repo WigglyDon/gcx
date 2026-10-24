@@ -493,6 +493,11 @@ pub fn package(root: &Path, source: &Path) -> Result<()> {
         "Java_com_machinerhythm_gcx_GcxActivity_beforeDestroy",
         "Java_com_machinerhythm_gcx_GcxActivity_windowChanged",
         "Java_com_machinerhythm_gcx_GcxActivity_windowFocus",
+        "Java_com_machinerhythm_gcx_GcxActivity_gameAction",
+        "Java_com_machinerhythm_gcx_GcxActivity_launchIntent",
+        "Java_com_machinerhythm_gcx_GcxActivity_controlsDraw",
+        "Java_com_machinerhythm_gcx_GcxActivity_controlsTouch",
+        "Java_com_machinerhythm_gcx_GcxActivity_controlsValue",
     ] {
         if !symbols.lines().any(|line| {
             line.split_whitespace().last() == Some(symbol)
@@ -524,11 +529,18 @@ pub fn package(root: &Path, source: &Path) -> Result<()> {
     }
     copy(&out.join("dex/classes.dex"), &payload.join("classes.dex"))?;
     let unsigned = out.join("unsigned.apk");
+    let compiled_resources = out.join("gcx-resources.zip");
+    run(Command::new(tools.build.join("aapt2"))
+        .args(["compile", "--dir"])
+        .arg(root.join("android/res"))
+        .arg("-o")
+        .arg(&compiled_resources))?;
     run(Command::new(tools.build.join("aapt2"))
         .args(["link", "--manifest"])
         .arg(root.join("android/AndroidManifest.xml"))
         .arg("-I")
         .arg(&tools.platform)
+        .arg(&compiled_resources)
         .arg("-A")
         .arg(out.join("assets"))
         .arg("-o")

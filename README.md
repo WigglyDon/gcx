@@ -1,5 +1,7 @@
 # gcx
 
+![gcx · Machine Rhythm](assets/brand/readme.svg)
+
 **Your GameCube games. Open, play, leave, return.**
 
 A game-first, Rust-first native GameCube player from Machine Rhythm. A separate
@@ -46,6 +48,12 @@ the latest complete checkpoint and ordinary saves before controlled process reti
 No clean Stop is claimed for that window. Broad lifecycle and full controls remain
 unqualified. Rust GameId links and pin-request code are implemented. See
 [native reproduction and limits](native/README.md).
+
+The first alpha presentation adds the sibling green-A identity, a cleaner native
+library and pause flow, and Rust-owned touch-layout editing with a separate input
+test. Opacity, dead zone, following sticks and haptics are configurable; positions
+are saved separately for each screen. The new alpha is being qualified off-device;
+its Fold installation and hardware results are not yet earned.
 
 GameCube is the initial scope. Dolphin's Wii capability is not a promise of Wii
 support in gcx. A Wii expansion, iOS implementation and multiple resident games

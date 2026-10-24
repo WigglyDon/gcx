@@ -5,7 +5,7 @@
 use crate::{Control, Pad};
 use std::time::{Duration, Instant};
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Area {
     pub left: f32,
     pub top: f32,
@@ -23,7 +23,7 @@ impl Area {
         )
     }
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Target {
     Button(Control),
     Stick(Control, Control),
@@ -64,131 +64,58 @@ pub struct Layout {
     pub game: Area,
     pub zones: Vec<Zone>,
 }
-fn area(x: f32, y: f32, radius: f32) -> Area {
-    Area {
-        left: x - radius,
-        top: y - radius,
-        right: x + radius,
-        bottom: y + radius,
-    }
-}
 impl Layout {
     pub fn new(width: f32, height: f32) -> Self {
         let width = width.max(1.0);
         let height = height.max(1.0);
+        if width >= 600.0 && height >= 500.0 {
+            return Self::docked(width, height);
+        }
         if width > height * 1.25 {
             return Self::landscape(width, height);
         }
-        let (game, left, right) = {
-            let top = height * 0.6;
-            (
-                Area {
-                    left: 0.0,
-                    top: 0.0,
-                    right: width,
-                    bottom: top,
-                },
-                Area {
-                    left: 0.0,
-                    top,
-                    right: width * 0.5,
-                    bottom: height,
-                },
-                Area {
-                    left: width * 0.5,
-                    top,
-                    right: width,
-                    bottom: height,
-                },
-            )
-        };
-        let mut zones = Vec::new();
-        for (pane, is_left) in [(left, true), (right, false)] {
-            let w = pane.right - pane.left;
-            let h = pane.bottom - pane.top;
-            let r = (w * 0.15).min(h * 0.1).max(1.0);
-            let point = |x: f32, y: f32| (pane.left + x * w, pane.top + y * h);
-            let (x, y) = point(0.43, 0.46);
-            zones.push(Zone {
-                area: area(x, y, r * 2.0),
-                target: if is_left {
-                    Target::Stick(Control::StickX, Control::StickY)
-                } else {
-                    Target::Stick(Control::CX, Control::CY)
-                },
-                label: if is_left { c"Control" } else { c"C Stick" },
-            });
-            zones.push(Zone {
-                area: Area {
-                    left: pane.left + w * 0.08,
-                    top: pane.top + h * 0.04,
-                    right: pane.left + w * 0.68,
-                    bottom: pane.top + h * 0.15,
-                },
-                target: Target::Travel(if is_left {
-                    Control::LTravel
-                } else {
-                    Control::RTravel
-                }),
-                label: if is_left { c"L travel" } else { c"R travel" },
-            });
-            let (x, y) = point(0.86, 0.095);
-            zones.push(Zone {
-                area: area(x, y, r),
-                target: Target::Button(if is_left {
-                    Control::LClick
-                } else {
-                    Control::RClick
-                }),
-                label: if is_left { c"L click" } else { c"R click" },
-            });
-            let buttons = if is_left {
-                [
-                    (Control::Up, 0.3, 0.75, c"Up"),
-                    (Control::Down, 0.3, 0.94, c"Down"),
-                    (Control::Left, 0.13, 0.845, c"Left"),
-                    (Control::Right, 0.47, 0.845, c"Right"),
-                    (Control::Start, 0.8, 0.82, c"Start"),
-                ]
-            } else {
-                [
-                    (Control::A, 0.76, 0.7, c"A"),
-                    (Control::B, 0.46, 0.8, c"B"),
-                    (Control::X, 0.85, 0.46, c"X"),
-                    (Control::Y, 0.73, 0.25, c"Y"),
-                    (Control::Z, 0.85, 0.94, c"Z"),
-                ]
-            };
-            for (button, x, y, label) in buttons {
-                let (x, y) = point(x, y);
-                zones.push(Zone {
-                    area: area(x, y, r),
-                    target: Target::Button(button),
-                    label,
-                });
-            }
+        if width >= 600.0 && height >= 280.0 {
+            return Self::docked(width, height);
         }
-        zones.push(Zone {
-            area: Area {
-                left: left.left + (left.right - left.left) * 0.74,
-                top: left.top + (left.bottom - left.top) * 0.48,
-                right: left.left + (left.right - left.left) * 0.98,
-                bottom: left.top + (left.bottom - left.top) * 0.60,
-            },
-            target: Target::Pause,
-            label: c"Pause",
-        });
-        Self { game, zones }
+        // A narrow display gets the same complete GameCube deck below the
+        // picture. The old fractional portrait arrangement clipped bottom
+        // targets and overlapped the C Stick. Keep real target sizes where a
+        // normal phone can fit them; tiny transition surfaces scale as a unit.
+        let deck_height = height.min(344.0);
+        let mut layout = Self::arranged(width, deck_height, 352.0);
+        let offset = height - deck_height;
+        for zone in &mut layout.zones {
+            zone.area.top += offset;
+            zone.area.bottom += offset;
+        }
+        layout.game = Area {
+            left: 0.0,
+            top: 0.0,
+            right: width,
+            bottom: offset,
+        };
+        layout
     }
     /// Input and presentation use this same density-aware geometry. The engine
     /// still owns the final fit to its reported game aspect, never a PS1 ratio.
     pub fn for_display(width: f32, height: f32, density: f32) -> Self {
+        Self::for_controls(width, height, density, None)
+    }
+    pub fn for_controls(
+        width: f32,
+        height: f32,
+        density: f32,
+        settings: Option<&crate::controls::Settings>,
+    ) -> Self {
         let density = if density.is_finite() && density > 0.0 {
             density
         } else {
             1.0
         };
-        let mut layout = Self::new(width / density, height / density);
+        let mut layout = settings.map_or_else(
+            || Self::new(width / density, height / density),
+            |s| s.layout(width / density, height / density),
+        );
         let scale = |a: &mut Area| {
             a.left *= density;
             a.top *= density;
@@ -202,10 +129,116 @@ impl Layout {
         layout
     }
     fn landscape(width: f32, height: f32) -> Self {
+        Self::arranged(width, height, 640.0)
+    }
+    fn docked(width: f32, height: f32) -> Self {
+        // Adapt PSX's square-display shoulder dock: use the middle space for
+        // L/R, keeping the primary stick level with A and the secondary controls
+        // nearby. A tall Fold must not put face buttons half a screen away.
+        let top = height - 260.0;
+        let mut zones = Vec::new();
+        let mut add = |x: f32, y: f32, w: f32, h: f32, target, label| {
+            zones.push(Zone {
+                area: Area {
+                    left: x,
+                    top: top + y,
+                    right: x + w,
+                    bottom: top + y + h,
+                },
+                target,
+                label,
+            })
+        };
+        for (x, travel, click, label, click_label) in [
+            (
+                width / 2.0 - 176.0,
+                Control::LTravel,
+                Control::LClick,
+                c"L analog",
+                c"L",
+            ),
+            (
+                width / 2.0 + 8.0,
+                Control::RTravel,
+                Control::RClick,
+                c"R analog",
+                c"R",
+            ),
+        ] {
+            add(x, 8.0, 104.0, 48.0, Target::Travel(travel), label);
+            add(
+                x + 112.0,
+                8.0,
+                48.0,
+                48.0,
+                Target::Button(click),
+                click_label,
+            );
+        }
+        add(
+            8.0,
+            16.0,
+            112.0,
+            112.0,
+            Target::Stick(Control::StickX, Control::StickY),
+            c"Control Stick",
+        );
+        add(8.0, 140.0, 112.0, 112.0, Target::Dpad, c"D-pad");
+        add(
+            128.0,
+            148.0,
+            48.0,
+            48.0,
+            Target::Button(Control::Start),
+            c"Start",
+        );
+        add(128.0, 204.0, 48.0, 48.0, Target::Pause, c"Pause");
+        for (x, y, size, control, label) in [
+            (width - 92.0, 88.0, 64.0, Control::A, c"A"),
+            (width - 152.0, 112.0, 48.0, Control::B, c"B"),
+            (width - 32.0, 62.0, 48.0, Control::X, c"X"),
+            (width - 94.0, 28.0, 48.0, Control::Y, c"Y"),
+        ] {
+            add(
+                x - size / 2.0,
+                y - size / 2.0,
+                size,
+                size,
+                Target::Button(control),
+                label,
+            );
+        }
+        add(
+            width - 168.0,
+            148.0,
+            48.0,
+            48.0,
+            Target::Button(Control::Z),
+            c"Z",
+        );
+        add(
+            width - 120.0,
+            140.0,
+            112.0,
+            112.0,
+            Target::Stick(Control::CX, Control::CY),
+            c"C Stick",
+        );
+        Self {
+            game: Area {
+                left: 0.0,
+                top: 0.0,
+                right: width,
+                bottom: top + 8.0,
+            },
+            zones,
+        }
+    }
+    fn arranged(width: f32, height: f32, minimum_width: f32) -> Self {
         // PSX's side rails: density-independent thumb wells, a clear centered
         // picture, and separate reachable auxiliary keys. Scale only transient
         // small surfaces; ordinary phone targets remain at least 48 points.
-        let scale = (width / 640.0).min(height / 344.0).min(1.0);
+        let scale = (width / minimum_width).min(height / 344.0).min(1.0);
         let w = width / scale;
         let h = height / scale;
         let rail = 176.0;
@@ -228,8 +261,8 @@ impl Layout {
             });
         };
         for (left, travel, click, travel_label, click_label) in [
-            (true, Control::LTravel, Control::LClick, c"L travel", c"L"),
-            (false, Control::RTravel, Control::RClick, c"R travel", c"R"),
+            (true, Control::LTravel, Control::LClick, c"L analog", c"L"),
+            (false, Control::RTravel, Control::RClick, c"R analog", c"R"),
         ] {
             let x = if left { 8.0 } else { w - rail + 8.0 };
             // Slider and click never share a target or an inferred threshold.
@@ -319,6 +352,8 @@ struct Capture {
     y: f32,
     origin: (f32, f32),
     direction: Option<u8>,
+    dead_zone: f32,
+    following: bool,
 }
 impl Capture {
     fn track(&mut self, x: f32, y: f32) {
@@ -332,7 +367,7 @@ impl Capture {
                 .max(1.0);
             let (dx, dy) = (x - self.origin.0, y - self.origin.1);
             let length = dx.hypot(dy);
-            if length > reach {
+            if length > reach && (self.following || self.zone.target == Target::Dpad) {
                 self.origin = (x - dx * reach / length, y - dy * reach / length);
             }
             if self.zone.target == Target::Dpad {
@@ -371,11 +406,11 @@ impl Capture {
             (self.origin.1 - self.y) / reach,
         );
         let length = x.hypot(y);
-        if length <= 0.12 {
+        if length <= self.dead_zone {
             return (0.0, 0.0);
         }
         // Continuous radial dead zone, followed by the GameCube octagonal gate.
-        let scale = ((length - 0.12) / 0.88).min(1.0) / length;
+        let scale = ((length - self.dead_zone) / (1.0 - self.dead_zone)).min(1.0) / length;
         x *= scale;
         y *= scale;
         let boundary =
@@ -423,6 +458,8 @@ pub struct TouchPad {
     oldest_update: Option<Instant>,
     last_poll: Option<Instant>,
     delivery: DeliveryStats,
+    dead_zone: f32,
+    following: bool,
 }
 impl TouchPad {
     pub const fn new() -> Self {
@@ -431,6 +468,8 @@ impl TouchPad {
             pending: [false; 12],
             oldest_update: None,
             last_poll: None,
+            dead_zone: 0.12,
+            following: true,
             delivery: DeliveryStats {
                 native_polls: 0,
                 max_poll_gap_micros: 0,
@@ -445,6 +484,11 @@ impl TouchPad {
                 histogram: [0; 7],
             },
         }
+    }
+    pub fn configure(&mut self, dead_zone_percent: u8, following: bool) {
+        self.cancel();
+        self.dead_zone = f32::from(dead_zone_percent.min(25)) / 100.0;
+        self.following = following;
     }
     /// A captured pointer keeps its target while it moves. Layout changes cancel captures.
     pub fn down(&mut self, id: i32, x: f32, y: f32, layout: &Layout) -> bool {
@@ -489,6 +533,8 @@ impl TouchPad {
                 y,
                 origin: zone.area.center(),
                 direction: None,
+                dead_zone: self.dead_zone,
+                following: self.following,
             };
             capture.track(x, y);
             self.latch(capture);
@@ -649,6 +695,57 @@ impl TouchPad {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn fold_and_narrow_decks_keep_all_targets_inside_with_independent_gamecube_controls() {
+        for (w, h) in [
+            (800., 700.),
+            (840., 700.),
+            (700., 800.),
+            (390., 844.),
+            (352., 700.),
+        ] {
+            let layout = Layout::new(w, h);
+            for (i, z) in layout.zones.iter().enumerate() {
+                let a = z.area;
+                assert!(
+                    a.left >= 0. && a.top >= 0. && a.right <= w + 0.01 && a.bottom <= h + 0.01,
+                    "{w}x{h} {:?}",
+                    z.target
+                );
+                assert!(
+                    a.right - a.left >= 47.99 && a.bottom - a.top >= 47.99,
+                    "{w}x{h} {:?}",
+                    z.target
+                );
+                for other in &layout.zones[..i] {
+                    let b = other.area;
+                    assert!(
+                        !(a.left < b.right - 0.01
+                            && a.right > b.left + 0.01
+                            && a.top < b.bottom - 0.01
+                            && a.bottom > b.top + 0.01),
+                        "{w}x{h} {:?} and {:?}",
+                        z.target,
+                        other.target
+                    );
+                }
+            }
+            for target in [
+                Target::Stick(Control::StickX, Control::StickY),
+                Target::Stick(Control::CX, Control::CY),
+                Target::Dpad,
+                Target::Travel(Control::LTravel),
+                Target::Travel(Control::RTravel),
+                Target::Button(Control::LClick),
+                Target::Button(Control::RClick),
+                Target::Button(Control::Z),
+                Target::Button(Control::Start),
+                Target::Pause,
+            ] {
+                assert!(layout.zones.iter().any(|z| z.target == target));
+            }
+        }
+    }
     fn zone(layout: &Layout, target: Target) -> Area {
         layout
             .zones

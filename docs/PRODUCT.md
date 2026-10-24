@@ -5,7 +5,9 @@
 The owner's working PSX PS1 player is the behavioral reference: select a game,
 play comfortably, leave it, try another game, fold the phone, and return to the
 correct scene after process restart. gcx carries that experience to GameCube as
-its own application and identity. It is not PSX renamed or a multi-console merger.
+its own application and identity. These are product siblings: consistent navigation,
+visual restraint and useful player tools, with each console’s own controls and
+durable game data. It is not PSX renamed or a multi-console merger.
 
 The normal path is **choose a local game -> play -> leave -> return**. The engine
 is implementation machinery, not a choice ordinary users need to configure.

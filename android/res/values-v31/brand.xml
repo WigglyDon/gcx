@@ -1,0 +1,14 @@
+<resources>
+  <style name="GcxTheme" parent="android:style/Theme.Material.NoActionBar">
+    <item name="android:fontFamily">sans</item>
+    <item name="android:colorAccent">@color/gcx_accent</item>
+    <item name="android:windowBackground">@color/gcx_background</item>
+    <item name="android:navigationBarColor">@color/gcx_background</item>
+    <item name="android:statusBarColor">@color/gcx_background</item>
+    <item name="android:windowLightStatusBar">false</item>
+    <item name="android:windowLightNavigationBar">false</item>
+    <item name="android:windowSplashScreenBackground">@color/gcx_background</item>
+    <item name="android:windowSplashScreenAnimatedIcon">@drawable/gcx_mark</item>
+    <item name="android:windowSplashScreenIconBackgroundColor">@color/launcher_plastic</item>
+  </style>
+</resources>
