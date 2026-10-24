@@ -11,8 +11,8 @@ SPEC = importlib.util.spec_from_file_location(
 packet = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(packet)
 OWN = packet.PACKAGE
-RESUMED = f"mResumedActivity: ActivityRecord{{1 u0 {OWN}/.GcxActivity t1}}"
-WINDOW = f"mCurrentFocus=Window{{1 u0 {OWN}/{OWN}.GcxActivity}}"
+RESUMED = f"Display #0 (activities):\nmResumedActivity: ActivityRecord{{1 u0 {OWN}/.GcxActivity t1}}"
+WINDOW = f"Display: mDisplayId=0 rootTasks=1\nmCurrentFocus=Window{{1 u0 {OWN}/{OWN}.GcxActivity}}\nmTopFocusedDisplayId=0"
 OTHER = "com.example.other/.OtherActivity"
 XML = f'''<?xml version="1.0"?><hierarchy><node bounds="[0,0][800,400]">
 <node text="Resume" package="{OWN}" class="android.widget.Button"
@@ -33,6 +33,8 @@ class Fixture:
         self.fail = False
         self.live = True
         self.clean = False
+        self.display_states = ["OFF"]
+        self.keyguard_states = ["true"]
         self.budget = packet.Budget(self.now, 1300)
         self.driver = packet.Driver(root, self.budget, self.invoke,
                                     lambda: self.now, self.sleep)
@@ -49,7 +51,7 @@ class Fixture:
         out = b""
         if "dumpsys activity" in joined:
             out = self.resumed.encode()
-        elif "dumpsys window |" in joined:
+        elif "dumpsys window displays |" in joined:
             out = self.windows.encode()
         elif "uiautomator dump" in joined:
             out = XML.encode()
@@ -71,9 +73,11 @@ class Fixture:
         elif "resolve-activity" in joined:
             out = b"com.example.home/.HomeActivity"
         elif "dumpsys display" in joined:
-            out = b"Display State=OFF"
+            state = self.display_states.pop(0) if len(self.display_states) > 1 else self.display_states[0]
+            out = ("Display State=" + state).encode()
         elif "dumpsys window policy" in joined:
-            out = b"showing=true secure=false"
+            state = self.keyguard_states.pop(0) if len(self.keyguard_states) > 1 else self.keyguard_states[0]
+            out = ("showing=" + state + " secure=false").encode()
         return subprocess.CompletedProcess(args, 0, out, b"")
 
 
@@ -116,6 +120,20 @@ class PacketTests(unittest.TestCase):
                                "timeout": 1})
         self.assertEqual(self.f.driver.operation_end, self.f.budget.cleanup_at - 1)
         self.assertEqual(self.f.timeouts, [1])
+
+    def test_live_display_section_excludes_historical_and_other_display_focus(self):
+        windows = ("historical ANR mCurrentFocus=Window{old u0 " + OTHER + "}\n" +
+                   "Display: mDisplayId=4 rootTasks=1\nmCurrentFocus=Window{other u0 " + OTHER + "}\n" + WINDOW)
+        activities = "Display #4 (activities):\ntopResumedActivity=" + OTHER + "\n" + RESUMED
+        self.assertEqual(packet.own_focus(activities, windows)[0], (OWN, OWN + ".GcxActivity"))
+        with self.assertRaises(packet.Refused):
+            packet.own_focus(activities, windows.replace("mTopFocusedDisplayId=0", "mTopFocusedDisplayId=4"))
+
+    def test_android13_single_live_display_needs_no_global_top_field(self):
+        windows = WINDOW.replace("mTopFocusedDisplayId=0", "")
+        self.assertEqual(packet.own_focus(RESUMED, windows)[0], (OWN, OWN + ".GcxActivity"))
+        with self.assertRaises(packet.Refused):
+            packet.own_focus(RESUMED, windows + "\nDisplay: mDisplayId=4 rootTasks=1\n")
 
     def test_resumed_and_focused_must_both_be_own_activity(self):
         for resumed, windows in ((RESUMED, f"mCurrentFocus=Window{{1 u0 {OTHER}}}"),
@@ -221,6 +239,25 @@ class PacketTests(unittest.TestCase):
         with self.assertRaises(packet.Refused):
             self.f.driver.call(["shell", "pidof", OWN])
         self.assertEqual(len(self.f.calls), count)
+
+    def test_asynchronous_sleep_transition_requires_fresh_return_observations(self):
+        self.f.clean = True
+        self.f.display_states = ["ON", "ON", "OFF"]
+        self.f.keyguard_states = ["false", "true"]
+        self.f.driver.finish()
+        self.assertTrue(self.f.driver.receipt["handback"])
+        self.assertAlmostEqual(self.f.now, 100.3)
+        self.assertEqual(sum("KEYCODE_SLEEP" in c for c in self.f.calls), 1)
+
+    def test_unsettled_display_return_has_finite_attempts_and_pending_reason(self):
+        self.f.clean = True
+        self.f.display_states = ["ON"]
+        self.f.keyguard_states = ["false"]
+        self.f.driver.finish()
+        self.assertFalse(self.f.driver.receipt["handback"])
+        self.assertIn("pending_recovery", self.f.driver.receipt)
+        self.assertEqual(sum("dumpsys display" in " ".join(c) for c in self.f.calls), 5)
+        self.assertAlmostEqual(self.f.now, 100.9)
 
     def test_clean_metadata_then_client_retirement_and_return(self):
         self.f.clean = True

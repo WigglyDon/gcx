@@ -69,7 +69,11 @@ It does not grant custody. The earlier of the outer deadline and the helper's
 reserved for final return. New tests and owner waiting end at the cleanup cutoff.
 
 Own UI input/captures require freshly matching resumed Activity and focused
-window. Framework button taps use the currently dumped layout, with a second
+window on the current live display. Use `dumpsys window displays`, not the first
+focus line in a full window dump: retained ANR snapshots can precede the live
+section. Android13 omits the global top-display ID from this subcommand; one
+live display is unambiguous, while several require an explicit top-display ID.
+Framework button taps use the currently dumped layout, with a second
 focus observation before the single tap. Native Pause uses the owner's real tap,
 not stale guessed coordinates. A mismatch ends new work; unexpected app content
 is not retained. Home, nonsecure wake and ordinary app entry are separate named
@@ -84,6 +88,11 @@ native join/profile release, own-client absence and physical display/keyguard
 return are separate observations; a helper flag alone is not acceptance. Confirm
 actual transaction/lease release after exit. Test guards off-device with
 `python3 -m unittest discover -s scripts/tests -v`.
+Allow a finite, deadline-bounded display/keyguard observation sequence after
+Sleep; an immediate read can precede the asynchronous transition. If it never
+settles, record a pending return. Keep stdin interactive for a live packet;
+EOF deliberately finalizes the helper. Re-observe the actual app PID/start after
+reentry before filtering logs; a Home return is not proof of process continuity.
 
 ## Private materials
 

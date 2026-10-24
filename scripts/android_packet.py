@@ -58,14 +58,35 @@ def component(text):
 
 
 def focused_pair(resumed, windows):
-    activity = component(resumed)
-    focus = re.search(r"mCurrentFocus=(.*)", windows)
-    if not focus:
-        raise Refused("focused-window observation missing")
-    window = component(focus[1])
+    # Only the current top-focused display is relevant. A full window dump can
+    # contain historical ANR focus records before the live display section.
+    top = set(re.findall(r"mTopFocusedDisplayId=(\d+)", windows))
+    sections = re.split(r"Display: mDisplayId=(\d+)[^\n]*", windows)
+    ids = sections[1::2]
+    # Android13's `window displays` omits the global top-display field. A
+    # single live display is unambiguous; several require its explicit ID.
+    if not top and len(ids) == 1:
+        top.add(ids[0])
+    if len(top) != 1:
+        raise Refused("current top-focused display missing or ambiguous")
+    display = top.pop()
+    current = [sections[i + 1] for i in range(1, len(sections), 2)
+               if sections[i] == display]
+    if len(current) != 1:
+        raise Refused("current focused display section missing or ambiguous")
+    focus = re.findall(r"mCurrentFocus=([^\n]+)", current[0])
+    if len(focus) != 1:
+        raise Refused("focused-window observation missing or ambiguous")
+    activities = re.split(r"Display #(\d+)[^\n]*", resumed)
+    active = [activities[i + 1] for i in range(1, len(activities), 2)
+              if activities[i] == display]
+    if len(active) != 1:
+        raise Refused("resumed Activity display missing or ambiguous")
+    activity = component(active[0])
+    window = component(focus[0])
     if window != activity:
         raise Refused("resumed Activity and focused window do not match")
-    return activity, focus[1].strip()
+    return activity, (display, focus[0].strip())
 
 
 def own_focus(resumed, windows):
@@ -147,8 +168,8 @@ class Driver:
         return result
 
     def focus(self):
-        a = self.call(["shell", "dumpsys activity activities | grep -E 'mResumedActivity:|topResumedActivity='"])
-        w = self.call(["shell", "dumpsys window | grep -E 'mCurrentFocus=|mFocusedApp='"])
+        a = self.call(["shell", "dumpsys activity activities | grep -E 'Display #[0-9]+|mResumedActivity:|topResumedActivity='"])
+        w = self.call(["shell", "dumpsys window displays | grep -E 'Display:|mCurrentFocus=|mTopFocusedDisplayId='"])
         try:
             return own_focus(a.stdout.decode(), w.stdout.decode())
         except Refused:
@@ -210,8 +231,8 @@ class Driver:
         elif op == "launch":
             if self.mismatch and not command.get("owner_reconfirmed"):
                 raise Refused("unexpected foreground requires owner clarification")
-            a = self.call(["shell", "dumpsys activity activities | grep -E 'mResumedActivity:|topResumedActivity='"])
-            w = self.call(["shell", "dumpsys window | grep -E 'mCurrentFocus=|mFocusedApp='"])
+            a = self.call(["shell", "dumpsys activity activities | grep -E 'Display #[0-9]+|mResumedActivity:|topResumedActivity='"])
+            w = self.call(["shell", "dumpsys window displays | grep -E 'Display:|mCurrentFocus=|mTopFocusedDisplayId='"])
             current, _ = focused_pair(a.stdout.decode(), w.stdout.decode())
             home = self.call(["shell", "cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME"])
             if current not in (component(home.stdout.decode()), (PACKAGE, PACKAGE + ".GcxActivity")) and not command.get("owner_reconfirmed"):
@@ -291,18 +312,28 @@ class Driver:
             display = self.call(["shell", "dumpsys display | grep -E 'Display State=|mState='"]).stdout.decode()
             if "Display State=OFF" not in display:
                 home = self.call(["shell", "cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME"]).stdout.decode()
-                resumed = self.call(["shell", "dumpsys activity activities | grep -E 'mResumedActivity:|topResumedActivity='"]).stdout.decode()
-                windows = self.call(["shell", "dumpsys window | grep -E 'mCurrentFocus=|mFocusedApp='"]).stdout.decode()
+                resumed = self.call(["shell", "dumpsys activity activities | grep -E 'Display #[0-9]+|mResumedActivity:|topResumedActivity='"]).stdout.decode()
+                windows = self.call(["shell", "dumpsys window displays | grep -E 'Display:|mCurrentFocus=|mTopFocusedDisplayId='"]).stdout.decode()
                 current, _ = focused_pair(resumed, windows)
                 if current not in (component(home), (PACKAGE, PACKAGE + ".GcxActivity")):
                     raise Refused("unexpected app during return; no screen input")
                 self.action(["shell", "input", "keyevent", "KEYCODE_SLEEP"])
-            display = self.call(["shell", "dumpsys display | grep -E 'Display State=|mState='"]).stdout.decode()
-            keyguard = self.call(["shell", "dumpsys window policy | grep -E 'secure=|showing='"]).stdout.decode()
-            self.receipt["display_off"] = "Display State=OFF" in display
-            self.receipt["keyguard_showing"] = "showing=true" in keyguard
+            # Sleep/keyguard transitions are asynchronous. Re-observe finitely,
+            # within the same remaining hard deadline; never infer success from
+            # the key-event command's return code.
+            for attempt in range(4):
+                display = self.call(["shell", "dumpsys display | grep -E 'Display State=|mState='"]).stdout.decode()
+                keyguard = self.call(["shell", "dumpsys window policy | grep -E 'secure=|showing='"]).stdout.decode()
+                self.receipt["display_off"] = "Display State=OFF" in display
+                self.receipt["keyguard_showing"] = "showing=true" in keyguard
+                if self.receipt["display_off"] and self.receipt["keyguard_showing"]:
+                    break
+                if attempt < 3 and self.clock() + 0.3 < self.budget.hard_end:
+                    self.sleep(0.3)
             self.receipt["handback"] = self.receipt["display_off"] and self.receipt["keyguard_showing"]
             self.receipt["recovery_resolved"] = self.receipt["handback"]
+            if not self.receipt["handback"]:
+                self.receipt["pending_recovery"] = "physical display/keyguard return not verified"
         except (Refused, ValueError, subprocess.TimeoutExpired) as error:
             self.receipt["pending_recovery"] = str(error)
 

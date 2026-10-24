@@ -1,5 +1,48 @@
 # Direct Dolphin integration
 
+## Focused diagnostic Pause/Resume and joined Stop, 2026-10-24
+
+Installed diagnostic source `e8821ba` / APK `9953d54c…` under fresh exclusive
+Pixel4 admission after matching actual installed recovery APK, current complete
+generation and ordinary files against protected backups. Update readback matched
+the prepared package and retained the collection unchanged. Setup restored the
+protected scene; it was not another acceptance campaign. The owner physically
+opened Pause, confirmed sound/movement/action, and left a menu open for visual
+inspection. Current-layout Resume worked with owner-confirmed sound/action.
+One relevant Home/reentry followed. Its app PID/start changed without our
+controlled retirement; do not report same-process hot return. The owner again
+confirmed sound/input and a responsive Pause menu.
+
+The owner then used ordinary Stop. The actual reentry process traced native
+shutdown/join while the writer was owned, durable clean metadata and release.
+Both profiles passed the product lock probe after Stop; the active one was
+proven busy beforehand. Both entries are stopped with incomplete/restart flags
+false and no active checkpoint references. Complete93,513,506byte-payload scene
+generations were independently verified/backed up before Stop, plus the final
+both-card/SRAM/generation/collection archive. WW ordinary card/SRAM advanced
+during this window before final Stop; current and earlier copies are retained,
+never rolled back. TP stayed unchanged. This does not earn another ordinary-save
+or card-menu reload row. Original exact recovery candidate/symbols stay protected.
+
+The helper caused additional operational failures: EOF ended an initial no-action
+packet; initial Chrome foreground correctly stopped setup; a full window query
+then mistook extra cached focus for live focus, and the first display-selector
+repair required a global field absent on Android13. Those false mismatches stopped
+test work and retained the paused writer. Bounded cleanup admissions completed
+the actual joined Stop and physical return; original pending records remain.
+The corrected selector and finite asynchronous display checks have20 offline
+regressions. The first process's192-event trace cap was exhausted; final Stop
+was verified from the actual later process's complete trace, not that stale PID.
+Original freeze root cause remains unproven; this bounded pass is not closure.
+
+Verified return2026-10-24 18:31:14UTC: own app absent, physical displayOFF,
+nonsecure keyguard and released lease. Combined primary/cleanup collection was
+256,622,709bytes, below the admitted256MiB ceiling; no unrelated capture was
+retained. Fold, launcher settings and sibling work were untouched. The owner
+has requested tighter Pause/Resume/startup and automated finite tests without
+further owner-play prompts; preserve the same custody/data rules and share the
+phone through normal exclusive admission.
+
 ## Pause/reentry diagnostics after Master6386389871
 
 The unresolved cleanup Pause/freeze report remains a blocker. Retained evidence
