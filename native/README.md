@@ -1,5 +1,36 @@
 # Direct Dolphin integration
 
+## Playing-intent Home return observed; later cleanup defect open
+
+Under Master6380607155, unchanged ABI8 directly left a playable unsaved WW
+grass/path/two-rupee scene with Android Home. Session and independently inspected
+generation both retained `paused=false`. The93,382,166byte payload and complete
+110,170,112byte generation were validated/backed up before controlled retirement.
+A genuinely new process entered through ordinary MAIN/LAUNCHER, restored the exact
+scene and returned to play without Resume, game-menu loading, pin or game URI.
+The owner explicitly confirmed automatic same-scene return, sound and movement/action.
+External Home→durable ack5.511s and launch→restore ack7.312s include command/scheduling
+overhead. Source-event age had an unattributed1,881,873us outlier; no latency pass.
+
+Later cleanup encountered unexpected non-gcx foreground, then an unresponsive
+Pause menu and owner report of a possible freeze. Root cause remains unconfirmed;
+own logs still published background checkpoints, without a new native/Java crash.
+An off-target capture was never opened and was deleted. The helper deadline left
+cleanup pending; bounded same-task recovery subsequently verified/protected the
+latest complete generation and freshly matching saves before controlled own-process
+retirement. A recovery hash-command quoting error was corrected; a denied backtrace
+was not bypassed. No normal Stop/native-worker-join claim for this window.
+
+Verified custody return2026-10-24 06:25:44UTC: app absent, displayOFF/keyguard and
+lease released; original pending evidence retained and custody recovery resolved.
+The product Pause/reentry defect remains open. Current WW metadata retains a complete
+false-intent checkpoint with stopped=false/runtime_incomplete=true/restart_required=false;
+no reference rewrite or card rollback. Both ordinary16MiB cards are unchanged;
+two rupees are snapshot evidence, not a new game-save claim. Separate ABI8 ordinary
+save/reload was not started. Candidate/symbols and all accepted prior results remain
+protected. Fold/siblings/launcher settings untouched. See
+[full result and limitation](https://github.com/WigglyDon/gcx/issues/2#issuecomment-6380918104).
+
 ## Actual pin capability and TP saved-dialogue return, 2026-10-24
 
 A separately granted window kept the same installed ABI8 pair. Actual WW

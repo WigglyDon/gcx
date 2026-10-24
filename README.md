@@ -39,7 +39,11 @@ owner-confirmed sound, controls and no audio bleed. Twilight Princess also retur
 to its saved opening dialogue in a later process, with owner-confirmed sound and
 A input; its interactive world remains untested. Actual Add to Home testing found
 the current launcher reports pinning unsupported, so OS pins and physical taps
-remain blocked. Automatic unpaused return and the full control matrix remain
+remain blocked. Direct Home departure while playing also returned automatically
+to the unsaved scene in a new process, with owner-confirmed sound and action input.
+A later Pause/freeze report during cleanup remains unresolved; recovery preserved
+the latest complete checkpoint and ordinary saves before controlled process retirement.
+No clean Stop is claimed for that window. Broad lifecycle and full controls remain
 unqualified. Rust GameId links and pin-request code are implemented. See
 [native reproduction and limits](native/README.md).
 

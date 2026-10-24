@@ -52,6 +52,24 @@ will always run before process death. Preserve the last accepted checkpoint.
 
 ## Earned scene return and next guarded qualification
 
+The [direct Home playing-intent follow-up](https://github.com/WigglyDon/gcx/issues/2#issuecomment-6380918104)
+under [Master6380607155](https://github.com/WigglyDon/gcx/issues/2#issuecomment-6380607155)
+observed the distinct automatic branch on unchanged ABI8: no gcx Pause before
+Home; both durable session and independently inspected complete generation had
+paused=false; validated backup preceded retirement; ordinary MAIN entry in a new
+process returned to the exact unsaved scene and play without Resume or game-menu
+load. The owner confirmed scene, sound and movement/action. This is separate from
+the previously accepted intentionally-paused test below.
+
+The same window later had an unresolved Pause/freeze report during cleanup and
+unexpected non-gcx foreground. Normal Stop did not complete. Bounded recovery
+protected and freshly verified the latest complete checkpoint/current saves before
+controlled own-process retirement and verified return. Custody recovery is resolved;
+the product defect remains open and prevents an unqualified lifecycle pass. The
+live WW reference is retained; two rupees are machine-state evidence only. Separate
+ABI8 ordinary in-game saving/reload remains unrun; do not roll back current files
+or repeat completed campaigns to hide the late failure.
+
 [Master6379842357](https://github.com/WigglyDon/gcx/issues/2#issuecomment-6379842357)
 accepted the bounded ABI8 single-game evidence below and directed actual library
 switching next, without a repeated cold-return campaign or unchanged rebuild.
