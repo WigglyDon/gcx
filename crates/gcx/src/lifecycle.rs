@@ -1,6 +1,24 @@
 // SPDX-License-Identifier: MIT
 //! Explicit ordinary-save stop. The runtime retains its profile through publication.
 use crate::library::Collection;
+use std::sync::atomic::{AtomicU32, Ordering};
+
+/// A fixed budget for the narrow lifecycle diagnostic burst, shared by callbacks.
+/// It does not gate player behavior or collect per-frame data.
+pub struct DiagnosticBudget(AtomicU32);
+impl DiagnosticBudget {
+    pub const fn new(limit: u32) -> Self {
+        Self(AtomicU32::new(limit))
+    }
+    pub fn reset(&self, limit: u32) {
+        self.0.store(limit, Ordering::Relaxed);
+    }
+    pub fn take(&self) -> bool {
+        self.0
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_sub(1))
+            .is_ok()
+    }
+}
 
 pub trait StopRuntime {
     fn epoch(&self) -> u64;
@@ -82,6 +100,29 @@ mod tests {
     use super::*;
     use crate::library::{GameId, SaveProfileId, SavedSession};
     use std::{cell::RefCell, rc::Rc};
+
+    #[test]
+    fn diagnostic_callbacks_share_a_hard_cap_without_underflow() {
+        let budget = std::sync::Arc::new(DiagnosticBudget::new(64));
+        let threads: Vec<_> = (0..4)
+            .map(|_| {
+                let budget = budget.clone();
+                std::thread::spawn(move || (0..100).filter(|_| budget.take()).count())
+            })
+            .collect();
+        assert_eq!(
+            threads
+                .into_iter()
+                .map(|t| t.join().unwrap())
+                .sum::<usize>(),
+            64
+        );
+        assert!(!budget.take());
+        budget.reset(2); // a new Activity receives its own finite budget
+        assert!(budget.take());
+        assert!(budget.take());
+        assert!(!budget.take());
+    }
 
     struct Runtime {
         epoch: u64,

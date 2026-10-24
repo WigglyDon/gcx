@@ -1,5 +1,28 @@
 # Direct Dolphin integration
 
+## Pause/reentry diagnostics after Master6386389871
+
+The unresolved cleanup Pause/freeze report remains a blocker. Retained evidence
+cannot distinguish lost input admission, missing presented geometry, menu
+generation/window failure or a synchronous native pause/checkpoint stall. No
+deadlock or native defect is established. The pinned Android activity adapter
+queues Java-main-thread callbacks asynchronously and releases its queue lock
+before executing them; posting alone does not prove a UI/native lock cycle.
+
+The bounded Rust diagnostic update tags Activity, runtime and menu generations
+on one monotonic clock. It records actual input admission/hit classification,
+presented Pause geometry, logical Pause acceptance, asynchronous menu execution
+and stale rejection, window/dialog stages, native pause, checkpoint capture and
+durable publication, and joined Stop. Each Activity has a hard 192-event cap;
+input/failure/geometry sub-budgets prevent per-frame or per-pad logging. Menu
+posting now occurs after releasing the touch mutex; this is lock hygiene, not a
+claimed root-cause repair. Tests cover presentation loss/reentry and diagnostic
+budget concurrency. The native ABI8 engine, resources, serialization ABI1 and
+save-generation rules are unchanged. The exact installed recovery APK and latest
+complete false-intent generation remain protected. Only a fresh authorized
+Pixel4 Pause → Resume → normal joined Stop can qualify the diagnostic candidate;
+accepted boot, library, TP and cold-return campaigns are not repeated.
+
 ## Playing-intent Home return observed; later cleanup defect open
 
 Under Master6380607155, unchanged ABI8 directly left a playable unsaved WW

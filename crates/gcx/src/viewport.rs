@@ -5,7 +5,7 @@
 //! see docs/PSX_TRANSFER.md. The engine supplies the GameCube aspect.
 use crate::{
     Pad,
-    touch::{Area, Layout, TouchPad},
+    touch::{Area, DownReport, Layout, TouchPad},
 };
 use std::sync::Arc;
 
@@ -152,6 +152,23 @@ impl Geometry {
                 / (self.window.surface.bottom - self.window.surface.top),
         )
     }
+    /// The presented Pause target in screen pixels; useful for scoped diagnosis.
+    pub fn pause_screen_area(&self) -> Option<Area> {
+        let a = self
+            .layout
+            .zones
+            .iter()
+            .find(|z| z.target == crate::touch::Target::Pause)?
+            .area;
+        let sx = (self.window.surface.right - self.window.surface.left) / self.buffer.0;
+        let sy = (self.window.surface.bottom - self.window.surface.top) / self.buffer.1;
+        Some(Area {
+            left: self.window.surface.left + a.left * sx,
+            top: self.window.surface.top + a.top * sy,
+            right: self.window.surface.left + a.right * sx,
+            bottom: self.window.surface.top + a.bottom * sy,
+        })
+    }
     pub fn picture(&self, aspect: f32) -> Area {
         let a = self.layout.game;
         let aspect = if aspect.is_finite() && aspect > 0.0 {
@@ -248,11 +265,17 @@ impl PlayerView {
         self.presented.as_ref()
     }
     pub fn down(&mut self, id: i32, x: f32, y: f32) -> bool {
+        self.down_report(id, x, y) == DownReport::Pause
+    }
+    pub fn has_presented_geometry(&self) -> bool {
+        self.presented.is_some()
+    }
+    pub fn down_report(&mut self, id: i32, x: f32, y: f32) -> DownReport {
         let Some(g) = &self.presented else {
-            return false;
+            return DownReport::NoGeometry;
         };
         let (x, y) = g.input_to_buffer(x, y);
-        self.touch.down(id, x, y, &g.layout)
+        self.touch.down_report(id, x, y, &g.layout)
     }
     pub fn moved(&mut self, id: i32, x: f32, y: f32) {
         if let Some(g) = &self.presented {
@@ -314,6 +337,52 @@ mod tests {
             },
             density: 2.75,
         }
+    }
+    #[test]
+    fn pause_reentry_requires_fresh_presentation_and_reports_the_actual_hit() {
+        let mut view = PlayerView::new();
+        let w = window();
+        view.measure(Some(w));
+        assert_eq!(view.down_report(1, 0.0, 0.0), DownReport::NoGeometry);
+        // A scaled buffer with translated screen/window origins must agree.
+        let g = view.present(4560.0, 2160.0).unwrap().clone();
+        let (sx, sy) = g.pause_screen_area().unwrap().center();
+        let input = (sx - w.input_origin.0, sy - w.input_origin.1);
+        assert_eq!(view.down_report(1, input.0, input.1), DownReport::Pause);
+        view.measure(None); // focus/surface departure
+        assert_eq!(
+            view.down_report(1, input.0, input.1),
+            DownReport::NoGeometry
+        );
+        view.measure(Some(w)); // measurement alone is not presentation
+        assert_eq!(
+            view.down_report(1, input.0, input.1),
+            DownReport::NoGeometry
+        );
+        view.present(4560.0, 2160.0).unwrap();
+        assert_eq!(view.down_report(1, input.0, input.1), DownReport::Pause);
+        assert_eq!(view.down_report(2, -500.0, -500.0), DownReport::Miss);
+    }
+    #[test]
+    fn down_reports_distinguish_capture_rejection_and_missing_geometry() {
+        let mut view = PlayerView::new();
+        let w = window();
+        view.measure(Some(w));
+        let g = view.present(2280.0, 1080.0).unwrap().clone();
+        let (x, y) = g
+            .layout
+            .zones
+            .iter()
+            .find(|z| z.target == Target::Button(Control::A))
+            .unwrap()
+            .area
+            .center();
+        assert_eq!(view.down_report(7, x, y), DownReport::Captured);
+        assert_eq!(view.down_report(7, x, y), DownReport::Rejected);
+        assert_eq!(view.sample_pad().values()[Control::A as usize], 1.0);
+        view.measure(None);
+        assert_eq!(view.sample_pad().values(), &[0.0; 18]);
+        assert_eq!(view.down_report(8, x, y), DownReport::NoGeometry);
     }
     #[test]
     fn stable_draws_reuse_geometry_and_native_poll_alone_consumes_input() {

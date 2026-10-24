@@ -31,6 +31,15 @@ pub enum Target {
     Dpad,
     Pause,
 }
+/// Result of the actual down-event path, without recording touch coordinates.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DownReport {
+    NoGeometry,
+    Rejected,
+    Miss,
+    Captured,
+    Pause,
+}
 impl Target {
     /// Original GameCube color cues, in the native draw list's ABGR format.
     pub fn color(self) -> u32 {
@@ -439,6 +448,9 @@ impl TouchPad {
     }
     /// A captured pointer keeps its target while it moves. Layout changes cancel captures.
     pub fn down(&mut self, id: i32, x: f32, y: f32, layout: &Layout) -> bool {
+        self.down_report(id, x, y, layout) == DownReport::Pause
+    }
+    pub fn down_report(&mut self, id: i32, x: f32, y: f32, layout: &Layout) -> DownReport {
         if !x.is_finite()
             || !y.is_finite()
             || self.captures.iter().all(Option::is_some)
@@ -448,7 +460,7 @@ impl TouchPad {
                 .flatten()
                 .any(|(pointer, _)| *pointer == id)
         {
-            return false;
+            return DownReport::Rejected;
         }
         if let Some(zone) = layout
             .zones
@@ -458,7 +470,7 @@ impl TouchPad {
             .copied()
         {
             if matches!(zone.target, Target::Pause) {
-                return true;
+                return DownReport::Pause;
             }
             if matches!(
                 zone.target,
@@ -469,7 +481,7 @@ impl TouchPad {
                 .flatten()
                 .any(|(_, capture)| capture.zone.target == zone.target)
             {
-                return false;
+                return DownReport::Rejected;
             }
             let mut capture = Capture {
                 zone,
@@ -486,8 +498,9 @@ impl TouchPad {
                 .find(|slot| slot.is_none())
                 .unwrap() = Some((id, capture));
             self.updated();
+            return DownReport::Captured;
         }
-        false
+        DownReport::Miss
     }
     pub fn moved(&mut self, id: i32, x: f32, y: f32) {
         if x.is_finite()

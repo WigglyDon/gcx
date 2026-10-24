@@ -67,6 +67,61 @@ static COMMANDS: Mutex<VecDeque<Command>> = Mutex::new(VecDeque::new());
 static EPOCH: AtomicU64 = AtomicU64::new(0);
 static MENU_GENERATION: AtomicU64 = AtomicU64::new(0);
 static PLAYING: AtomicBool = AtomicBool::new(false);
+// Diagnostic-only: one bounded burst per Activity, never per native pad/frame.
+static TRACE_START: OnceLock<std::time::Instant> = OnceLock::new();
+static TRACE_EVENTS: gcx::lifecycle::DiagnosticBudget = gcx::lifecycle::DiagnosticBudget::new(192);
+static TRACE_INPUT: gcx::lifecycle::DiagnosticBudget = gcx::lifecycle::DiagnosticBudget::new(32);
+static TRACE_INPUT_FAILURES: gcx::lifecycle::DiagnosticBudget =
+    gcx::lifecycle::DiagnosticBudget::new(8);
+static TRACE_GEOMETRY: gcx::lifecycle::DiagnosticBudget = gcx::lifecycle::DiagnosticBudget::new(24);
+static TRACE_RUNTIME: AtomicU64 = AtomicU64::new(0);
+
+pub fn trace_runtime(runtime: u64) {
+    TRACE_RUNTIME.store(runtime, Ordering::Relaxed);
+}
+pub fn trace(runtime: u64, menu: u64, stage: &str, detail: &str) {
+    if TRACE_EVENTS.take() {
+        let elapsed = TRACE_START
+            .get_or_init(std::time::Instant::now)
+            .elapsed()
+            .as_micros();
+        diagnostic(&format!(
+            "Lifecycle +{elapsed}us a={} r={runtime} m={menu} {stage} {detail}",
+            EPOCH.load(Ordering::Acquire)
+        ));
+    }
+}
+pub fn trace_current(stage: &str, detail: &str) {
+    trace(
+        TRACE_RUNTIME.load(Ordering::Relaxed),
+        MENU_GENERATION.load(Ordering::Acquire),
+        stage,
+        detail,
+    );
+}
+pub fn trace_input(detail: &str) {
+    if TRACE_INPUT.take() {
+        trace_current("input.down", detail);
+    }
+}
+pub fn trace_input_problem(detail: &str) {
+    if TRACE_INPUT_FAILURES.take() {
+        trace_current("input.down", detail);
+    }
+}
+pub fn trace_focus() {
+    // A normal gesture burst cannot consume the failure samples for reentry.
+    // The overall Activity event cap still applies across all focus transitions.
+    TRACE_INPUT.reset(32);
+    TRACE_INPUT_FAILURES.reset(8);
+    TRACE_GEOMETRY.reset(24);
+    trace_current("activity.focus", "gained");
+}
+pub fn trace_geometry(detail: &str) {
+    if TRACE_GEOMETRY.take() {
+        trace_current("geometry", detail);
+    }
+}
 
 pub enum Command {
     NativeError {
@@ -118,6 +173,12 @@ pub fn commands() -> Vec<Command> {
 }
 pub fn init(app: &AndroidApp) -> Result<()> {
     EPOCH.fetch_add(1, Ordering::AcqRel);
+    TRACE_EVENTS.reset(192);
+    TRACE_INPUT.reset(32);
+    TRACE_INPUT_FAILURES.reset(8);
+    TRACE_GEOMETRY.reset(24);
+    trace_runtime(0);
+    trace_current("activity.init", "");
     PLAYING.store(false, Ordering::Release);
     COMMANDS
         .lock()
@@ -456,7 +517,13 @@ fn measure(env: &mut JNIEnv<'_>, activity: &JObject<'_>) -> Result<gcx::viewport
     })
 }
 fn update_window(env: &mut JNIEnv<'_>, activity: &JObject<'_>) {
+    trace_geometry("measure.begin");
     let result = env.with_local_frame(64, |env| measure(env, activity));
+    trace_geometry(if result.is_ok() {
+        "measure.end.ok"
+    } else {
+        "measure.end.error"
+    });
     // Initial layout can legitimately lack insets. A later inset/layout callback
     // retries; until then no touch geometry is admitted.
     crate::player::measure_window(result.ok());
@@ -494,8 +561,10 @@ extern "system" fn Java_com_machinerhythm_gcx_GcxActivity_windowFocus(
     focused: jni::sys::jboolean,
 ) {
     if !current_activity(&env, &activity) {
+        trace_current("focus.reject", "stale_activity");
         return;
     }
+    trace_current("focus", if focused != 0 { "gained" } else { "lost" });
     if focused != 0 {
         if playing_window(&mut env, &activity, PLAYING.load(Ordering::Acquire)).is_err() {
             diagnostic("Could not apply app-local system-bar mode");
@@ -754,18 +823,39 @@ fn render_menu_with_games(
 ) {
     let epoch = EPOCH.load(Ordering::Acquire);
     let generation = MENU_GENERATION.fetch_add(1, Ordering::AcqRel) + 1;
+    trace(
+        runtime,
+        generation,
+        "menu.post",
+        if show { "show" } else { "hide" },
+    );
     app.run_on_java_main_thread(Box::new(move || {
         if EPOCH.load(Ordering::Acquire) != epoch || !menu_current(generation) {
+            trace(
+                runtime,
+                generation,
+                "menu.reject",
+                &format!("posted_activity={epoch} stale_activity_or_menu"),
+            );
             return;
         }
+        trace(runtime, generation, "menu.execute", "");
         let result = with_env(|env, activity| {
             PLAYING.store(!show, Ordering::Release);
+            trace(
+                runtime,
+                generation,
+                "window.policy.begin",
+                if show { "menu" } else { "playing" },
+            );
             playing_window(env, activity, !show)?;
+            trace(runtime, generation, "window.policy.end", "ok");
             let old = MENU.lock().map_err(|_| "menu lock poisoned")?.take();
             if let Some(dialog) = old {
                 env.call_method(dialog.as_obj(), "dismiss", "()V", &[])?;
             }
             if show {
+                trace(runtime, generation, "dialog.build", "");
                 let view = env.new_object(
                     "android/widget/LinearLayout",
                     "(Landroid/content/Context;)V",
@@ -1008,7 +1098,9 @@ fn render_menu_with_games(
                     "(Landroid/view/View;)V",
                     &[JValue::Object(&scroll)],
                 )?;
+                trace(runtime, generation, "dialog.show.begin", "");
                 env.call_method(&dialog, "show", "()V", &[])?;
+                trace(runtime, generation, "dialog.show.end", "ok");
                 let window = env
                     .call_method(&dialog, "getWindow", "()Landroid/view/Window;", &[])?
                     .l()?;
@@ -1019,15 +1111,18 @@ fn render_menu_with_games(
                     &[JValue::Int(-1), JValue::Int(-1)],
                 )?;
                 *MENU.lock().map_err(|_| "menu lock poisoned")? = Some(env.new_global_ref(dialog)?);
+                trace(runtime, generation, "dialog.ready", "framework_window");
             }
             update_window(env, activity);
             Ok(())
         });
         if result.is_err() {
+            trace(runtime, generation, "menu.error", "jni_or_window");
             push(Command::Error(
                 "Could not prepare the player surface.".into(),
             ));
         } else if !show {
+            trace(runtime, generation, "menu.hidden.post", "");
             push(Command::MenuHidden(generation));
         }
     }));
@@ -1068,8 +1163,20 @@ extern "system" fn Java_com_machinerhythm_gcx_GcxActivity_uiAction(
     runtime: jlong,
 ) {
     if !current_activity(&env, &activity) || !menu_current(menu as u64) {
+        trace(
+            runtime as u64,
+            menu as u64,
+            "action.reject",
+            "stale_activity_or_menu",
+        );
         return;
     }
+    trace(
+        runtime as u64,
+        menu as u64,
+        "action.admit",
+        &format!("action={action}"),
+    );
     match action {
         1 => push(Command::Choose),
         2 => push(Command::Restart),

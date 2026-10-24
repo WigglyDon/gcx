@@ -10,7 +10,7 @@ use gcx::lifecycle::{StopResult, StopRuntime, stop_game};
 use gcx::{
     Pad, ProfileLock,
     engine::*,
-    touch::Target,
+    touch::{DownReport, Target},
     viewport::{PlayerView, WindowGeometry},
 };
 use ndk::native_window::NativeWindow;
@@ -30,6 +30,7 @@ type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 static OWNER: AtomicBool = AtomicBool::new(false);
 static NEXT_RUNTIME: AtomicU64 = AtomicU64::new(1);
 static UI: Mutex<PlayerView> = Mutex::new(PlayerView::new());
+static MISSING_PRESENT_REPORTED: AtomicBool = AtomicBool::new(false);
 // The core asks for one complete input packet at its actual pad poll. Rendering
 // and the Android owner loop never consume quick-press pulses.
 unsafe extern "C" fn sample_input(controls: *mut f64) {
@@ -43,8 +44,15 @@ unsafe extern "C" fn sample_input(controls: *mut f64) {
     }
 }
 pub(crate) fn measure_window(geometry: Option<WindowGeometry>) {
-    if let Ok(mut ui) = UI.lock() {
+    let observed = UI.lock().ok().map(|mut ui| {
         ui.measure(geometry);
+        ui.has_presented_geometry()
+    });
+    if let Some(ready) = observed {
+        platform::trace_geometry(&format!(
+            "measurement={} presented={ready}",
+            geometry.is_some()
+        ));
     }
 }
 
@@ -78,7 +86,9 @@ impl LiveRuntime {
         // SAFETY: this live owner retains the native runtime and profile lock.
         // Keep execution paused after the barrier until stop/join completes.
         unsafe {
+            platform::trace_current("native.pause.begin", "pause");
             gcx_engine_pause(1);
+            platform::trace_current("native.pause.end", "paused");
             gcx_engine_input(Pad::default().values().as_ptr());
             // A partially loaded machine is quarantined through teardown.
             gcx_engine_recovery_required() != 0 || gcx_engine_flush_cards() != 0
@@ -125,24 +135,35 @@ fn save_checkpoint(
         ));
     }
     unsafe {
+        platform::trace_current("native.pause.begin", "pause");
         gcx_engine_pause(1);
+        platform::trace_current("native.pause.end", "paused");
         gcx_engine_input(Pad::default().values().as_ptr());
     }
-    let id = unsafe {
+    platform::trace_current("checkpoint.capture.begin", "");
+    let captured = unsafe {
         checkpoint::capture(
             &active._profile.path,
             &active.binding,
             collection.entries[index].paused,
-        )?
+        )
     };
+    platform::trace_current(
+        "checkpoint.capture.end",
+        if captured.is_ok() { "ok" } else { "error" },
+    );
+    let id = captured?;
     let generation = gcx::storage::save_generation(&active._profile.path)?;
     let earlier = collection.entries[index].checkpoint.replace(id.clone());
+    platform::trace_current("checkpoint.publish.begin", "");
     if let Err(error) = save_collection(root, collection) {
+        platform::trace_current("checkpoint.publish.end", "error");
         // Even if rename preceded the sync error, both possible references still
         // reach complete files. Never retire either on unacknowledged metadata.
         collection.entries[index].checkpoint = earlier;
         return Err(error);
     }
+    platform::trace_current("checkpoint.publish.end", "durable");
     active.accepted_generation = Some(generation);
     if let Some(old) = active.accepted_checkpoint.replace(id.clone())
         && let Err(error) = checkpoint::retire_previous(&active._profile.path, &old, &id)
@@ -167,13 +188,17 @@ impl LiveRuntime {
         let Some(mut state) = self.pending_restore.take() else {
             return Ok(None);
         };
+        platform::trace(self.events.epoch, 0, "restore.validate.begin", "");
         state.verify_current_saves(&self._profile.path)?;
+        platform::trace(self.events.epoch, 0, "restore.load.begin", "");
         if unsafe { gcx_engine_checkpoint_load(state.payload.as_mut_ptr(), state.payload.len()) }
             == 0
         {
+            platform::trace(self.events.epoch, 0, "restore.load.end", "error");
             self.failed_restore = true;
             return Err("Checkpoint restore failed. Its file and current saves are retained; restart explicitly with current saves.".into());
         }
+        platform::trace(self.events.epoch, 0, "restore.load.end", "ok_paused");
         self.accepted_generation = Some(gcx::storage::save_generation(&self._profile.path)?);
         platform::diagnostic(
             "Checkpoint restored into paused native runtime; current saves validated",
@@ -195,7 +220,9 @@ fn pause_for_background(
         return;
     };
     unsafe {
+        platform::trace_current("native.pause.begin", "pause");
         gcx_engine_pause(1);
+        platform::trace_current("native.pause.end", "paused");
         gcx_engine_input(Pad::default().values().as_ptr());
         if !matches!(gcx_engine_state(), 1 | 2) {
             *native_paused = None;
@@ -239,6 +266,7 @@ impl StopRuntime for LiveRuntime {
             if let Ok(mut error) = self.events.teardown_error.lock() {
                 *error = None;
             }
+            platform::trace(self.events.epoch, 0, "stop.join.begin", "writer_owned");
             platform::diagnostic("Native shutdown begin; profile writer still owned");
             // SAFETY: same serialized native owner. Keep all Rust fields/profile
             // alive until the stop caller has durably published its result.
@@ -248,6 +276,7 @@ impl StopRuntime for LiveRuntime {
                 gcx_engine_shutdown();
             }
             self.native_alive = false;
+            platform::trace(self.events.epoch, 0, "stop.join.end", "writer_owned");
             platform::diagnostic("Native shutdown joined; profile writer still owned");
             // SAFETY: shutdown has joined native workers; this only reads core state.
             if unsafe { gcx_engine_state() } != 0 {
@@ -326,20 +355,33 @@ unsafe extern "C" fn event(context: *mut std::ffi::c_void, id: u32, message: *co
     }
 }
 extern "C" fn draw(phase: u32, width: f32, height: f32, aspect: f32) -> Rect {
-    let (geometry, pad, centers) = {
+    let observed = {
         let Ok(mut ui) = UI.lock() else {
             return Rect::default();
         };
-        let Some(geometry) = ui.present(width, height).cloned() else {
-            return Rect::default();
-        };
-        let pad = if phase == 1 { ui.pad() } else { Pad::default() };
-        let centers = [
-            ui.stick_center(gcx::Control::StickX),
-            ui.stick_center(gcx::Control::CX),
-        ];
-        (geometry, pad, centers)
+        let fresh = !ui.has_presented_geometry();
+        ui.present(width, height).cloned().map(|geometry| {
+            let pad = if phase == 1 { ui.pad() } else { Pad::default() };
+            let centers = [
+                ui.stick_center(gcx::Control::StickX),
+                ui.stick_center(gcx::Control::CX),
+            ];
+            (geometry, pad, centers, fresh)
+        })
     };
+    let Some((geometry, pad, centers, fresh)) = observed else {
+        if !MISSING_PRESENT_REPORTED.swap(true, Ordering::Relaxed) {
+            platform::trace_geometry("present.unavailable");
+        }
+        return Rect::default();
+    };
+    MISSING_PRESENT_REPORTED.store(false, Ordering::Relaxed);
+    if fresh {
+        platform::trace_geometry(&format!(
+            "present.ready buffer={width}x{height} pause_screen={:?}",
+            geometry.pause_screen_area()
+        ));
+    }
     if phase == 0 {
         let a = geometry.picture(aspect);
         return Rect {
@@ -546,6 +588,8 @@ fn boot(
         stopped: AtomicBool::new(false),
         teardown_error: Mutex::new(None),
     });
+    platform::trace_runtime(events.epoch);
+    platform::trace_current("runtime.boot.begin", "");
     // SAFETY: serialized owner, valid strings and stable process-long callbacks.
     unsafe {
         if gcx_engine_abi() != 8 {
@@ -612,6 +656,7 @@ fn boot(
         if admitted == 0 {
             return Err("The native engine could not boot this GameCube game.".into());
         }
+        platform::trace_current("runtime.boot.end", "ready_for_restore_or_play");
         Ok(runtime)
     }
 }
@@ -673,6 +718,7 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
     let mut picker_pending = false;
     let mut native_paused = None;
     let mut surface_pending = false;
+    let mut surface_traced = false;
     let mut restart_requested = false;
     let mut refresh_pins = true;
     if explicit_launch {
@@ -701,12 +747,15 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
             if let PollEvent::Main(event) = event {
                 match event {
                     MainEvent::InitWindow { .. } => {
+                        platform::trace_current("surface.init", "");
+                        surface_traced = false;
                         window = app.native_window();
                         measure_window(None);
                         platform::refresh_window(app);
                         surface_pending = runtime.is_some();
                     }
                     MainEvent::TerminateWindow { .. } => {
+                        platform::trace_current("surface.terminate", "");
                         // Complete pause/checkpoint while the old drawable is still
                         // retained; surface loss never requests a fresh boot.
                         pause_for_background(
@@ -723,10 +772,12 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                         }
                     }
                     MainEvent::GainedFocus => {
+                        platform::trace_focus();
                         foreground = true;
                         platform::refresh_window(app);
                     }
                     MainEvent::LostFocus | MainEvent::Pause | MainEvent::Stop => {
+                        platform::trace_current("activity.departure", "lost_focus_pause_or_stop");
                         foreground = false;
                         pause_for_background(
                             &root,
@@ -761,55 +812,95 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                         if let Ok(mut input) = app.input_events_iter() {
                             while input.next(|event| {
                                 if let InputEvent::MotionEvent(motion) = event {
-                                    if hidden
-                                        && runtime.is_some()
-                                        && window.is_some()
-                                        && let Ok(mut touch) = UI.lock()
-                                    {
-                                        touch.record_source_age(platform::motion_age(
-                                            motion.event_time(),
+                                    let down = matches!(
+                                        motion.action(),
+                                        MotionAction::Down | MotionAction::PointerDown
+                                    );
+                                    let mut pause_menu = None;
+                                    let mut report = None;
+                                    if down {
+                                        platform::trace_input(&format!(
+                                            "dispatch hidden={hidden} runtime={} window={}",
+                                            runtime.is_some(),
+                                            window.is_some()
                                         ));
-                                        match motion.action() {
-                                            MotionAction::Down | MotionAction::PointerDown => {
-                                                let pointer =
-                                                    motion.pointer_at_index(motion.pointer_index());
-                                                if touch.down(
-                                                    pointer.pointer_id(),
-                                                    pointer.x(),
-                                                    pointer.y(),
-                                                ) && let Some(index) = selected
-                                                {
-                                                    collection.entries[index].paused = true;
-                                                    touch.cancel();
-                                                    hidden = false;
-                                                    if let Some(active) = &runtime {
-                                                        platform::player_menu(
-                                                            app,
-                                                            active.events.epoch,
-                                                            !collection.entries[index]
-                                                                .restart_required,
-                                                            None,
-                                                        );
-                                                    }
-                                                }
-                                            }
-                                            MotionAction::Move => {
-                                                for pointer in motion.pointers() {
-                                                    touch.moved(
+                                    }
+                                    if hidden && runtime.is_some() && window.is_some() {
+                                        if let Ok(mut touch) = UI.lock() {
+                                            touch.record_source_age(platform::motion_age(
+                                                motion.event_time(),
+                                            ));
+                                            match motion.action() {
+                                                MotionAction::Down | MotionAction::PointerDown => {
+                                                    let pointer = motion
+                                                        .pointer_at_index(motion.pointer_index());
+                                                    let hit = touch.down_report(
                                                         pointer.pointer_id(),
                                                         pointer.x(),
                                                         pointer.y(),
                                                     );
+                                                    report = Some(hit);
+                                                    if hit == DownReport::Pause
+                                                        && let Some(index) = selected
+                                                    {
+                                                        collection.entries[index].paused = true;
+                                                        touch.cancel();
+                                                        hidden = false;
+                                                        if let Some(active) = &runtime {
+                                                            pause_menu = Some((
+                                                                active.events.epoch,
+                                                                !collection.entries[index]
+                                                                    .restart_required,
+                                                            ));
+                                                        }
+                                                    }
                                                 }
+                                                MotionAction::Move => {
+                                                    for pointer in motion.pointers() {
+                                                        touch.moved(
+                                                            pointer.pointer_id(),
+                                                            pointer.x(),
+                                                            pointer.y(),
+                                                        );
+                                                    }
+                                                }
+                                                MotionAction::Up | MotionAction::PointerUp => {
+                                                    let pointer = motion
+                                                        .pointer_at_index(motion.pointer_index());
+                                                    touch.up(pointer.pointer_id());
+                                                }
+                                                MotionAction::Cancel => touch.cancel(),
+                                                _ => {}
                                             }
-                                            MotionAction::Up | MotionAction::PointerUp => {
-                                                let pointer =
-                                                    motion.pointer_at_index(motion.pointer_index());
-                                                touch.up(pointer.pointer_id());
-                                            }
-                                            MotionAction::Cancel => touch.cancel(),
-                                            _ => {}
+                                        } else if down {
+                                            platform::trace_input_problem(
+                                                "rejected ui_lock_poisoned",
+                                            );
                                         }
+                                    } else if down {
+                                        platform::trace_input_problem(&format!(
+                                            "rejected hidden={hidden} runtime={} window={}",
+                                            runtime.is_some(),
+                                            window.is_some()
+                                        ));
+                                    }
+                                    // No UI lock crosses JNI menu posting or native quiescence.
+                                    if let Some(hit) = report {
+                                        let detail = format!("admitted result={hit:?}");
+                                        if hit == DownReport::Captured {
+                                            platform::trace_input(&detail);
+                                        } else {
+                                            platform::trace_input_problem(&detail);
+                                        }
+                                    }
+                                    if let Some((epoch, can_resume)) = pause_menu {
+                                        platform::trace(
+                                            epoch,
+                                            0,
+                                            "pause.accepted",
+                                            "logical_intent=true",
+                                        );
+                                        platform::player_menu(app, epoch, can_resume, None);
                                     }
                                     InputStatus::Handled
                                 } else {
@@ -931,26 +1022,49 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                 }
                 Command::Restart => restart_requested = true,
                 Command::Resume(epoch) => {
+                    platform::trace(epoch, 0, "resume.command", "");
                     if runtime.as_ref().is_some_and(|r| r.events.epoch == epoch)
                         && let Some(index) = selected
                         && !collection.entries[index].restart_required
                     {
                         collection.entries[index].paused = false;
                         platform::menu(app, false, None);
+                    } else {
+                        platform::trace(epoch, 0, "resume.reject", "stale_or_restart_required");
                     }
                 }
                 Command::Stop(epoch) => {
+                    platform::trace(epoch, 0, "stop.command", "");
                     if let Some(index) = selected {
                         match stop_game(&mut runtime, epoch, &mut collection, index, |c| {
                             save_collection(&root, c).map_err(|e| e.to_string())
                         }) {
-                            StopResult::Ignored => {}
+                            StopResult::Ignored => {
+                                platform::trace(epoch, 0, "stop.reject", "stale_runtime");
+                            }
                             StopResult::Retained(error) => {
+                                platform::trace(
+                                    epoch,
+                                    0,
+                                    "stop.retained",
+                                    "barrier_or_storage_error",
+                                );
                                 hidden = false;
                                 native_paused = Some(true);
                                 platform::player_menu(app, epoch, false, Some(error));
                             }
                             StopResult::Unloaded { error } => {
+                                platform::trace(
+                                    epoch,
+                                    0,
+                                    "stop.complete",
+                                    if error.is_none() {
+                                        "joined_durable_profile_released"
+                                    } else {
+                                        "unloaded_with_error"
+                                    },
+                                );
+                                platform::trace_runtime(0);
                                 hidden = false;
                                 native_paused = None;
                                 surface_pending = false;
@@ -1085,6 +1199,16 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                     }
                 }
                 Command::MenuHidden(generation) => {
+                    platform::trace(
+                        0,
+                        generation,
+                        "menu.hidden.consume",
+                        if platform::menu_current(generation) {
+                            "current"
+                        } else {
+                            "stale"
+                        },
+                    );
                     if platform::menu_current(generation) {
                         hidden = true;
                     }
@@ -1101,7 +1225,9 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                         }
                         hidden = false;
                         unsafe {
+                            platform::trace_current("native.pause.begin", "pause");
                             gcx_engine_pause(1);
+                            platform::trace_current("native.pause.end", "paused");
                             gcx_engine_input(Pad::default().values().as_ptr());
                         }
                         native_paused = Some(true);
@@ -1241,7 +1367,21 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
             unsafe {
                 gcx_engine_dispatch();
                 if surface_pending && let Some(window) = &window {
+                    if !surface_traced {
+                        platform::trace_current("surface.apply.begin", "");
+                    }
                     surface_pending = gcx_engine_surface(window.ptr().as_ptr().cast()) == 0;
+                    if !surface_traced || !surface_pending {
+                        platform::trace_current(
+                            "surface.apply.end",
+                            if surface_pending {
+                                "pending"
+                            } else {
+                                "applied"
+                            },
+                        );
+                    }
+                    surface_traced = true;
                 }
                 if foreground
                     && window.is_some()
@@ -1282,7 +1422,15 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                         || window.is_none()
                         || selected.is_some_and(|i| collection.entries[i].paused);
                     if native_paused != Some(paused) {
+                        platform::trace_current(
+                            "native.pause.begin",
+                            if paused { "pause" } else { "play" },
+                        );
                         gcx_engine_pause(i32::from(paused));
+                        platform::trace_current(
+                            "native.pause.end",
+                            if paused { "paused" } else { "playing" },
+                        );
                         native_paused = Some(paused);
                         if paused
                             && !restoring
@@ -1299,7 +1447,9 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                             if let Some(index) = selected {
                                 collection.entries[index].paused = true;
                             }
+                            platform::trace_current("native.pause.begin", "pause");
                             gcx_engine_pause(1);
+                            platform::trace_current("native.pause.end", "paused");
                             native_paused = Some(true);
                             platform::push(Command::Error("Could not preserve session settings. The paused game and previous checkpoint are retained.".into()));
                         }

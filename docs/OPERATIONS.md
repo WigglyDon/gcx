@@ -56,6 +56,35 @@ updates/migration, retain the signer/application ID and a workable restore route
 No active progress is sacrificed for a test. Return the device in the agreed state
 and verify screen/lock/lease release as required; disclose any unresolved return.
 
+### gcx-local test helper after Master6386389871
+
+`scripts/android_packet.py` is the versioned repair of gcx's existing private
+JSON packet helper, not a device service or application layer. Its private launch
+wrapper must pass the admitted alias, a new private evidence directory,
+`GCX_DEVICE_TASK`, and an absolute monotonic `GCX_OUTER_DEADLINE_MONO` established
+before the outer timeout starts. Run it only inside the existing exclusive
+`android-device transaction`; every nested command inherits that transaction FD.
+It does not grant custody. The earlier of the outer deadline and the helper's
+17-minute limit controls a five-minute cleanup reserve, including one minute
+reserved for final return. New tests and owner waiting end at the cleanup cutoff.
+
+Own UI input/captures require freshly matching resumed Activity and focused
+window. Framework button taps use the currently dumped layout, with a second
+focus observation before the single tap. Native Pause uses the owner's real tap,
+not stale guessed coordinates. A mismatch ends new work; unexpected app content
+is not retained. Home, nonsecure wake and ordinary app entry are separate named
+steps; unexpected foreground requires owner clarification. Raw UI/capture/hash
+batches are refused. Hashing uses nonempty, validated literal own-file arguments,
+never a quoted `sh -c` string or an input-less hash command.
+
+The helper does not kill an unverified live writer to simulate Stop. It records
+pending recovery before releasing custody if normal cleanup cannot complete.
+Timeout means no further device commands from that helper. Clean Stop metadata,
+native join/profile release, own-client absence and physical display/keyguard
+return are separate observations; a helper flag alone is not acceptance. Confirm
+actual transaction/lease release after exit. Test guards off-device with
+`python3 -m unittest discover -s scripts/tests -v`.
+
 ## Private materials
 
 Keep game images, original firmware, saves, checkpoints, card icons extracted from

@@ -32,4 +32,5 @@ keys/
 .env
 .env.*
 .DS_Store
+__pycache__/
 # A qualified redistributable generated artifact needs an explicit reviewed rule.
