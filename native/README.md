@@ -1,5 +1,35 @@
 # Direct Dolphin integration
 
+## Next: first playable Fold session, prepared off-device only
+
+Master6391781406 accepts the bounded Pixel4 footer/normal-Stop result below and
+directs real Wind Waker gameplay on the Fold, then a focused Home-return → Pause/
+Resume → normal joined Stop check. No current device grant or unchanged rebuild.
+The accepted APK/source/symbol and all complete/ordinary/recovery histories remain
+preserved. Pixel4 stays explicitly stopped with checkpoint=null; no active
+reference is rewritten and no Pixel4 profile/card/session is transferred to Fold.
+
+The existing private runner is prepared for actual Fold data instead of an empty
+collection: verified previous APK/data/preferences backup before same-signer
+update, supplied RVZ receipt, new device-local binding, and actual ordinary files
+across profiles, including retained rejected entries with no card directory.
+Seven focused return fixtures and five Fold admission/guard fixtures pass off-device;
+they do not earn Fold hardware results. Synthetic editor baseline exists but the
+original post-drag readback does not: preserve differing current choices unless
+attribution/owner confirmation justifies supported editor Reset/Save.
+
+A fresh offered safe Fold window must reestablish current private return/recovery,
+exact USB identity/profile and physical panel. Prefer inner; retain all focus,
+physical-panel, presented-geometry, capture, clipping and deadline guards. World
+movement/action/C Stick and audible sound/practical feel require the actual
+control/observation opportunity, not a widened native-Pause synthetic route.
+Owner/world readiness is required before the focused transition; record actual
+before/after PID+start, keep first failing-stage evidence, and force automatic
+same-lease backup/normal-Stop-or-proven-recovery and all-displays-OFF/keyguard
+return. If intro or feedback reaches cutoff, retain partial results and clean up.
+Ordinary-save/cold-reload, exact-scene restore, extended controls/folds and shortcuts
+remain separate. Original later-play freeze stays open. No phone queried here.
+
 ## Current: fixed footer and normal Stop qualified on Pixel4
 
 Installed source `efcd11e6468a982e0ba8ad3d289c7359dbbc52cf`, APK SHA256

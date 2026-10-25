@@ -4,6 +4,29 @@ There are no earned gcx runtime results at seed creation. Each report binds the
 exact source, patches, resources, build identity and tested path. Source inspection,
 automated host tests, APK checks and owner gameplay are separate evidence classes.
 
+## Current alpha review and next Fold session
+
+[Master6391781406](https://github.com/WigglyDon/gcx/issues/2#issuecomment-6391781406)
+accepts source`efcd11e`/APK`6241dc2c` on Pixel4 for fixed Resume/Stop reachability,
+Pause→Resume→Pause→normal joined/durable/profile-released Stop, independently
+protected current checkpoint and same-lease verified return. The50.785seconds is
+operational duration, not responsiveness or game speed. Do not repeat that fixture
+or rebuild unchanged binaries. Explicit Stop correctly left checkpoint=null;
+never rewrite the reference or roll back ordinary data to stage another test.
+
+The next prepared scope is actual Wind Waker gameplay on the primary Fold, after
+a NEW owner offer and actual exclusive admission. Preserve its actual older gcx
+APK/data/preferences, use the accepted same-signer candidate and supplied scoped
+RVZ, and retain any unattributable later controller edits. Use the Fold's actual
+GameId/SaveProfile, panel and source-bound geometry; no Pixel4 save/state migration
+or coordinate reuse. Establish world movement/action/C Stick and direct sound/feel
+observations when available, then one Home→foreground→Pause→Resume→Pause→normal
+joined Stop scenario with actual PID/start classification and automatic same-lease
+backup/return. First failure ends test expansion. Missing observations stay unrun.
+No posture/second-game/shortcut/full-matrix/latency or ordinary-save/cold-reload
+campaign is bundled. Original later-play Pause/reentry freeze remains unresolved.
+Preparation grants no Fold or Pixel4 query, lease polling, installation or test.
+
 ## GCX-1: native engine slice
 
 Verify a complete reproducible Dolphin input pin and licenses. Build an Android
