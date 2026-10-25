@@ -6,6 +6,8 @@ use std::sync::atomic::{AtomicU32, Ordering};
 /// A fixed budget for the narrow lifecycle diagnostic burst, shared by callbacks.
 /// It does not gate player behavior or collect per-frame data.
 pub struct DiagnosticBudget(AtomicU32);
+/// Keep fresh presented-frame evidence available after noisy inset callbacks.
+pub const PRESENTATION_TRACE_RESERVE: u32 = 12;
 impl DiagnosticBudget {
     pub const fn new(limit: u32) -> Self {
         Self(AtomicU32::new(limit))
@@ -14,8 +16,13 @@ impl DiagnosticBudget {
         self.0.store(limit, Ordering::Relaxed);
     }
     pub fn take(&self) -> bool {
+        self.take_preserving(0)
+    }
+    pub fn take_preserving(&self, reserve: u32) -> bool {
         self.0
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_sub(1))
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| {
+                (n > reserve).then(|| n - 1)
+            })
             .is_ok()
     }
 }
@@ -119,6 +126,39 @@ mod tests {
         );
         assert!(!budget.take());
         budget.reset(2); // a new Activity receives its own finite budget
+        assert!(budget.take());
+        assert!(budget.take());
+        assert!(!budget.take());
+    }
+
+    #[test]
+    fn noisy_callbacks_cannot_spend_the_presented_frame_reserve() {
+        let budget = std::sync::Arc::new(DiagnosticBudget::new(48));
+        let threads: Vec<_> = (0..4)
+            .map(|_| {
+                let budget = budget.clone();
+                std::thread::spawn(move || {
+                    (0..100)
+                        .filter(|_| budget.take_preserving(PRESENTATION_TRACE_RESERVE))
+                        .count()
+                })
+            })
+            .collect();
+        assert_eq!(
+            threads
+                .into_iter()
+                .map(|t| t.join().unwrap())
+                .sum::<usize>(),
+            36
+        );
+        // More focus/inset callbacks cannot reopen or consume the reserve.
+        for _ in 0..100 {
+            assert!(!budget.take_preserving(PRESENTATION_TRACE_RESERVE));
+        }
+        assert_eq!((0..100).filter(|_| budget.take()).count(), 12);
+        assert!(!budget.take());
+        budget.reset(2);
+        assert!(!budget.take_preserving(PRESENTATION_TRACE_RESERVE));
         assert!(budget.take());
         assert!(budget.take());
         assert!(!budget.take());

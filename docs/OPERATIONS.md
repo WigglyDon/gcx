@@ -200,8 +200,9 @@ does not qualify game speed, sound, control feel or extended lifecycle behavior.
 A process-loss first failure must also retain gcx's OS exit/scoped crash evidence
 and current data, even when there is no PID to Pause/Stop. The prepared post-exit
 finalizer performs no UI, process kill or intent rewrite: validate actual file
-paths/sizes against remaining budget, archive all app-owned data, compare hashes
-before/after and recheck process absence. Inspect a referenced checkpoint only
+paths/sizes against remaining budget, archive ordinary profiles/settings and the
+selected referenced state, compare hashes before/after and recheck process absence.
+Retain inactive state history in place and record the archive's exact scope. Inspect a referenced checkpoint only
 against the actual device-local binding; preserve archive/errors on mismatch or
 failed validation, and never imply normal Stop. Five new offline fixtures cover
 absent runtime, newly appearing writer, size refusal, foreign binding and failed
@@ -217,3 +218,13 @@ beside returned=true. A free lock alone does not prove handback. Cite actual
 client retirement, physical display/keyguard and kernel-release evidence. Product
 failures or a deferred read-only backup remain product follow-up, not an active
 lease; never relabel them as a successful native Stop to clear custody.
+
+A readiness check must require the newest presented frame after the most recent
+surface init/termination, invalid measurement or unavailable-frame marker, plus
+current playing acknowledgment. An old present record before Home is not proof
+of reentry readiness. Measurement bursts retain a reserved share of the fixed
+sample budget for new frame evidence; never work around missing proof with a
+historical coordinate. Post-exit backup includes all current ordinary profiles,
+collection/settings and the selected referenced state, with independent state
+inspection; inactive state history is inventoried and retained in place rather
+than repeatedly copied into each bounded archive.

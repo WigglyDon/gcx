@@ -43,6 +43,26 @@ preparation, not physical full-width acceptance or a haptics/performance fix on
 Fold. No rebuild of unchanged native engine or completed Pixel4 campaign is
 requested. Device installation/testing needs a fresh offer, backup and admission.
 
+The owner subsequently designated Pixel4 as the working device. The
+[changed-candidate handback](https://github.com/WigglyDon/gcx/issues/2#issuecomment-6400634222)
+records same-signer141dd91e installation with current data hashes preserved,
+real startup graphics and an accepted Android modal-menu haptic request. After
+same-PID/start Home-return the Pause guard correctly refused missing fresh
+presentation evidence. Exactly48 shared samples had been consumed by geometry
+measurements; no post-return frame could publish its rectangle. No normal Stop
+or subjective haptic/audio/control result is earned by that pass. Automatic
+same-lease recovery independently protected the actual new checkpoint and both
+ordinary profiles before guarded quiescent retirement, then verified return.
+Current Pixel4 intent is paused=false/stopped=false/runtime_incomplete=true with
+a checkpoint present; do not rewrite it to the earlier stopped/null reference.
+
+The next bounded diagnostic repair reserves12 of the existing48 samples for
+fresh presentation acknowledgments, keeps the original192 total bound and marks
+presentation exhaustion explicitly. The helper requires a frame after the most
+recent surface/measurement invalidation. Host regressions pass; device proof and
+normal Stop on this repair remain due. This does not diagnose the original Fold
+process-loss incident or close the earlier later-play freeze.
+
 ## GCX-1: native engine slice
 
 Verify a complete reproducible Dolphin input pin and licenses. Build an Android

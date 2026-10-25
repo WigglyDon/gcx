@@ -374,13 +374,13 @@ extern "C" fn draw(phase: u32, width: f32, height: f32, aspect: f32) -> Rect {
     };
     let Some((geometry, pad, centers, fresh, opacity)) = observed else {
         if !MISSING_PRESENT_REPORTED.swap(true, Ordering::Relaxed) {
-            platform::trace_geometry("present.unavailable");
+            platform::trace_presentation(&format!("present.unavailable buffer={width}x{height}"));
         }
         return Rect::default();
     };
     MISSING_PRESENT_REPORTED.store(false, Ordering::Relaxed);
     if fresh {
-        platform::trace_geometry(&format!(
+        platform::trace_presentation(&format!(
             "present.ready buffer={width}x{height} pause_screen={:?}",
             geometry.pause_screen_area()
         ));

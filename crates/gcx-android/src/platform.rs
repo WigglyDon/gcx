@@ -79,6 +79,7 @@ static TRACE_INPUT_FAILURES: gcx::lifecycle::DiagnosticBudget =
     gcx::lifecycle::DiagnosticBudget::new(16);
 static TRACE_GEOMETRY: gcx::lifecycle::DiagnosticBudget = gcx::lifecycle::DiagnosticBudget::new(24);
 static TRACE_RUNTIME: AtomicU64 = AtomicU64::new(0);
+static TRACE_PRESENT_CAP_REPORTED: AtomicBool = AtomicBool::new(false);
 
 pub fn trace_runtime(runtime: u64) {
     TRACE_RUNTIME.store(runtime, Ordering::Relaxed);
@@ -115,7 +116,9 @@ pub fn trace_current(stage: &str, detail: &str) {
     );
 }
 pub fn trace_input(detail: &str) {
-    if TRACE_INPUT.take() && TRACE_SAMPLES.take() {
+    if TRACE_INPUT.take()
+        && TRACE_SAMPLES.take_preserving(gcx::lifecycle::PRESENTATION_TRACE_RESERVE)
+    {
         emit_current("input.down", detail);
     }
 }
@@ -132,8 +135,20 @@ pub fn trace_focus() {
     trace_current("activity.focus", "gained");
 }
 pub fn trace_geometry(detail: &str) {
-    if TRACE_GEOMETRY.take() && TRACE_SAMPLES.take() {
+    if TRACE_GEOMETRY.take()
+        && TRACE_SAMPLES.take_preserving(gcx::lifecycle::PRESENTATION_TRACE_RESERVE)
+    {
         emit_current("geometry", detail);
+    }
+}
+
+/// A successful presentation is input-admission evidence, independent of the
+/// per-focus measurement budget. It still shares the fixed48-sample hard cap.
+pub fn trace_presentation(detail: &str) {
+    if TRACE_SAMPLES.take() {
+        emit_current("geometry", detail);
+    } else if !TRACE_PRESENT_CAP_REPORTED.swap(true, Ordering::Relaxed) {
+        trace_current("geometry", "presentation trace cap reached");
     }
 }
 
@@ -193,6 +208,7 @@ pub fn init(app: &AndroidApp) -> Result<()> {
     EPOCH.fetch_add(1, Ordering::AcqRel);
     TRACE_EVENTS.reset(128);
     TRACE_SAMPLES.reset(48);
+    TRACE_PRESENT_CAP_REPORTED.store(false, Ordering::Relaxed);
     TRACE_INPUT.reset(32);
     TRACE_INPUT_FAILURES.reset(16);
     TRACE_GEOMETRY.reset(24);

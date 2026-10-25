@@ -105,6 +105,16 @@ class Fixture:
 
 
 class PacketTests(unittest.TestCase):
+    def test_play_readiness_rejects_historical_frame_after_surface_or_measurement_loss(self):
+        first = "surface.init\ngeometry present.ready buffer=2280x1080\nnative.pause.end playing\n"
+        self.assertTrue(packet.playing_presentation_ready(first))
+        for invalid in ("surface.init", "surface.terminate", "geometry measurement=false presented=false", "geometry measurement=true presented=false", "geometry present.unavailable buffer=2280x1080"):
+            stale = first + invalid + "\nnative.pause.end playing\n"
+            self.assertFalse(packet.playing_presentation_ready(stale))
+            self.assertTrue(packet.playing_presentation_ready(stale + "geometry present.ready buffer=2280x1080\n"))
+        self.assertFalse(packet.playing_presentation_ready(first + "native.pause.end paused\n"))
+        self.assertFalse(packet.playing_presentation_ready(first + "presentation trace cap reached\n"))
+
     def test_every_fold_display_must_be_off_and_policy_mstate_is_not_physical_state(self):
         self.assertFalse(packet.physical_displays_off("Display State=ON\nDisplay State=OFF\nmState=OFF"))
         self.assertTrue(packet.physical_displays_off("Display State=OFF\nDisplay State=OFF\nmState=AUTO_BRIGHTNESS_ENABLED"))

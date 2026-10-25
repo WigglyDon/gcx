@@ -84,6 +84,24 @@ class Budget:
         return self.commands_end if self.cleanup(now) else self.cleanup_at
 
 
+def playing_presentation_ready(trace):
+    """Require current playing intent and a frame newer than invalidation.
+
+    Historical geometry before the latest surface/measurement is not readiness.
+    A capped presentation history cannot authorize a native coordinate contact.
+    """
+    if any(marker in trace for marker in ("trace cap", "trace limit", "suppressed", "truncated")):
+        return False
+    states = re.findall(r"native\.pause\.end (paused|playing)", trace)
+    ready = trace.rfind("geometry present.ready")
+    measurements = list(re.finditer(r"geometry measurement=(?:true|false) presented=false", trace))
+    invalid = max(trace.rfind("surface.init"), trace.rfind("surface.terminate"),
+                  trace.rfind("geometry measurement=false"),
+                  measurements[-1].start() if measurements else -1,
+                  trace.rfind("geometry present.unavailable"))
+    return bool(states and states[-1] == "playing" and ready > invalid)
+
+
 def component(text):
     matches = re.findall(r"\b([\w.]+)/([\w.$]+)", text)
     normalized = {(p, p + a if a.startswith(".") else a) for p, a in matches}

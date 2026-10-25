@@ -95,6 +95,14 @@ is unfocused while a Dialog is up. Android feedback return values are recorded
 once per outcome per Activity (accepted, declined, no focus, JNI error), without
 forcing system settings or adding work to pad polling. Acceptance of a request
 does not establish felt vibration. Physical consistency still needs qualification.
+Window measurement/input diagnostics may not exhaust the evidence needed for a
+new presented frame. The shared48-sample Activity budget reserves12 slots for
+presentation-ready/unavailable reports; optional callbacks use an atomic
+reserve-preserving take. The overall192-event bound remains unchanged. The
+per-focus measurement counter does not reopen that shared budget. Presentation
+exhaustion has an explicit marker, and native test input still refuses absent,
+stale or capped geometry. This repairs observed diagnostic starvation, not the
+underlying original Fold process-loss incident.
 App-local API30+ WindowInsetsController (API28/29 immersive-sticky fallback) hides
 bars only while playing; menus/picker restore ordinary navigation. Main-thread
 callbacks are checked against the bound Activity; posted work also checks its
