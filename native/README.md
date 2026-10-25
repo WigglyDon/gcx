@@ -1,5 +1,32 @@
 # Direct Dolphin integration
 
+## Prepared fixed-footer candidate
+
+Source `efcd11e6468a982e0ba8ad3d289c7359dbbc52cf`, private APK SHA256
+`6241dc2c49b2afac8636a16c4df9f06f49ebb5887e9ccc2374c447cc91b4fca7`
+(15,870,092bytes), fixes the observed landscape Stop visibility issue in Rust.
+59 host library tests,45 helper regressions, host/Android/xtask warnings-denied
+Clippy and formatting pass. ARM64/JNI, signature, manifest, notices/resources and
+16KiB ELF/ZIP package checks pass. All65 corresponding-source preservation
+checksums passed; matching Rust symbols retained.595 Sys/engine/runtime entries
+and resource manifests match installed Alpha1; native ABI8/state ABI1 unchanged.
+No engine rebuild. This candidate is NOT installed or hardware-qualified.
+
+The next ten-minute private packet has automatic cleanup in the SAME held lease:
+protect and independently inspect the latest coherent generation, click only a
+currently visible semantic Stop, require joined/durable/profile-release evidence,
+verify final ordinary backups and physical return. If Stop is unavailable, retain
+accurate failure and use only the existing backed-current-generation/quiescence
+recovery gates. Five offline workflow fixtures pass for successful Stop, recovery
+without a visible Stop, failed independent inspection, absent quiescence and an
+expired/insufficient original reserve. These are helper fixtures, not device
+results. Both earlier complete archives and current ordinary saves remain intact.
+No further phone operation is queued ahead of a peer's active work or verified
+return. The earlier recovery wrapper's allowed deadline was not clipped to the
+original hard limit, although actual return preceded it; its replay is now refused
+after resolved recovery or insufficient original reserve. Future cleanup is bound
+to the original same-lease budget, without a second admission.
+
 ## Latest Pixel4 Alpha 1 pass and bounded recovery, 2026-10-24
 
 Alpha 1 sourcea9acbe2/APK7c5522f2 is now also installed on Pixel4, with exact
