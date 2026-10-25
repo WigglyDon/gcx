@@ -182,3 +182,17 @@ alone cannot establish a visible button. For the next alpha pass, prepare
 automatic checkpoint backup and normal Stop/recovery inside the held transaction
 before launch; the cleanup reserve must not depend on model turnaround or a
 second admission. EOF finalizes an interactive helper; use an actual open PTY.
+
+The owner requested automated tests without human control takeover. The bounded
+fixed-footer fixture may drive native **Pause only** from the exact installed
+source's actual current-process `present.ready` rectangle, with no covering native
+framework menu, playing-state acknowledgment, live own Activity/window/display,
+fresh single-use PNG and matching buffer geometry. It must refuse stale/missing
+source geometry or a different foreground. This avoids guessing historical
+coordinates while removing model turnaround from a known gcx control. Resolve
+Resume/Stop through current semantic button bounds; retain/open the own-app
+captures for visual review. This is not a general arbitrary-coordinate or guest
+input route. Keep automatic backup/validation/Stop-or-guarded-recovery in the SAME
+held lease, and wait finitely for coherent Home after the authorized stock
+nonsecure wake before launching. A successful short functional fixture
+does not qualify game speed, sound, control feel or extended lifecycle behavior.

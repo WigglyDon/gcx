@@ -1,5 +1,48 @@
 # Direct Dolphin integration
 
+## Current: fixed footer and normal Stop qualified on Pixel4
+
+Installed source `efcd11e6468a982e0ba8ad3d289c7359dbbc52cf`, APK SHA256
+`6241dc2c49b2afac8636a16c4df9f06f49ebb5887e9ccc2374c447cc91b4fca7`.
+After the compatible update/data readback recorded below, a bounded automated
+pass completed in50.785seconds under ONE held physical-device lease. Current
+native graphics rendered from the protected Wind Waker intro/title checkpoint.
+The fixture drove Pause → Resume → Pause using only the actual current process's
+Rust-presented Pause rectangle, fresh own window/display/buffer/PNG coherence and
+single-use capture guards. Native framework buttons were resolved semantically
+with ancestor clipping. Four own-app images were opened afterward; both Resume
+and Stop are visibly fixed below the scrolling body on both pauses. No guest
+movement/action input or historical coordinate was injected.
+
+Automatic cleanup independently validated/backed the latest coherent checkpoint,
+then clicked visible Stop. Current-process trace proves `stop.join.end writer_owned`
+and `stop.complete joined_durable_profile_released`. Final selected metadata is
+stopped=true/runtime_incomplete=false/restart_required=false/checkpoint=null,
+matching explicit Stop intent. Both final ordinary profiles were backed and
+compared to current file hashes. This pass used NORMAL Stop, not controlled game
+process retirement. Empty Java client retirement followed the clean metadata.
+Physical displayOFF/nonsecure keyguard, app absence and actual kernel lease
+release were verified2026-10-25 00:58:17.470UTC.147,482,833bytes, eight UI actions,
+four captures; no pending gcx return/client. Peers notified; Fold untouched.
+
+An earlier ten-minute pass hit its input cutoff before Pause. Its automatic
+same-lease backup/quiescence/recovery returned correctly, without a normal Stop
+claim. The first fully scripted pass then refused the asynchronous stock wake
+before a coherent Home was observed: no game launched, safe return. A read-only
+bounded wake-to-Home observation fixed the fixture race without changing focus
+guards or binaries. Original failures/refused budget retry remain retained. The
+successful script removes model turnaround from this narrow native Pause fixture;
+it does not open arbitrary UI/input, use another app, or weaken the installed
+stock-device lease and return procedure. The earlier operator failures below
+remain historical evidence, not current custody or a normal-Stop pass.
+
+This earns the fixed-footer visibility and bounded current-build Pause/Resume/
+normal-Stop row. It does NOT earn interactive-world input, audible audio/control
+feel, full controls, new ordinary game save/reload, broad reentry/fold transitions,
+shortcuts or performance. Original Pause/reentry root cause remains unproven.
+All accepted earlier source-bound rows and protected candidates/data remain intact.
+No unchanged APK/engine rebuild, launcher change, Fold query or public release.
+
 ## Prepared fixed-footer candidate
 
 Source `efcd11e6468a982e0ba8ad3d289c7359dbbc52cf`, private APK SHA256
@@ -10,7 +53,8 @@ Clippy and formatting pass. ARM64/JNI, signature, manifest, notices/resources an
 16KiB ELF/ZIP package checks pass. All65 corresponding-source preservation
 checksums passed; matching Rust symbols retained.595 Sys/engine/runtime entries
 and resource manifests match installed Alpha1; native ABI8/state ABI1 unchanged.
-No engine rebuild. This candidate is NOT installed or hardware-qualified.
+No engine rebuild. This candidate is now installed on Pixel4; the bounded fixed-footer/Stop result
+above is its earned hardware scope. Fold remains on the earlier Alpha1 build.
 
 The next ten-minute private packet has automatic cleanup in the SAME held lease:
 protect and independently inspect the latest coherent generation, click only a

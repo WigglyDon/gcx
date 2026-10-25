@@ -54,8 +54,9 @@ library and pause flow, and Rust-owned touch-layout editing with a separate inpu
 test. Opacity, dead zone, following sticks and haptics are configurable; positions
 are saved separately for each screen. The Alpha 1 APK is built, privately preserved and installed on the Fold and Pixel 4. The Fold library and control editor rendered
 on the inner display; Pixel 4 rendered Wind Waker intro/title graphics and passed
-a bounded Pause/Resume UI check. Its Stop placement needs the prepared footer fix;
-that pass ended through verified checkpoint recovery. Fold gameplay,
+a bounded Pause/Resume UI check. The fixed-footer update keeps Resume and Stop visible and passed an automated
+Pause/Resume/normal joined Stop check on Pixel 4, with coherent backup and verified
+return. Fold gameplay,
 audio, ordinary saves, resume and posture transitions remain unqualified.
 
 GameCube is the initial scope. Dolphin's Wii capability is not a promise of Wii
