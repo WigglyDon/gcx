@@ -60,10 +60,14 @@ return. The same build now renders Wind Waker's world on Fold, with owner-confir
 movement/action/C Stick. Intermittent sound/frame lag, narrow picture, crowded
 controls and inconsistent haptics are reported. Home-return produced two gcx-named
 processes then process loss; no Fold Resume/normal Stop or latest-generation backup
-result is claimed. The Fold was verified returned. A Rust deck/visual/haptic
-refinement is prepared off-device; exit diagnostics and current-data backup await
-a fresh offered window. Fold ordinary-save/reload, resume, posture and performance
-qualification remain due.
+result is claimed. The Fold was verified returned. The Rust deck/visual/haptic
+refinement and a bounded presentation-diagnostic repair are now installed on
+Pixel 4. Its same-process Home return, fresh graphics, Pause/Resume and normal
+joined Stop passed, with independently backed-up saves/checkpoint and verified
+device return. Android accepted a haptic request; physical feedback quality and
+the new layout on Fold remain unqualified. Fold exit diagnostics and current-data
+backup await a fresh offered window. Fold ordinary-save/reload, resume, posture
+and performance qualification remain due.
 
 GameCube is the initial scope. Dolphin's Wii capability is not a promise of Wii
 support in gcx. A Wii expansion, iOS implementation and multiple resident games

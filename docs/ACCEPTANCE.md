@@ -53,15 +53,39 @@ measurements; no post-return frame could publish its rectangle. No normal Stop
 or subjective haptic/audio/control result is earned by that pass. Automatic
 same-lease recovery independently protected the actual new checkpoint and both
 ordinary profiles before guarded quiescent retirement, then verified return.
-Current Pixel4 intent is paused=false/stopped=false/runtime_incomplete=true with
-a checkpoint present; do not rewrite it to the earlier stopped/null reference.
+At that return Pixel4 intent was paused=false/stopped=false/runtime_incomplete=true
+with a checkpoint present. That actual generation was protected and subsequently
+admitted without rewriting it to the earlier stopped/null reference.
 
-The next bounded diagnostic repair reserves12 of the existing48 samples for
+The bounded diagnostic repair reserves12 of the existing48 samples for
 fresh presentation acknowledgments, keeps the original192 total bound and marks
 presentation exhaustion explicitly. The helper requires a frame after the most
-recent surface/measurement invalidation. Host regressions pass; device proof and
-normal Stop on this repair remain due. This does not diagnose the original Fold
-process-loss incident or close the earlier later-play freeze.
+recent surface/measurement invalidation. Its62 host tests and46 helper regressions,
+formatting, relevant warnings-denied lints and package/reproduction checks pass.
+
+The [repair handback](https://github.com/WigglyDon/gcx/issues/2#issuecomment-6401284540)
+binds source`b8f1843`/APK`307910ef` to a compatible same-signer Pixel4 update with
+all existing data hashes unchanged. Ordinary MAIN entry admitted that actual
+protected title checkpoint; it did not transplant an older gameplay state or use
+Stop to stage entry. Actual Home departure/return retained the same PID and
+process start. Fresh post-surface geometry admitted native Pause, followed by the
+visible fixed footer, Resume, another Pause and normal joined Stop. Five own-app
+captures were opened. No arbitrary guest input or repeated scene-return, library
+or shortcut campaign was performed.
+
+Before Stop, the newest complete generation was independently verified/backed up
+(93,250,868-byte payload, pause intent=true,110,038,528-byte complete archive).
+Native join/durable/profile-release traces and final stopped=true,
+runtime_incomplete=false/restart_required=false/checkpoint=null were verified.
+Both ordinary profiles were backed up; all four ordinary card/console-data files
+also matched their pre-update hashes. App absence, display OFF/nonsecure keyguard
+and exact kernel release were verified at2026-10-25T17:31:54.991442Z; canonical
+custody is released with no pending resources/return. The60.352seconds is operational
+duration, not latency or game speed. Android accepted haptic feedback, which does
+not prove felt vibration. This title-only pass does not earn gameplay, audible
+sound, control feel, ordinary in-game save/reload, full controls or broad lifecycle
+endurance. It does not diagnose the original Fold process-loss incident or close
+the earlier later-play freeze. Fold was not queried.
 
 ## GCX-1: native engine slice
 

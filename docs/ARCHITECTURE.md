@@ -80,8 +80,8 @@ transient bars. The OS can overlay its temporarily revealed bars on that stable
 picture; controls retain clearance. A changed effective/invalid mapping or mismatched
 rotation releases held input; the game is retained.
 The first Fold world pass exposed a tall deck narrowing the picture and a
-following stick drawing over adjacent controls. The next Rust-only presentation
-candidate reduces the default dock from260 to172 points: D-pad beside Control
+following stick drawing over adjacent controls. The Rust-only presentation
+increment reduces the default dock from260 to172 points: D-pad beside Control
 Stick, C Stick below-left of the face buttons, independent analog/click shoulders
 and separate Start/Pause. All digital targets remain at least48 points; docked
 sticks are104 points. Synthetic Fold-size fixtures keep a full-width picture at
