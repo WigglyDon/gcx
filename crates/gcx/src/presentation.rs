@@ -8,6 +8,21 @@ pub const ACCENT: u32 = 0xff85ca72;
 pub const INK: u32 = 0xff173322;
 pub const DANGER: u32 = 0xffdca7a0;
 
+/// Keep a following stick's visible well inside its generous touch target.
+/// Input keeps its continuous following origin; drawing cannot drift over D-pad,
+/// Start or another independently captured control.
+pub fn stick_visual(area: crate::touch::Area, origin: Option<(f32, f32)>) -> (f32, f32, f32) {
+    let radius = (area.right - area.left).min(area.bottom - area.top) * 0.4;
+    let (x, y) = origin
+        .filter(|(x, y)| x.is_finite() && y.is_finite())
+        .unwrap_or(area.center());
+    (
+        x.clamp(area.left + radius, area.right - radius),
+        y.clamp(area.top + radius, area.bottom - radius),
+        radius,
+    )
+}
+
 /// Keep departure controls outside scrollable library/menu content. An error
 /// replaces Resume with Restart; it must never displace Stop from the footer.
 pub fn menu_footer_action(editing: bool, stop_available: bool, action: i32) -> bool {
@@ -64,6 +79,39 @@ pub fn opacity(abgr: u32, percent: u8) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn following_stick_graphics_stay_inside_the_captured_target_even_after_long_drags() {
+        use crate::{
+            Control,
+            touch::{Layout, Target},
+        };
+        for (w, h) in [(840., 420.), (800., 700.), (390., 844.)] {
+            let layout = Layout::new(w, h);
+            for z in layout
+                .zones
+                .iter()
+                .filter(|z| matches!(z.target, Target::Stick(..)))
+            {
+                for origin in [
+                    None,
+                    Some((-10000., 10000.)),
+                    Some((10000., -10000.)),
+                    Some((f32::NAN, 0.)),
+                ] {
+                    let (x, y, r) = stick_visual(z.area, origin);
+                    assert!(x - r >= z.area.left - 0.01 && x + r <= z.area.right + 0.01);
+                    assert!(y - r >= z.area.top - 0.01 && y + r <= z.area.bottom + 0.01);
+                    assert!(r > 0.);
+                }
+            }
+            assert!(
+                layout
+                    .zones
+                    .iter()
+                    .any(|z| z.target == Target::Stick(Control::CX, Control::CY))
+            );
+        }
+    }
     #[test]
     fn pause_recovery_and_library_keep_stop_beside_the_primary_action() {
         for actions in [

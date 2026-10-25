@@ -132,10 +132,10 @@ impl Layout {
         Self::arranged(width, height, 640.0)
     }
     fn docked(width: f32, height: f32) -> Self {
-        // Adapt PSX's square-display shoulder dock: use the middle space for
-        // L/R, keeping the primary stick level with A and the secondary controls
-        // nearby. A tall Fold must not put face buttons half a screen away.
-        let top = height - 260.0;
+        // Keep the Fold's deck shallow enough for a full-width, aspect-correct
+        // picture. The D-pad sits beside the Control Stick; C sits below-left
+        // of A. Travel and digital shoulder clicks remain separate targets.
+        let top = height - 172.0;
         let mut zones = Vec::new();
         let mut add = |x: f32, y: f32, w: f32, h: f32, target, label| {
             zones.push(Zone {
@@ -150,15 +150,9 @@ impl Layout {
             })
         };
         for (x, travel, click, label, click_label) in [
+            (8.0, Control::LTravel, Control::LClick, c"L analog", c"L"),
             (
-                width / 2.0 - 176.0,
-                Control::LTravel,
-                Control::LClick,
-                c"L analog",
-                c"L",
-            ),
-            (
-                width / 2.0 + 8.0,
+                width - 384.0,
                 Control::RTravel,
                 Control::RClick,
                 c"R analog",
@@ -177,27 +171,34 @@ impl Layout {
         }
         add(
             8.0,
-            16.0,
-            112.0,
-            112.0,
+            60.0,
+            104.0,
+            104.0,
             Target::Stick(Control::StickX, Control::StickY),
             c"Control Stick",
         );
-        add(8.0, 140.0, 112.0, 112.0, Target::Dpad, c"D-pad");
+        add(136.0, 84.0, 80.0, 80.0, Target::Dpad, c"D-pad");
         add(
-            128.0,
-            148.0,
+            width / 2.0 - 72.0,
+            116.0,
             48.0,
             48.0,
             Target::Button(Control::Start),
             c"Start",
         );
-        add(128.0, 204.0, 48.0, 48.0, Target::Pause, c"Pause");
+        add(
+            width / 2.0 - 16.0,
+            116.0,
+            48.0,
+            48.0,
+            Target::Pause,
+            c"Pause",
+        );
         for (x, y, size, control, label) in [
-            (width - 92.0, 88.0, 64.0, Control::A, c"A"),
-            (width - 152.0, 112.0, 48.0, Control::B, c"B"),
-            (width - 32.0, 62.0, 48.0, Control::X, c"X"),
-            (width - 94.0, 28.0, 48.0, Control::Y, c"Y"),
+            (width - 64.0, 88.0, 64.0, Control::A, c"A"),
+            (width - 104.0, 144.0, 48.0, Control::B, c"B"),
+            (width - 32.0, 28.0, 48.0, Control::X, c"X"),
+            (width - 128.0, 36.0, 48.0, Control::Y, c"Y"),
         ] {
             add(
                 x - size / 2.0,
@@ -209,18 +210,18 @@ impl Layout {
             );
         }
         add(
-            width - 168.0,
-            148.0,
+            width - 208.0,
+            8.0,
             48.0,
             48.0,
             Target::Button(Control::Z),
             c"Z",
         );
         add(
-            width - 120.0,
-            140.0,
-            112.0,
-            112.0,
+            width - 248.0,
+            60.0,
+            104.0,
+            104.0,
             Target::Stick(Control::CX, Control::CY),
             c"C Stick",
         );
@@ -229,7 +230,7 @@ impl Layout {
                 left: 0.0,
                 top: 0.0,
                 right: width,
-                bottom: top + 8.0,
+                bottom: top + 4.0,
             },
             zones,
         }

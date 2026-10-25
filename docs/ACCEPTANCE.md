@@ -14,18 +14,34 @@ operational duration, not responsiveness or game speed. Do not repeat that fixtu
 or rebuild unchanged binaries. Explicit Stop correctly left checkpoint=null;
 never rewrite the reference or roll back ordinary data to stage another test.
 
-The next prepared scope is actual Wind Waker gameplay on the primary Fold, after
-a NEW owner offer and actual exclusive admission. Preserve its actual older gcx
-APK/data/preferences, use the accepted same-signer candidate and supplied scoped
-RVZ, and retain any unattributable later controller edits. Use the Fold's actual
-GameId/SaveProfile, panel and source-bound geometry; no Pixel4 save/state migration
-or coordinate reuse. Establish world movement/action/C Stick and direct sound/feel
-observations when available, then one Home→foreground→Pause→Resume→Pause→normal
-joined Stop scenario with actual PID/start classification and automatic same-lease
-backup/return. First failure ends test expansion. Missing observations stay unrun.
-No posture/second-game/shortcut/full-matrix/latency or ordinary-save/cold-reload
-campaign is bundled. Original later-play Pause/reentry freeze remains unresolved.
-Preparation grants no Fold or Pixel4 query, lease polling, installation or test.
+The first Fold Wind Waker world session is now observed on that same efcd11e /
+6241dc2c candidate. The [source-bound handback](https://github.com/WigglyDon/gcx/issues/2#issuecomment-6399269117)
+records opened title/cutscene/world images and owner-confirmed movement, action
+and C Stick. Owner reports intermittent sound/frame lag, insufficient picture
+width, crowded controls and inconsistent haptics. No new ordinary-save/reload,
+full input matrix, latency or quality acceptance follows.
+
+The focused Home→foreground return failed before Pause/Resume/Stop: one own PID
+before departure, two gcx-named PIDs after ordinary launch, then neither remained.
+No operator force-stop occurred. Cause is undetermined; normal native Stop/join,
+clean metadata and a post-Home latest-generation backup were NOT earned. The
+same-lease finalizer did verify app absence, both displays OFF/keyguard and exact
+kernel release at 2026-10-25T15:02:33.229390Z. Preserve this result separately
+from the earlier menu-only recovery and accepted Pixel4 Stop rows.
+
+Owner chose continued off-device work instead of the requested fresh read-only
+window. Prepared next packet reads only gcx's OS exit/scoped crash evidence and
+hash-verifies current quiescent data/card/checkpoint backup; no launch, input or
+metadata rewrite. Keep device data and every prior candidate/backup intact.
+Original later-play freeze and this Fold process-loss incident both remain open.
+
+Off-device Rust polish now compacts the default Fold deck, keeps following stick
+graphics inside their touch targets, adds preferred haptics to admitted menu and
+library actions, chooses the focused owned Dialog/Activity window and records
+bounded Android feedback acknowledgments. Host fixtures/geometry previews are
+preparation, not physical full-width acceptance or a haptics/performance fix on
+Fold. No rebuild of unchanged native engine or completed Pixel4 campaign is
+requested. Device installation/testing needs a fresh offer, backup and admission.
 
 ## GCX-1: native engine slice
 

@@ -197,6 +197,7 @@ pub fn init(app: &AndroidApp) -> Result<()> {
     TRACE_INPUT_FAILURES.reset(16);
     TRACE_GEOMETRY.reset(24);
     trace_runtime(0);
+    HAPTIC_OUTCOMES.store(0, Ordering::Relaxed);
     trace_current("activity.init", "");
     PLAYING.store(false, Ordering::Release);
     COMMANDS
@@ -809,31 +810,56 @@ pub fn player_menu(app: &AndroidApp, runtime: u64, can_resume: bool, error: Opti
 pub fn menu_current(generation: u64) -> bool {
     MENU_GENERATION.load(Ordering::Acquire) == generation
 }
+// At most one acknowledgment per outcome per Activity. Android accepting a
+// request is distinct from the owner feeling a vibration; never override its
+// system feedback preference or add work to native pad polling.
+static HAPTIC_OUTCOMES: AtomicU64 = AtomicU64::new(0);
+fn feedback(env: &mut JNIEnv<'_>, activity: &JObject<'_>) {
+    if !crate::player::haptics_enabled() {
+        return;
+    }
+    let result: Result<(u64, &str)> = (|| {
+        // A modal menu owns its own focused window. The Activity decor loses
+        // focus while that Dialog is up, including a queued Pause contact.
+        let dialog = MENU.lock().map_err(|_| "menu lock poisoned")?.clone();
+        let owner = dialog.as_ref().map_or(activity, |d| d.as_obj());
+        let window = env
+            .call_method(owner, "getWindow", "()Landroid/view/Window;", &[])?
+            .l()?;
+        let view = env
+            .call_method(window, "getDecorView", "()Landroid/view/View;", &[])?
+            .l()?;
+        if !env.call_method(&view, "hasWindowFocus", "()Z", &[])?.z()? {
+            return Ok((4, "no_window_focus"));
+        }
+        // VIRTUAL_KEY respects Android's haptic setting and capability.
+        let accepted = env
+            .call_method(view, "performHapticFeedback", "(I)Z", &[JValue::Int(1)])?
+            .z()?;
+        Ok(if accepted {
+            (1, "accepted")
+        } else {
+            (2, "declined")
+        })
+    })();
+    let (flag, detail) = result.unwrap_or_else(|_| {
+        let _ = env.exception_clear();
+        (8, "jni_error")
+    });
+    if HAPTIC_OUTCOMES.fetch_or(flag, Ordering::Relaxed) & flag == 0 {
+        trace_current("haptic.result", detail);
+    }
+}
 pub fn haptic(app: &AndroidApp) {
     let epoch = EPOCH.load(Ordering::Acquire);
     app.run_on_java_main_thread(Box::new(move || {
         if EPOCH.load(Ordering::Acquire) != epoch {
             return;
         }
-        let result = with_env(|env, activity| {
-            let window = env
-                .call_method(activity, "getWindow", "()Landroid/view/Window;", &[])?
-                .l()?;
-            let view = env
-                .call_method(window, "getDecorView", "()Landroid/view/View;", &[])?
-                .l()?;
-            if env.call_method(&view, "hasWindowFocus", "()Z", &[])?.z()? {
-                // VIRTUAL_KEY respects the system's own feedback preference.
-                env.call_method(view, "performHapticFeedback", "(I)Z", &[JValue::Int(1)])?;
-            }
+        let _ = with_env(|env, activity| {
+            feedback(env, activity);
             Ok(())
         });
-        if result.is_err() {
-            let _ = with_env(|env, _| {
-                env.exception_clear()?;
-                Ok(())
-            });
-        }
     }));
 }
 fn menu_caption(
@@ -1588,6 +1614,9 @@ extern "system" fn Java_com_machinerhythm_gcx_GcxActivity_uiAction(
         }
         _ => {}
     }
+    if matches!(action, 1..=11 | 20..=25) {
+        feedback(&mut env, &activity);
+    }
 }
 #[unsafe(no_mangle)]
 extern "system" fn Java_com_machinerhythm_gcx_GcxActivity_gameAction(
@@ -1601,7 +1630,10 @@ extern "system" fn Java_com_machinerhythm_gcx_GcxActivity_gameAction(
     }
     let id = env.get_string(&game).map(String::from);
     match id {
-        Ok(id) if gcx::library::valid_id(&id) => push(Command::Game(id)),
+        Ok(id) if gcx::library::valid_id(&id) => {
+            feedback(&mut env, &activity);
+            push(Command::Game(id));
+        }
         _ => {
             let _ = env.exception_clear();
             push(Command::Notice("Invalid library game.".into()));

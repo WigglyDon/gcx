@@ -31,6 +31,9 @@ static OWNER: AtomicBool = AtomicBool::new(false);
 static NEXT_RUNTIME: AtomicU64 = AtomicU64::new(1);
 static UI: Mutex<PlayerView> = Mutex::new(PlayerView::new());
 static MISSING_PRESENT_REPORTED: AtomicBool = AtomicBool::new(false);
+pub(crate) fn haptics_enabled() -> bool {
+    UI.lock().is_ok_and(|ui| ui.haptics())
+}
 // The core asks for one complete input packet at its actual pad poll. Rendering
 // and the Android owner loop never consume quick-press pulses.
 unsafe extern "C" fn sample_input(controls: *mut f64) {
@@ -416,7 +419,10 @@ extern "C" fn draw(phase: u32, width: f32, height: f32, aspect: f32) -> Rect {
                 let radius = (a.right - a.left).min(a.bottom - a.top) * 0.5;
                 match zone.target {
                     Target::Stick(cx, cy) => {
-                        let (x, y) = centers[usize::from(cx == gcx::Control::CX)].unwrap_or((x, y));
+                        let (x, y, radius) = gcx::presentation::stick_visual(
+                            a,
+                            centers[usize::from(cx == gcx::Control::CX)],
+                        );
                         circle(x, y, radius, 0x708f9298);
                         circle(x, y, radius - 1.5 * geometry.density, 0xc026292e);
                         let reach = radius * 0.64;
@@ -972,7 +978,7 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                                     // No UI lock crosses JNI menu posting or native quiescence.
                                     if let Some(hit) = report {
                                         if matches!(hit, DownReport::Captured | DownReport::Pause)
-                                            && UI.lock().is_ok_and(|ui| ui.haptics())
+                                            && haptics_enabled()
                                         {
                                             platform::haptic(app);
                                         }

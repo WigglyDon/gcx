@@ -27,8 +27,8 @@ up. The landscape update now runs on Pixel 4 with GameCube colors and labels;
 the owner reports it works. Pause/Resume, one Home/return and clean Stop passed.
 The owner accepted the edge-to-edge picture correction, and a fresh-process reload
 of the earlier card save passed on that build. A misplaced system Home handle
-after bar reveal remains open. The full control matrix, extended surface transitions
-and Fold play remain unqualified. Rust-owned coherent
+after bar reveal remains open. The full control matrix and extended surface
+transitions remain unqualified; the first Fold world result is detailed below. Rust-owned coherent
 machine/card checkpoints passed actual native restore/failure fixtures and an
 ABI7 Pixel4 fresh-process return to unsaved scenes, with owner-confirmed sound,
 controls and retained pause intent. The newer ABI8 input/UI build rendered its
@@ -56,8 +56,14 @@ are saved separately for each screen. The Alpha 1 APK is built, privately preser
 on the inner display; Pixel 4 rendered Wind Waker intro/title graphics and passed
 a bounded Pause/Resume UI check. The fixed-footer update keeps Resume and Stop visible and passed an automated
 Pause/Resume/normal joined Stop check on Pixel 4, with coherent backup and verified
-return. Fold gameplay,
-audio, ordinary saves, resume and posture transitions remain unqualified.
+return. The same build now renders Wind Waker's world on Fold, with owner-confirmed
+movement/action/C Stick. Intermittent sound/frame lag, narrow picture, crowded
+controls and inconsistent haptics are reported. Home-return produced two gcx-named
+processes then process loss; no Fold Resume/normal Stop or latest-generation backup
+result is claimed. The Fold was verified returned. A Rust deck/visual/haptic
+refinement is prepared off-device; exit diagnostics and current-data backup await
+a fresh offered window. Fold ordinary-save/reload, resume, posture and performance
+qualification remain due.
 
 GameCube is the initial scope. Dolphin's Wii capability is not a promise of Wii
 support in gcx. A Wii expansion, iOS implementation and multiple resident games

@@ -196,3 +196,15 @@ input route. Keep automatic backup/validation/Stop-or-guarded-recovery in the SA
 held lease, and wait finitely for coherent Home after the authorized stock
 nonsecure wake before launching. A successful short functional fixture
 does not qualify game speed, sound, control feel or extended lifecycle behavior.
+
+A process-loss first failure must also retain gcx's OS exit/scoped crash evidence
+and current data, even when there is no PID to Pause/Stop. The prepared post-exit
+finalizer performs no UI, process kill or intent rewrite: validate actual file
+paths/sizes against remaining budget, archive all app-owned data, compare hashes
+before/after and recheck process absence. Inspect a referenced checkpoint only
+against the actual device-local binding; preserve archive/errors on mismatch or
+failed validation, and never imply normal Stop. Five new offline fixtures cover
+absent runtime, newly appearing writer, size refusal, foreign binding and failed
+state inspection. This follow-up path was added AFTER the first Fold world
+window; that window's latest-generation backup remains unqualified. A deferred
+read-only window is not permission to reacquire or to install another candidate.

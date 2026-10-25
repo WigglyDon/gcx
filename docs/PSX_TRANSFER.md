@@ -161,3 +161,15 @@ D-pad and separate L/R travel/clicks remain independent. Saved overrides address
 logical targets in normalized control-safe coordinates; drawing and input share
 the admitted geometry. Editing/test input never reaches the emulating machine.
 These are source/host observations until the new alpha earns its device results.
+
+## Fold refinement, 2026-10-25
+
+After actual Fold world play exposed crowding, gcx's original Rust refinement
+repackages the existing GameCube targets into a172-point deck and contains
+following-stick graphics inside their touch rectangles. It builds on the already
+reviewed MIT adaptation above; no additional PSX source or private presets were
+copied. The engine aspect, GameCube trigger/click channels, independent pointer
+capture and original input-following policy are retained. The actual shared
+Geometry example now includes a Fold-size synthetic picture fixture. Host checks
+are not a physical Fold layout, haptics or performance acceptance. Sibling work,
+files and device settings were untouched.

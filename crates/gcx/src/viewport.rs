@@ -715,6 +715,45 @@ mod tests {
         assert!((p.right - p.left - 1350.0).abs() < 0.01);
     }
     #[test]
+    fn fold_deck_allows_full_width_without_covering_controls_or_stretching_the_game() {
+        for (density, bottom) in [(2.4375, 80.), (2.45, 78.), (2.625, 48.), (2.75, 16.)] {
+            let bounds = rect(0., 0., 2076., 2152.);
+            let w = WindowGeometry {
+                window: bounds,
+                surface: bounds,
+                content: bounds,
+                input_origin: (0., 0.),
+                clearance: Insets {
+                    bottom,
+                    ..Insets::default()
+                },
+                density,
+            };
+            let g = Geometry::new(w, 2076., 2152.).unwrap();
+            for aspect in [1.25, 4. / 3.] {
+                let picture = g.picture(aspect);
+                assert!(
+                    picture.left.abs() < 0.01 && (picture.right - 2076.).abs() < 0.01,
+                    "narrow Fold picture at density {density}: {picture:?}"
+                );
+                assert!(
+                    ((picture.right - picture.left) / (picture.bottom - picture.top) - aspect)
+                        .abs()
+                        < 0.0001
+                );
+                for z in &g.layout.zones {
+                    let a = z.area;
+                    assert!(
+                        picture.right <= a.left + 0.01
+                            || picture.left >= a.right - 0.01
+                            || picture.bottom <= a.top + 0.01
+                            || picture.top >= a.bottom - 0.01
+                    );
+                }
+            }
+        }
+    }
+    #[test]
     fn revealing_bars_does_not_shrink_or_offset_the_picture_or_break_touch_mapping() {
         let w = window();
         let hidden = Geometry::new(w, 2280.0, 1080.0).unwrap();

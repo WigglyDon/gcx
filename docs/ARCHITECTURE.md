@@ -79,6 +79,22 @@ Dolphin's reported aspect. It does not reserve entire side rails or shrink for
 transient bars. The OS can overlay its temporarily revealed bars on that stable
 picture; controls retain clearance. A changed effective/invalid mapping or mismatched
 rotation releases held input; the game is retained.
+The first Fold world pass exposed a tall deck narrowing the picture and a
+following stick drawing over adjacent controls. The next Rust-only presentation
+candidate reduces the default dock from260 to172 points: D-pad beside Control
+Stick, C Stick below-left of the face buttons, independent analog/click shoulders
+and separate Start/Pause. All digital targets remain at least48 points; docked
+sticks are104 points. Synthetic Fold-size fixtures keep a full-width picture at
+the supplied engine aspect without covering targets. Drawing confines each
+following well to its generous hit rectangle; input following and native sampling
+stay unchanged. Existing saved placements/preferences are not erased.
+
+Gameplay contacts and admitted menu/library clicks share the saved haptics
+preference. Modal menus use their own focused Dialog window; the Activity decor
+is unfocused while a Dialog is up. Android feedback return values are recorded
+once per outcome per Activity (accepted, declined, no focus, JNI error), without
+forcing system settings or adding work to pad polling. Acceptance of a request
+does not establish felt vibration. Physical consistency still needs qualification.
 App-local API30+ WindowInsetsController (API28/29 immersive-sticky fallback) hides
 bars only while playing; menus/picker restore ordinary navigation. Main-thread
 callbacks are checked against the bound Activity; posted work also checks its
