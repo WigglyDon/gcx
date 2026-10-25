@@ -175,3 +175,10 @@ Collection text uses shell-v2 status/stderr: a successful exec-out stream contai
 a missing-file message is not proof of an absent collection. The current helper
 has43 offline regressions covering these gates. The installed Alpha 1 APK is
 unchanged by test-helper repairs.
+
+Semantic button input must intersect its bounds with every ancestor container,
+including ScrollView clipping, and preserve negative coordinates. Screen bounds
+alone cannot establish a visible button. For the next alpha pass, prepare
+automatic checkpoint backup and normal Stop/recovery inside the held transaction
+before launch; the cleanup reserve must not depend on model turnaround or a
+second admission. EOF finalizes an interactive helper; use an actual open PTY.

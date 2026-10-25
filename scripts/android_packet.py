@@ -134,14 +134,16 @@ def own_focus(resumed, windows):
 
 def button_center(xml, text):
     tree = ET.fromstring(xml)
+    parents = {child: parent for parent in tree.iter() for child in parent}
     roots = list(tree)
     if not roots:
         raise Refused("no current UI root")
     def bounds(node):
-        numbers = re.findall(r"\d+", node.attrib.get("bounds", ""))
-        if len(numbers) != 4:
+        rectangle = re.fullmatch(r"\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]",
+                                 node.attrib.get("bounds", ""))
+        if rectangle is None:
             raise Refused("current UI bounds missing")
-        return tuple(map(int, numbers))
+        return tuple(map(int, rectangle.groups()))
     root = bounds(roots[0])
     matches = [n for n in tree.iter("node") if n.attrib.get("text") == text
                and n.attrib.get("package") == PACKAGE
@@ -151,6 +153,11 @@ def button_center(xml, text):
     if len(matches) != 1:
         raise Refused("requested current gcx button missing or ambiguous")
     a, b, c, d = bounds(matches[0])
+    ancestor = parents.get(matches[0])
+    while ancestor is not None and ancestor.tag == "node":
+        left, top, right, bottom = bounds(ancestor)
+        a, b, c, d = max(a, left), max(b, top), min(c, right), min(d, bottom)
+        ancestor = parents.get(ancestor)
     a, b, c, d = max(a, root[0]), max(b, root[1]), min(c, root[2]), min(d, root[3])
     if a >= c or b >= d:
         raise Refused("button is outside the currently observed layout")

@@ -1,5 +1,51 @@
 # Direct Dolphin integration
 
+## Latest Pixel4 Alpha 1 pass and bounded recovery, 2026-10-24
+
+Alpha 1 sourcea9acbe2/APK7c5522f2 is now also installed on Pixel4, with exact
+signer/APK readback and every selected checkpoint/card/SRAM/generation/collection
+hash unchanged across the update. Current ordinary data was freshly backed up;
+the existing complete checkpoint matched the independently validated protected
+archive. Original99018690 APK and all older recovery candidates remain preserved.
+The initial read-only comparison refused changed first-party source/license
+receipts; engine, selected resources and dependency notices actually match.
+An existing-directory error and noninteractive stdin EOF were also retained.
+The idle install helper returned without starting a game. Actual peer contention
+refused safely; PCX and XBX coordinated their separate verified returns.
+
+A separate finite native allocation restored Wind Waker's protected INTRO state
+into paused native execution, then automatically played. It was not the earlier
+interactive-world scene. Four own-app images were opened. Actual Pause hit opened
+the alpha menu; semantic Resume returned to advancing intro/title graphics.
+AudioTrack reported successful fast-track creation, not audible sound, sustained
+quality or latency. One held Start stimulus refused an expired image before any
+input, so no game-action/control-feel qualification follows. No ordinary in-game
+save/reload, A/B/A or launcher campaign was repeated.
+
+The landscape menu's Stop action was below the visible scroll area. Operator
+handling missed the normal-Stop opportunity and the automatic helper cutoff left
+an incomplete return. No clean Stop or joined teardown is claimed. A bounded
+exact-task recovery independently validated and backed the NEW93,382,166-byte
+false-intent checkpoint (complete archive110,169,600bytes), plus both current
+ordinary profiles. Exact current files, PID/start and native quiescence were
+proved before controlled process retirement. Current reference and incomplete
+metadata remain; no rollback or false stopped metadata. Actual app absence,
+physical screenOFF/nonsecure keyguard and kernel lease release were verified at
+2026-10-25 00:08:05UTC, BEFORE the original native hard deadline. Both peers were
+notified. Total collected230,639,278bytes. Original failures remain alongside the
+reconciled private return; no current gcx phone lease/client remains.
+
+The resulting bounded Rust correction pins Resume/Restart and Stop beside each
+other in the existing fixed footer, while auxiliary rows scroll. It also reduces
+the live menu's brand heading. Controls-editor Save/Cancel remains fixed. The
+helper now clips semantic button targets against every ancestor rectangle and
+preserves negative bounds, refusing offscreen targets.59 host library tests and
+45 focused helper regressions pass. New package/hardware status is tracked in
+state.toml; a source/host fix is not device acceptance or closure of the original
+Pause/reentry issue. Before a further phone test, prepare automatic same-lease
+backup/normal-Stop/recovery so the reserved cleanup interval does not depend on
+model or operator turnaround. No Fold/launcher/network/sibling action in this pass.
+
 ## Current: Alpha 1 installed; bounded Fold UI pass only
 
 Alpha 1 product source is `a9acbe21cb34b184577ea7436b5abe361bdaf653`, APK SHA256

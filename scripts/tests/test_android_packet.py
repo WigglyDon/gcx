@@ -429,6 +429,21 @@ class PacketTests(unittest.TestCase):
                           ["shell", "input", "tap", "550", "240"]])
         self.assertEqual(sum("dumpsys activity" in " ".join(c) for c in self.f.calls), 4)
 
+    def test_scroll_view_clips_button_even_when_button_is_inside_the_screen(self):
+        xml = XML.replace('<node text="Stop game"',
+                          '<node bounds="[300,10][750,190]"><node text="Stop game"')
+        xml = xml.replace('bounds="[400,200][700,280]"/>',
+                          'bounds="[400,200][700,280]"/></node>')
+        with self.assertRaises(packet.Refused):
+            packet.button_center(xml, "Stop game")
+        visible = xml.replace('[300,10][750,190]', '[300,10][750,250]')
+        self.assertEqual(packet.button_center(visible, "Stop game"), (550, 225))
+
+    def test_negative_offscreen_bounds_cannot_become_positive_tap_coordinates(self):
+        xml = XML.replace('[400,200][700,280]', '[400,-280][700,-200]')
+        with self.assertRaises(packet.Refused):
+            packet.button_center(xml, "Stop game")
+
     def test_focus_change_after_layout_aborts_the_input_batch(self):
         self.f.after_dump = f"mCurrentFocus=Window{{1 u0 {OTHER}}}"
         with self.assertRaises(packet.Refused):

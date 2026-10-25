@@ -8,6 +8,16 @@ pub const ACCENT: u32 = 0xff85ca72;
 pub const INK: u32 = 0xff173322;
 pub const DANGER: u32 = 0xffdca7a0;
 
+/// Keep departure controls outside scrollable library/menu content. An error
+/// replaces Resume with Restart; it must never displace Stop from the footer.
+pub fn menu_footer_action(editing: bool, stop_available: bool, action: i32) -> bool {
+    if editing {
+        matches!(action, 10 | 11)
+    } else {
+        stop_available && matches!(action, 2..=4)
+    }
+}
+
 /// File-provider names remain intact in storage. Present only their title;
 /// region/revision/file-container labels are not a game's public identity.
 pub fn game_title(name: &str) -> String {
@@ -54,6 +64,31 @@ pub fn opacity(abgr: u32, percent: u8) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn pause_recovery_and_library_keep_stop_beside_the_primary_action() {
+        for actions in [
+            vec![3, 4, 7, 6, 8],
+            vec![2, 4, 7, 6, 8],
+            vec![8, 9, 3, 4, 1],
+        ] {
+            let fixed: Vec<_> = actions
+                .iter()
+                .copied()
+                .filter(|a| menu_footer_action(false, true, *a))
+                .collect();
+            assert!(fixed.contains(&4));
+            assert_eq!(fixed.len(), 2);
+            assert!(fixed.contains(&3) || fixed.contains(&2));
+        }
+        // An unloaded game's Play/Restart and the editor retain their own flow.
+        assert!(!menu_footer_action(false, false, 2));
+        assert!(!menu_footer_action(false, false, 5));
+        let editor: Vec<_> = [20, 21, 23, 24, 25, 22, 10, 11]
+            .into_iter()
+            .filter(|a| menu_footer_action(true, false, *a))
+            .collect();
+        assert_eq!(editor, [10, 11]);
+    }
     #[test]
     fn library_names_keep_disc_and_subtitle_but_drop_known_file_metadata() {
         assert_eq!(

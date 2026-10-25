@@ -89,3 +89,7 @@ Keep future multi-resident sessions possible through identity/ownership, but
 implement one runtime first. Android and iOS may provide the same durable game
 experience with different process and execution policies. Do not promise equal
 engine availability or speed on all platforms without evidence.
+
+Live-game menus keep Resume (or explicit Restart after an error) and Stop in a
+fixed footer. Library rows and auxiliary actions scroll independently, so ordinary
+departure never requires finding Stop below the screen in landscape.

@@ -1092,7 +1092,7 @@ fn render_menu_with_games(
                     activity,
                     &view,
                     "gcx   /   ALPHA 1",
-                    30.0,
+                    if runtime != 0 && !editing { 18.0 } else { 30.0 },
                     gcx::presentation::TEXT,
                 )?;
                 menu_caption(
@@ -1150,7 +1150,9 @@ fn render_menu_with_games(
                 if editing {
                     controls_ui::append(env, activity, &view, density, generation)?;
                 }
-                let footer = if editing {
+                let stop_available = actions.iter().any(|(action, _)| *action == 4);
+                let fixed_footer = editing || stop_available;
+                let footer = if fixed_footer {
                     let row = env.new_object(
                         "android/widget/LinearLayout",
                         "(Landroid/content/Context;)V",
@@ -1238,7 +1240,9 @@ fn render_menu_with_games(
                             &[JValue::Object(&tag)],
                         )?;
                         menu_background(env, &button, color, density)?;
-                        let footer_action = editing && matches!(action, Some(10 | 11));
+                        let footer_action = action.is_some_and(|action| {
+                            gcx::presentation::menu_footer_action(editing, stop_available, action)
+                        });
                         let params = if footer_action {
                             env.new_object(
                                 "android/widget/LinearLayout$LayoutParams",
@@ -1257,9 +1261,9 @@ fn render_menu_with_games(
                             "setMargins",
                             "(IIII)V",
                             &[
-                                JValue::Int(0),
+                                JValue::Int(if footer_action { dp(4.) } else { 0 }),
                                 JValue::Int(dp(5.)),
-                                JValue::Int(0),
+                                JValue::Int(if footer_action { dp(4.) } else { 0 }),
                                 JValue::Int(dp(5.)),
                             ],
                         )?;
@@ -1380,7 +1384,7 @@ fn render_menu_with_games(
                     "(Landroid/view/View;)V",
                     &[JValue::Object(&view)],
                 )?;
-                let content = if editing {
+                let content = if fixed_footer {
                     let content = env.new_object(
                         "android/widget/LinearLayout",
                         "(Landroid/content/Context;)V",
