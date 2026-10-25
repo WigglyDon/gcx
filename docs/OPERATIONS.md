@@ -208,3 +208,12 @@ absent runtime, newly appearing writer, size refusal, foreign binding and failed
 state inspection. This follow-up path was added AFTER the first Fold world
 window; that window's latest-generation backup remains unqualified. A deferred
 read-only window is not permission to reacquire or to install another candidate.
+
+After an accountable later return, keep the current canonical custody receipt
+consistent: returned phase, released custody, resolved recovery and no active
+resource/return/cleanup-error flags. Preserve earlier attempts verbatim with
+hashes and explicit history/resolution references; do not leave a pending phase
+beside returned=true. A free lock alone does not prove handback. Cite actual
+client retirement, physical display/keyguard and kernel-release evidence. Product
+failures or a deferred read-only backup remain product follow-up, not an active
+lease; never relabel them as a successful native Stop to clear custody.
