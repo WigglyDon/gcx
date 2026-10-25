@@ -4,7 +4,16 @@ There are no earned gcx runtime results at seed creation. Each report binds the
 exact source, patches, resources, build identity and tested path. Source inspection,
 automated host tests, APK checks and owner gameplay are separate evidence classes.
 
-## Current alpha review and next Fold session
+## Current alpha review and gameplay investigation
+
+[Master6403418064](https://github.com/WigglyDon/gcx/issues/2#issuecomment-6403418064)
+accepts the b8f1843/307910ef Pixel4 presentation-evidence repair and bounded
+same-process Home/Pause/Resume/normal Stop row below, as recorded rather than an
+independent rerun. Pixel4 is the owner's current working device. Next is actual
+controllable Wind Waker play, then the relevant Home/foreground transition;
+preserve the installed binary/backups and do not repeat the title/footer fixture.
+The original later-play freeze, Fold process loss and intermittent lag remain
+distinct open incidents. Fold stays released and needs its own future grant.
 
 [Master6391781406](https://github.com/WigglyDon/gcx/issues/2#issuecomment-6391781406)
 accepts source`efcd11e`/APK`6241dc2c` on Pixel4 for fixed Resume/Stop reachability,
@@ -86,6 +95,28 @@ not prove felt vibration. This title-only pass does not earn gameplay, audible
 sound, control feel, ordinary in-game save/reload, full controls or broad lifecycle
 endurance. It does not diagnose the original Fold process-loss incident or close
 the earlier later-play freeze. Fold was not queried.
+
+The [gameplay setup attempt](https://github.com/WigglyDon/gcx/issues/2#issuecomment-6404831850)
+used that unchanged installed candidate under fresh stock-lab admission. The owner
+was away and explicitly chose automation. Its named Start contact was refused
+because the inspected capture was145.663seconds old after host/tool turnaround;
+no guest contact or controllable-world observation occurred. Playing/presented
+evidence was available and uncapped. This is setup/observation expiry, not a
+reproduced game Pause failure. It does not earn another title/footer campaign.
+Same-lease backup independently protected the current generation and both ordinary
+profiles before normal joined/durable Stop and verified return at
+2026-10-25T22:48:18.741368Z. Both ordinary cards stayed unchanged; active console
+SRAM changed and its final bytes were protected without restoring earlier data.
+
+The off-device helper refinement keeps all input-admission guards and the30-second
+capture limit. It compares a fresh entire named control against its already
+inspected source/settings/geometry-bound pixels; A setup also checks the inspected
+quest/confirmation region. Ten new public helper checks and13 task guard checks
+pass; this new path still needs actual device proof. No APK rebuild/reinstall or
+performance fix follows. Current clean Stop/checkpoint=null remains legitimate;
+use ordinary quest loading, not an old protected scene reference. Any fresh test
+requires exclusive admission after the current shared lab task's accountable
+return, with automatic same-lease backup/Stop/recovery and original cleanup reserve.
 
 ## GCX-1: native engine slice
 

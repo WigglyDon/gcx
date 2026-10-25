@@ -102,6 +102,41 @@ def playing_presentation_ready(trace):
     return bool(states and states[-1] == "playing" and ready > invalid)
 
 
+def matching_inspected_region(reference_size, reference_rgb, current_size, current_rgb, bounds):
+    """Match a complete previously inspected control against fresh RGB pixels.
+
+    This is a task-fixture check, not input authority or a geometry transform.
+    The caller still needs its named control scope, exact source, current native
+    geometry, fresh focus/display/capture and the ordinary single-use tap guards.
+    Changed game pixels outside the inspected control may differ. Any changed
+    control pixel, frame size, malformed plane or invalid region refuses.
+    """
+    if (not isinstance(current_size, (tuple, list)) or len(current_size) != 2
+            or reference_size != current_size):
+        return False
+    if any(type(n) is not int or not 1 <= n <= 8192 for n in current_size):
+        return False
+    width, height = current_size
+    if (not isinstance(reference_rgb, (bytes, bytearray))
+            or not isinstance(current_rgb, (bytes, bytearray))
+            or len(reference_rgb) != width * height * 3 or len(current_rgb) != len(reference_rgb)):
+        return False
+    if (not isinstance(bounds, (tuple, list)) or len(bounds) != 4
+            or any(type(n) is not int for n in bounds)):
+        return False
+    left, top, right, bottom = bounds
+    if not (0 <= left < right <= width and 0 <= top < bottom <= height
+            and right - left >= 32 and bottom - top >= 32):
+        return False
+    def digest(rgb):
+        view = memoryview(rgb)
+        result = hashlib.sha256()
+        for row in range(top, bottom):
+            result.update(view[(row * width + left) * 3:(row * width + right) * 3])
+        return result.digest()
+    return digest(reference_rgb) == digest(current_rgb)
+
+
 def component(text):
     matches = re.findall(r"\b([\w.]+)/([\w.$]+)", text)
     normalized = {(p, p + a if a.startswith(".") else a) for p, a in matches}
@@ -192,7 +227,10 @@ def hash_arguments(paths):
 
 
 class Driver:
-    def __init__(self, root, budget, invoke, clock=time.monotonic, sleep=time.sleep):
+    def __init__(self, root, budget, invoke, clock=time.monotonic, sleep=time.sleep, *, capture_limit=8):
+        if type(capture_limit) is not int or not 1 <= capture_limit <= 10:
+            raise Refused("invalid admitted capture ceiling")
+        self.capture_limit = capture_limit
         self.root, self.budget, self.invoke = Path(root), budget, invoke
         self.clock, self.sleep = clock, sleep
         self.operation_end = budget.commands_end
@@ -203,6 +241,7 @@ class Driver:
         self.own_ui_observed = False
         self.launched = False
         self.receipt = {"started": time.time(), "operations": [], "handback": False,
+                        "capture_limit": capture_limit,
                         "phase": "admitted", "recovery_resolved": False}
 
     def save(self):
@@ -423,7 +462,7 @@ class Driver:
         self.budget.admit(self.clock(), cleanup, seconds)
         self.operation_end = min(self.budget.commands_end, self.clock() + seconds)
         if op == "capture":
-            if self.captures >= 8:
+            if self.captures >= self.capture_limit:
                 raise Refused("image ceiling reached")
             self.captures += 1
             before = self.focus()

@@ -104,6 +104,83 @@ class Fixture:
         return subprocess.CompletedProcess(args, 0, out, b"")
 
 
+class CaptureBudgetTests(unittest.TestCase):
+    def test_existing_packets_keep_eight_capture_default(self):
+        with tempfile.TemporaryDirectory() as root:
+            fixture = Fixture(root)
+            self.assertEqual(fixture.driver.capture_limit, 8)
+            self.assertEqual(fixture.driver.receipt['capture_limit'], 8)
+            fixture.driver.captures = 8
+            with self.assertRaises(packet.Refused):
+                fixture.driver.execute(dict(op='capture', name='extra.png', capture_limit=10))
+            self.assertEqual(fixture.calls, [])
+
+    def test_task_admitted_ten_capture_ceiling_is_enforced(self):
+        with tempfile.TemporaryDirectory() as root:
+            fixture = Fixture(root)
+            driver = packet.Driver(root, fixture.budget, fixture.invoke,
+                                   lambda: fixture.now, fixture.sleep, capture_limit=10)
+            driver.captures = 9
+            self.assertEqual(driver.receipt['capture_limit'], 10)
+            driver.execute(dict(op='capture', name='tenth.png'))
+            self.assertEqual(driver.captures, 10)
+            before = len(fixture.calls)
+            with self.assertRaises(packet.Refused):
+                driver.execute(dict(op='capture', name='eleventh.png'))
+            self.assertEqual(len(fixture.calls), before)
+
+    def test_ceiling_above_stock_lab_max_refuses_before_transport(self):
+        for limit in [0, 11, 10., True]:
+            with self.subTest(limit=limit), self.assertRaises(packet.Refused):
+                packet.Driver('/unused', None, None, capture_limit=limit)
+
+
+class InspectedRegionTests(unittest.TestCase):
+    def setUp(self):
+        self.size = (128, 96)
+        self.rgb = bytes([72, 104, 156]) * (128 * 96)
+        self.bounds = (32, 24, 96, 88)
+
+    def matches(self, **changes):
+        args = dict(reference_size=self.size, reference_rgb=self.rgb,
+                    current_size=self.size, current_rgb=self.rgb, bounds=self.bounds)
+        args.update(changes)
+        return packet.matching_inspected_region(**args)
+
+    def test_exact_control_pixels_match(self):
+        self.assertTrue(self.matches())
+
+    def test_one_changed_control_pixel_refuses(self):
+        changed = bytearray(self.rgb)
+        changed[(40 * 128 + 50) * 3] ^= 1
+        self.assertFalse(self.matches(current_rgb=changed))
+
+    def test_background_outside_control_may_change(self):
+        changed = bytearray(self.rgb)
+        changed[0] ^= 1
+        self.assertTrue(self.matches(current_rgb=changed))
+
+    def test_changed_frame_size_refuses(self):
+        self.assertFalse(self.matches(current_size=(96, 128)))
+
+    def test_malformed_frame_sizes_refuse(self):
+        for size in [None, (), (128,), (128., 96), (0, 96), (8193, 96)]:
+            with self.subTest(size=size):
+                self.assertFalse(self.matches(current_size=size))
+
+    def test_malformed_rgb_plane_refuses(self):
+        self.assertFalse(self.matches(current_rgb=self.rgb[:-1]))
+        self.assertFalse(self.matches(reference_rgb=b''))
+        self.assertFalse(self.matches(current_rgb=None))
+        self.assertFalse(self.matches(reference_rgb=''))
+
+    def test_invalid_or_tiny_bounds_refuse(self):
+        for bounds in [None, (-1, 0, 64, 64), (32, 24, 129, 88), (32, 24, 63, 88),
+                       (32, 24, 96, 24), (32., 24, 96, 88), (32, 24, 96)]:
+            with self.subTest(bounds=bounds):
+                self.assertFalse(self.matches(bounds=bounds))
+
+
 class PacketTests(unittest.TestCase):
     def test_play_readiness_rejects_historical_frame_after_surface_or_measurement_loss(self):
         first = "surface.init\ngeometry present.ready buffer=2280x1080\nnative.pause.end playing\n"

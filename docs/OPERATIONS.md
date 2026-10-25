@@ -197,6 +197,25 @@ held lease, and wait finitely for coherent Home after the authorized stock
 nonsecure wake before launching. A successful short functional fixture
 does not qualify game speed, sound, control feel or extended lifecycle behavior.
 
+For the separately owner-authorized automated Wind Waker setup, Start/A are the
+existing named guest-contact route; the Pause fixture alone grants neither. If
+model/tool turnaround expires an inspected capture, keep the30-second guard and
+report a setup refusal, not a game freeze. A task may bind a complete inspected
+control region to the exact source/APK, settings and native geometry, then compare
+every RGB pixel against its newly captured counterpart before that one contact.
+Require identical frame dimensions and an unchanged complete control/clear border;
+changed pixels, profiles, geometry or a covering framework menu refuse. This is
+no coordinate scaling or generic recognition route. Keep current focus/display,
+playing/presentation, buffer, freshness and single-use guards; retain/open each
+whole frame before any further guest action. Limit Start to ordinary title entry,
+A to the inspected existing quest route and one observed-world action, preserve
+the Pause/cleanup capture reserve, and stop at the first refusal. Never overwrite
+a quest or interpret an intro as controllable play.
+The standard helper retains its eight-image default. The explicitly admitted
+gameplay packet may select ten at construction, within the current stock-lab
+maximum; per-command input cannot raise that ceiling. Its18-minute hard limit,
+five-minute cleanup and45-second final-return reserve remain the original bounds.
+
 A process-loss first failure must also retain gcx's OS exit/scoped crash evidence
 and current data, even when there is no PID to Pause/Stop. The prepared post-exit
 finalizer performs no UI, process kill or intent rewrite: validate actual file
