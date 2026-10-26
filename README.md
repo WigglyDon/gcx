@@ -69,6 +69,14 @@ the new layout on Fold remain unqualified. Fold exit diagnostics and current-dat
 backup await a fresh offered window. Fold ordinary-save/reload, resume, posture
 and performance qualification remain due.
 
+A focused native regression exposed our input hook consuming queued presses on
+GameCube connection/status probes before a button packet. Sampling now occurs at
+the actual SI data read; the same Start/A cases fail before and pass after the
+repair. The new ARM64 build is installed on Pixel 4 with existing data and both
+recovery candidates preserved. Its zero-duration menu contact still left Wind
+Waker at the title, so actual-world Pause/Home investigation on this candidate
+remains unrun. No game-entry, latency or original-freeze fix is claimed.
+
 GameCube is the initial scope. Dolphin's Wii capability is not a promise of Wii
 support in gcx. A Wii expansion, iOS implementation and multiple resident games
 are separate decisions. Google Play and ordinary Apple App Store distribution
