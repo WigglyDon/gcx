@@ -379,7 +379,12 @@ host verifier's startup failure as a changed app signer. Prepare resource compat
 before custody; the executor's memory/virtual-address bounds apply to child tools too.
 The next packet keeps a constructor-declared stick duration, at most four seconds,
 while earlier callers retain their one-second default. These are individual finite
-contacts on a current inspected frame, with full named-control matching and the
-same source/settings/geometry/focus/process/single-use guards. Refresh an expired
-observation explicitly; no blind gesture or silent replacement frame. This changes
-test pacing, not emulator input policy, game speed or performance qualification.
+contacts with full named-control matching and the same source/settings/geometry/
+focus/process/single-use guards. Direct dispatch uses the actual inspected frame
+within thirty seconds. A prepared, explicitly requested matching refresh may
+instead capture a new frame and compare its complete named control AND inspected
+guest-context region exactly before dispatch. The dispatched frame retains the
+same age limit. Preserve/open that whole capture before any further guest action.
+Changed pixels refuse; there is no blind gesture, implicit refresh or age extension.
+This changes test pacing, not emulator input policy, game speed or performance
+qualification. Tool/inspection expiry remains missing evidence, not a game freeze.

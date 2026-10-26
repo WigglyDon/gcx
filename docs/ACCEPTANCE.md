@@ -49,7 +49,12 @@ These are test-harness repairs, not an emulator, signer or original-freeze fix.
 
 Next preparation permits individually admitted stick contacts up to four seconds,
 with the one-second default preserved for prior packets. Contacts still require
-the actual inspected frame within thirty seconds and cannot silently replace it.
+either the actual inspected frame within thirty seconds, or an explicitly requested
+fresh capture whose complete control and inspected guest-context pixels match
+exactly before dispatch. The dispatched frame's age limit is unchanged, and its
+whole image is retained/opened before another guest input. Direct-only dispatch
+subsequently refused an expired first world observation; no world input occurred,
+and that failed work returned with protected saves and normal joined Stop.
 Local test receipts now publish atomically after a transient reader/truncation
 race was observed. The missing meaningful game-save/reload objective remains due;
 another actual session requires normal fleet admission after the current holder.
