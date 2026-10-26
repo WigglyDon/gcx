@@ -234,6 +234,15 @@ that requests cleanup enters the finalizer immediately, without requiring a
 separate Finish command or waiting for the fixed cutoff. Keep both original
 absolute deadlines and the return reserve intact.
 
+An offline host checkpoint-inspector timeout is distinct from an invalid
+checkpoint verdict and a device-transport timeout. Retain the first timeout.
+The existing same-lease finalizer may make one further host-only verification
+attempt against the same archive, with a command limit of 30 seconds and at
+least 140 seconds of the original Stop/return reserve remaining. Never renew
+the lease/deadlines, recollect an unbudgeted archive, retry an invalid verdict,
+or continue after a timed-out device transport. Keep verifier/source identity
+and both attempt results; a later pass does not erase the first failure.
+
 A process-loss first failure must also retain gcx's OS exit/scoped crash evidence
 and current data, even when there is no PID to Pause/Stop. The prepared post-exit
 finalizer performs no UI, process kill or intent rewrite: validate actual file
