@@ -265,3 +265,27 @@ historical coordinate. Post-exit backup includes all current ordinary profiles,
 collection/settings and the selected referenced state, with independent state
 inspection; inactive state history is inventoried and retained in place rather
 than repeatedly copied into each bounded archive.
+
+For presentation timing, `cargo run --offline --locked -p gcx --bin
+gcx-present-times -- PRIVATE_OBSERVATION.json` analyzes already collected text;
+it performs no device operation. The input is `{"snapshots":[{"start_ns":0,
+"end_ns":1,"stats":"..."}, ...]}` with monotonic host read bounds and the raw
+output of `dumpsys SurfaceFlinger --latency EXACT_OWNED_LAYER`. Collect only under
+fresh admitted custody, with current own foreground, process/start, display and
+playing evidence. Discover only matching gcx layer names; require exactly one
+advancing history and rediscover after a surface transition. Keep names and raw
+histories private. Never omit the layer argument (global animation statistics),
+use `--latency-clear`, or change OS/emulator timing settings for this observation.
+
+The decoder follows the public Android13
+[FrameTracker format](https://android.googlesource.com/platform/frameworks/native/+/refs/tags/android-13.0.0_r3/services/surfaceflinger/FrameTracker.cpp):
+refresh period, then at most 127 desired/actual/ready timestamp rows. It uses the
+actual column, excludes zero/invalid/pending fences, deduplicates overlap, and
+requires the previous completed high-water timestamp in every next history.
+Lost overlap withholds interval statistics. Missing/nonadvancing history is not
+zero FPS or proof of a hung game. The bounded report retains long intervals,
+initial progress observation and a trailing no-progress lower bound; its first
+interval begins at the baseline's latest frame, which can predate the first
+read. These are completed surface presentation intervals, not unique game FPS,
+emulation speed, audio quality or touch-to-photon latency. At most 32 snapshots
+and 512 KiB input keep this an offline diagnostic, not a monitoring service.
