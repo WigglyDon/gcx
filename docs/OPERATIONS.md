@@ -330,3 +330,37 @@ transition is a separate segment, never a fabricated continuous stream. Refuse
 to pool changed-process/layer/refresh, missing-history and nonadvancing cases.
 Keep the finite profiling bound inside the original new-work/cleanup deadlines;
 no refresh/speed/audio/save-durability change is part of this observation.
+
+Master6425756029 accepts the recorded matched stationary comparison as complete
+for that hypothesis. Do not rerun it or add a Home-specific timing fix without
+new evidence. The next prepared current-build packet concerns ordinary progress.
+
+For that packet, retain current collection/settings and every ordinary profile
+before play. Use only individually guarded, source/scene-bound contacts; title
+Start/A setup is not a general gameplay macro. Inspect the actual game Save menu
+and confirmation before navigating it. Require visible movement/action/C Stick,
+a recognizable marker the game persists and an observed save-completion message.
+The first normal joined Stop protects its current generation independently;
+only then retire the empty app, prove absence and launch a new process through
+the game's own menus. Reject checkpoint-restore evidence as ordinary reload.
+Confirm the persisted marker, then protect the final generation and Stop normally.
+Keep each stage's evidence distinct and retain the first failure. Missing/capped
+diagnostics or expired observations are not proof of the original freeze.
+
+This two-Stop packet declares finite aggregate image/byte bounds at construction;
+individual commands cannot enlarge them. Existing packets retain their earlier
+caps. Reserve bytes for both remaining Stop backups before admitting more images,
+and reserve cold loading plus final cleanup before the first Stop. Stage helpers
+inherit absolute deadlines and aggregate counters; no deadline is renewed.
+
+Use the installed android-device finite recipe route for qualified Pixel4 lab
+work. Prepare the private authority/input graph, admit/work/cleanup/verify hooks
+and finite budgets off-device before `request`; use the actual returned job ID
+for `status`, `wait`, `resume` or `cancel`. Client wait duration is not job duration.
+The installed custodian owns physical admission, safe handoff and actual release;
+product hooks verify their own data/clients and return under that same lease.
+Do not create a second controller or detach a legacy foreground transaction.
+Respect this task's no-immediate-reacquisition instruction; preparation alone
+submits no request or reservation. A nonprogressing pending startup is reported
+through fleet issue21 with its job ID, never cleared by editing custody records.
+Fold requires its own fresh personal window and is excluded from this packet.

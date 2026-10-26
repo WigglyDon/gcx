@@ -227,10 +227,16 @@ def hash_arguments(paths):
 
 
 class Driver:
-    def __init__(self, root, budget, invoke, clock=time.monotonic, sleep=time.sleep, *, capture_limit=8):
-        if type(capture_limit) is not int or not 1 <= capture_limit <= 10:
+    def __init__(self, root, budget, invoke, clock=time.monotonic, sleep=time.sleep, *,
+                 capture_limit=8, byte_limit=268435456):
+        # These are prepared task bounds, not authority or policy overrides.
+        # Existing callers retain their original eight/ten-image and byte caps.
+        if type(capture_limit) is not int or not 1 <= capture_limit <= 48:
             raise Refused("invalid admitted capture ceiling")
+        if type(byte_limit) is not int or not 1 <= byte_limit <= 402653184:
+            raise Refused("invalid admitted collected-byte ceiling")
         self.capture_limit = capture_limit
+        self.byte_limit = byte_limit
         self.root, self.budget, self.invoke = Path(root), budget, invoke
         self.clock, self.sleep = clock, sleep
         self.operation_end = budget.commands_end
@@ -242,6 +248,7 @@ class Driver:
         self.launched = False
         self.receipt = {"started": time.time(), "operations": [], "handback": False,
                         "capture_limit": capture_limit,
+                        "byte_limit": byte_limit,
                         "phase": "admitted", "recovery_resolved": False}
 
     def save(self):
@@ -265,7 +272,7 @@ class Driver:
             self.timeout = True
             raise
         self.received += len(result.stdout) + len(result.stderr)
-        if self.received > 268435456:
+        if self.received > self.byte_limit:
             self.budget.forced_cleanup = True
             raise Refused("collected-byte ceiling reached")
         return result
@@ -483,11 +490,13 @@ class Driver:
             p.chmod(0o600)
             self.last_capture = (name, self.clock(), before, dimensions)
             return {"capture": str(p), "bytes": len(result.stdout)}
-        if op == "gcx_tap":
+        if op in ("gcx_tap", "gcx_stick"):
             # Automated native-button checks use an agent-inspected, just-taken
             # own image. Bind one tap to its live window AND display geometry;
             # never reuse a guessed historical layout or a batch of points.
-            if command["target"] not in ("Pause", "Start", "A", "B"):
+            admitted = (("Control Stick", "C Stick") if op == "gcx_stick"
+                        else ("Pause", "Start", "A", "B"))
+            if command["target"] not in admitted:
                 raise Refused("unadmitted native control")
             if cleanup and command["target"] != "Pause":
                 raise Refused("cleanup native input is Pause only")
@@ -512,14 +521,31 @@ class Driver:
             width, height = capture[3]
             if not (0 <= a < c <= width and 0 <= b < d <= height):
                 raise Refused("native button outside current image")
-            press = command.get("press_ms", 0)
-            if type(press) is not int or not 0 <= press <= 250:
-                raise Refused("test press duration must be 0..250ms")
-            if press and command["target"] == "Pause":
-                raise Refused("Pause opens a new window; held contact is game controls only")
-            x, y = str((a+c)//2), str((b+d)//2)
-            result = self.action(["shell", "input", "swipe", x, y, x, y, str(press)] if press else
-                                 ["shell", "input", "tap", x, y])
+            x, y = (a+c)//2, (b+d)//2
+            if op == "gcx_stick":
+                delta = command.get("delta")
+                duration = command.get("duration_ms")
+                if (not isinstance(delta, list) or len(delta) != 2
+                        or any(type(v) is not int for v in delta)
+                        or not any(delta)
+                        or sum(v*v for v in delta) > (min(c-a, d-b)//3)**2):
+                    raise Refused("stick displacement must stay inside its inspected thumb well")
+                if type(duration) is not int or not 100 <= duration <= 1000:
+                    raise Refused("one stick contact must be 100..1000ms")
+                # Stock swipe supplies down/move/up as one finite command.
+                # The fixture must prove the complete named well, source,
+                # settings and live geometry; no arbitrary screen trajectory.
+                result = self.action(["shell", "input", "swipe", str(x), str(y),
+                                      str(x+delta[0]), str(y+delta[1]), str(duration)])
+            else:
+                press = command.get("press_ms", 0)
+                if type(press) is not int or not 0 <= press <= 250:
+                    raise Refused("test press duration must be 0..250ms")
+                if press and command["target"] == "Pause":
+                    raise Refused("Pause opens a new window; held contact is game controls only")
+                x, y = str(x), str(y)
+                result = self.action(["shell", "input", "swipe", x, y, x, y, str(press)] if press else
+                                     ["shell", "input", "tap", x, y])
         elif op == "gcx_button":
             text = command["text"]
             if cleanup and text not in ("Stop game", "Stop current game"):

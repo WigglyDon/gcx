@@ -6,6 +6,26 @@ automated host tests, APK checks and owner gameplay are separate evidence classe
 
 ## Current alpha review and gameplay investigation
 
+[Master6425756029](https://github.com/WigglyDon/gcx/issues/2#issuecomment-6425756029)
+accepts the retained analysis and eight matched stationary windows on unchanged
+f9de0b0/b4c92127. That comparison is complete for the present Home timing
+hypothesis: no repeat or Home-specific performance fix without new evidence.
+The original later-play freeze remains open, separately from Fold process loss.
+The next missing current-build result is actual Wind Waker movement/action and
+C Stick, meaningful ordinary progress saved through the game, normal joined
+Stop, then a fresh-process game-menu reload of that progress. Older ordinary
+save/reload results remain earned only on their recorded source/build.
+
+The owner is away and chose guarded automation preparation. The prepared packet
+binds each finite contact to the inspected guest context, complete named control,
+unchanged source/APK/settings and current presentation/focus. It requires visible
+play outcomes, a persisted marker and actual game-save completion; sent input,
+camera position or changed card hashes cannot substitute. Two Stop stages share
+the original deadlines and aggregate evidence bounds, with distinct protected
+generations. A checkpoint restore cannot satisfy ordinary reload. These are
+off-device guards, not a new gameplay/save result; audible sound and control feel
+require real human observations. No new device admission has been requested.
+
 [The f9de0b0/b4c92127 handback](https://github.com/WigglyDon/gcx/issues/2#issuecomment-6408382857)
 records actual Pixel4 bridge-world Pause/Resume, same-process Home/return and
 final native paused/durable checkpoint acknowledgment, followed by independently

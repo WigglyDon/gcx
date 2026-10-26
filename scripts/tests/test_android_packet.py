@@ -129,10 +129,35 @@ class CaptureBudgetTests(unittest.TestCase):
                 driver.execute(dict(op='capture', name='eleventh.png'))
             self.assertEqual(len(fixture.calls), before)
 
-    def test_ceiling_above_stock_lab_max_refuses_before_transport(self):
-        for limit in [0, 11, 10., True]:
+    def test_invalid_or_unimplemented_capture_ceiling_refuses_before_transport(self):
+        for limit in [0, 49, 10., True]:
             with self.subTest(limit=limit), self.assertRaises(packet.Refused):
                 packet.Driver('/unused', None, None, capture_limit=limit)
+
+    def test_prepared_two_stop_packet_has_one_aggregate_evidence_budget(self):
+        with tempfile.TemporaryDirectory() as root:
+            fixture = Fixture(root)
+            driver = packet.Driver(root, fixture.budget, fixture.invoke,
+                                   lambda: fixture.now, fixture.sleep,
+                                   capture_limit=48, byte_limit=384 * 1024**2)
+            self.assertEqual(driver.receipt['byte_limit'], 384 * 1024**2)
+            driver.captures = 48
+            with self.assertRaises(packet.Refused):
+                driver.execute(dict(op='capture', name='extra.png'))
+            self.assertEqual(fixture.calls, [])
+            driver.received = driver.byte_limit
+            with self.assertRaises(packet.Refused):
+                driver.call(['shell', packet.FOCUS_QUERY])
+            self.assertTrue(fixture.budget.forced_cleanup)
+
+    def test_old_byte_limit_and_new_constructor_limit_do_not_follow_commands(self):
+        with tempfile.TemporaryDirectory() as root:
+            fixture = Fixture(root)
+            self.assertEqual(fixture.driver.byte_limit, 256 * 1024**2)
+            self.assertEqual(fixture.driver.receipt['byte_limit'], 256 * 1024**2)
+        for invalid in (0, -1, True, 1., 384 * 1024**2 + 1):
+            with self.subTest(limit=invalid), self.assertRaises(packet.Refused):
+                packet.Driver('/unused', None, None, byte_limit=invalid)
 
 
 class InspectedRegionTests(unittest.TestCase):
@@ -458,6 +483,41 @@ class PacketTests(unittest.TestCase):
         self.assertEqual(self.f.calls[-1], ["shell", "input", "tap", "60", "345"])
         with self.assertRaises(packet.Refused):
             self.f.driver.execute(tap)
+
+    def test_stick_contact_is_named_finite_and_single_use(self):
+        self.f.driver.execute(dict(op='capture', name='stick.png'))
+        command = dict(op='gcx_stick', target='C Stick', capture='stick.png',
+                       bounds=[30, 290, 150, 390], delta=[20, -15], duration_ms=500)
+        self.f.driver.execute(command)
+        self.assertEqual(self.f.calls[-1],
+                         ['shell', 'input', 'swipe', '90', '340', '110', '325', '500'])
+        with self.assertRaises(packet.Refused):
+            self.f.driver.execute(command)
+
+    def test_stick_contact_refuses_unbounded_arbitrary_and_cleanup_routes(self):
+        self.f.driver.execute(dict(op='capture', name='stick.png'))
+        command = dict(op='gcx_stick', target='Control Stick', capture='stick.png',
+                       bounds=[30, 290, 150, 390], delta=[20, 0], duration_ms=500)
+        for change in ({'target': 'A'}, {'cleanup': True}, {'delta': [0, 0]},
+                       {'delta': [34, 0]}, {'delta': [25, 25]}, {'delta': [True, 0]},
+                       {'delta': [1]}, {'delta': '20,0'}, {'duration_ms': 99},
+                       {'duration_ms': 1001}, {'duration_ms': True}):
+            with self.subTest(change=change), self.assertRaises(packet.Refused):
+                self.f.driver.execute(dict(command, **change))
+        self.assertFalse(any('input' in call for call in self.f.calls))
+
+    def test_stick_capture_expiry_and_window_change_refuse(self):
+        self.f.driver.execute(dict(op='capture', name='stick.png'))
+        command = dict(op='gcx_stick', target='Control Stick', capture='stick.png',
+                       bounds=[30, 290, 150, 390], delta=[20, 0], duration_ms=500)
+        self.f.now += 31
+        with self.assertRaises(packet.Refused):
+            self.f.driver.execute(command)
+        self.f.now -= 31
+        self.f.windows = WINDOW.replace('r=0', 'r=1')
+        with self.assertRaises(packet.Refused):
+            self.f.driver.execute(command)
+        self.assertFalse(any('input' in call for call in self.f.calls))
 
     def test_focus_metadata_is_batched_without_dropping_either_observation(self):
         self.f.driver.focus()
