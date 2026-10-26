@@ -80,13 +80,40 @@ static TRACE_INPUT_FAILURES: gcx::lifecycle::DiagnosticBudget =
 static TRACE_GEOMETRY: gcx::lifecycle::DiagnosticBudget = gcx::lifecycle::DiagnosticBudget::new(24);
 static TRACE_RUNTIME: AtomicU64 = AtomicU64::new(0);
 static TRACE_PRESENT_CAP_REPORTED: AtomicBool = AtomicBool::new(false);
+static TRACE_OPTIONAL_CAP_REPORTED: AtomicBool = AtomicBool::new(false);
+static TRACE_ACK_CAP_REPORTED: AtomicBool = AtomicBool::new(false);
 
 pub fn trace_runtime(runtime: u64) {
     TRACE_RUNTIME.store(runtime, Ordering::Relaxed);
 }
 pub fn trace(runtime: u64, menu: u64, stage: &str, detail: &str) {
-    if TRACE_EVENTS.take() {
+    if TRACE_EVENTS.take_lifecycle_stage(stage) {
         emit_trace(runtime, menu, stage, detail);
+    } else {
+        let optional =
+            gcx::lifecycle::lifecycle_trace_reserve(stage) == gcx::lifecycle::LIFECYCLE_ACK_RESERVE;
+        let reported = if optional {
+            &TRACE_OPTIONAL_CAP_REPORTED
+        } else {
+            &TRACE_ACK_CAP_REPORTED
+        };
+        // Each marker spends one of the existing128 slots; no cap expansion.
+        if !reported.swap(true, Ordering::Relaxed) && TRACE_EVENTS.take() {
+            emit_trace(
+                runtime,
+                menu,
+                if optional {
+                    "lifecycle.optional_limit"
+                } else {
+                    "lifecycle.ack_limit"
+                },
+                if optional {
+                    "optional records omitted; native acknowledgment and Stop slots reserved"
+                } else {
+                    "trace cap: native state acknowledgments unavailable"
+                },
+            );
+        }
     }
 }
 fn emit_trace(runtime: u64, menu: u64, stage: &str, detail: &str) {
@@ -209,6 +236,8 @@ pub fn init(app: &AndroidApp) -> Result<()> {
     TRACE_EVENTS.reset(128);
     TRACE_SAMPLES.reset(48);
     TRACE_PRESENT_CAP_REPORTED.store(false, Ordering::Relaxed);
+    TRACE_OPTIONAL_CAP_REPORTED.store(false, Ordering::Relaxed);
+    TRACE_ACK_CAP_REPORTED.store(false, Ordering::Relaxed);
     TRACE_INPUT.reset(32);
     TRACE_INPUT_FAILURES.reset(16);
     TRACE_GEOMETRY.reset(24);

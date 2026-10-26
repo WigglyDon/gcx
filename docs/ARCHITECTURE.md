@@ -103,6 +103,21 @@ per-focus measurement counter does not reopen that shared budget. Presentation
 exhaustion has an explicit marker, and native test input still refuses absent,
 stale or capped geometry. This repairs observed diagnostic starvation, not the
 underlying original Fold process-loss incident.
+The subsequent Pixel4 world pass completed Pause/Resume and one same-process
+Home/return, but routine lifecycle stages exhausted the separate128-event bucket
+before final native-pause and Stop acknowledgments. Independent completion
+messages still recorded durable checkpoint publication and successful joined Stop.
+The initial automatic finalizer refused missing stage proof; a separately acquired
+cleanup-only follow-up kept the original deadline and backed current data before
+normal Stop. This is missing diagnostic evidence, not a demonstrated native hang.
+The Rust correction reserves44 of those same128 slots for state/Stop evidence,
+including12 that state acknowledgments cannot spend. Routine records, native-state
+acknowledgments and Stop use the existing atomic budget at their respective
+priorities. Exhaustion markers spend existing slots too; total lifecycle128 and
+overall192 limits stay fixed. State-evidence exhaustion still refuses native
+coordinate input. This candidate has focused regression/lint coverage, not a new
+phone or performance result. Player input, rendering and persistence policy are
+unchanged.
 App-local API30+ WindowInsetsController (API28/29 immersive-sticky fallback) hides
 bars only while playing; menus/picker restore ordinary navigation. Main-thread
 callbacks are checked against the bound Activity; posted work also checks its

@@ -74,8 +74,14 @@ GameCube connection/status probes before a button packet. Sampling now occurs at
 the actual SI data read; the same Start/A cases fail before and pass after the
 repair. The new ARM64 build is installed on Pixel 4 with existing data and both
 recovery candidates preserved. Its zero-duration menu contact still left Wind
-Waker at the title, so actual-world Pause/Home investigation on this candidate
-remains unrun. No game-entry, latency or original-freeze fix is claimed.
+Waker at the title; that case remains unresolved. Separately title-proven ordinary
+menu contacts loaded the existing quest into the bridge world. Pause/Resume and
+one same-process Home/return/Pause/Resume worked. Final detailed acknowledgments
+exhausted their diagnostic budget, so initial automatic cleanup remained pending.
+A bounded cleanup-only follow-up protected the current generation and ordinary
+saves, obtained an explicit joined/durable/released Stop completion, and verified
+device return. A Rust diagnostic-reserve correction passes focused host checks;
+its phone qualification is due. No latency or original-freeze fix is claimed.
 
 GameCube is the initial scope. Dolphin's Wii capability is not a promise of Wii
 support in gcx. A Wii expansion, iOS implementation and multiple resident games

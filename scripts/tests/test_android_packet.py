@@ -182,6 +182,17 @@ class InspectedRegionTests(unittest.TestCase):
 
 
 class PacketTests(unittest.TestCase):
+    def test_optional_lifecycle_limit_retains_fresh_state_and_presentation_proof(self):
+        trace = ('native.pause.end playing\ngeometry present.ready buffer=2280x1080\n'
+                 'lifecycle.optional_limit optional records omitted; native acknowledgment and Stop slots reserved\n')
+        self.assertTrue(packet.playing_presentation_ready(trace))
+
+    def test_missing_native_acknowledgments_refuse_even_with_a_fresh_frame(self):
+        trace = ('native.pause.end playing\n'
+                 'lifecycle.ack_limit trace cap: native state acknowledgments unavailable\n'
+                 'geometry present.ready buffer=2280x1080\n')
+        self.assertFalse(packet.playing_presentation_ready(trace))
+
     def test_play_readiness_rejects_historical_frame_after_surface_or_measurement_loss(self):
         first = "surface.init\ngeometry present.ready buffer=2280x1080\nnative.pause.end playing\n"
         self.assertTrue(packet.playing_presentation_ready(first))

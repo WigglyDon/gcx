@@ -8,6 +8,22 @@ use std::sync::atomic::{AtomicU32, Ordering};
 pub struct DiagnosticBudget(AtomicU32);
 /// Keep fresh presented-frame evidence available after noisy inset callbacks.
 pub const PRESENTATION_TRACE_RESERVE: u32 = 12;
+/// Keep native-state acknowledgments and final Stop evidence within the same cap.
+pub const LIFECYCLE_ACK_RESERVE: u32 = 44;
+pub const LIFECYCLE_STOP_RESERVE: u32 = 12;
+
+pub fn lifecycle_trace_reserve(stage: &str) -> u32 {
+    if stage.starts_with("stop.") {
+        0
+    } else if matches!(
+        stage,
+        "native.pause.end" | "checkpoint.capture.end" | "checkpoint.publish.end"
+    ) {
+        LIFECYCLE_STOP_RESERVE
+    } else {
+        LIFECYCLE_ACK_RESERVE
+    }
+}
 impl DiagnosticBudget {
     pub const fn new(limit: u32) -> Self {
         Self(AtomicU32::new(limit))
@@ -17,6 +33,9 @@ impl DiagnosticBudget {
     }
     pub fn take(&self) -> bool {
         self.take_preserving(0)
+    }
+    pub fn take_lifecycle_stage(&self, stage: &str) -> bool {
+        self.take_preserving(lifecycle_trace_reserve(stage))
     }
     pub fn take_preserving(&self, reserve: u32) -> bool {
         self.0
@@ -347,5 +366,75 @@ mod tests {
         drop(crate::ProfileLock::acquire(&path).unwrap());
         std::fs::remove_file(path.join("writer.lock")).unwrap();
         std::fs::remove_dir(path).unwrap();
+    }
+    #[test]
+    fn lifecycle_events_preserve_state_and_stop_evidence() {
+        let budget = DiagnosticBudget::new(128);
+        let mut emitted = (0..1000)
+            .filter(|_| budget.take_lifecycle_stage("window.policy.begin"))
+            .count();
+        for stage in [
+            "native.pause.end",
+            "checkpoint.capture.end",
+            "checkpoint.publish.end",
+            "stop.command",
+            "stop.join.begin",
+            "stop.join.end",
+            "stop.complete",
+        ] {
+            assert!(budget.take_lifecycle_stage(stage), "missing {stage}");
+            emitted += 1;
+        }
+        assert!(emitted <= 128);
+    }
+
+    #[test]
+    fn repeated_state_acknowledgments_cannot_spend_the_stop_reserve() {
+        let budget = DiagnosticBudget::new(128);
+        let mut emitted = (0..1000)
+            .filter(|_| budget.take_lifecycle_stage("activity.focus"))
+            .count();
+        emitted += (0..1000)
+            .filter(|_| budget.take_lifecycle_stage("native.pause.end"))
+            .count();
+        for stage in [
+            "stop.command",
+            "stop.join.begin",
+            "stop.join.end",
+            "stop.complete",
+        ] {
+            assert!(budget.take_lifecycle_stage(stage), "missing {stage}");
+            emitted += 1;
+        }
+        emitted += (0..1000).filter(|_| budget.take()).count();
+        assert_eq!(emitted, 128);
+        assert!(!budget.take_lifecycle_stage("stop.complete"));
+    }
+
+    #[test]
+    fn lifecycle_limit_markers_spend_existing_slots_and_leave_stop_evidence() {
+        let budget = DiagnosticBudget::new(128);
+        let mut emitted = (0..1000)
+            .filter(|_| budget.take_lifecycle_stage("window.policy.begin"))
+            .count();
+        assert!(budget.take()); // one optional-limit marker, inside the cap
+        emitted += 1;
+        emitted += (0..1000)
+            .filter(|_| budget.take_lifecycle_stage("native.pause.end"))
+            .count();
+        assert!(budget.take()); // one state-limit marker, inside the cap
+        emitted += 1;
+        for stage in [
+            "stop.command",
+            "stop.join.begin",
+            "stop.join.end",
+            "stop.complete",
+        ] {
+            assert!(budget.take_lifecycle_stage(stage), "missing {stage}");
+            emitted += 1;
+        }
+        emitted += (0..1000).filter(|_| budget.take()).count();
+        assert_eq!(emitted, 128);
+        assert!(!budget.take());
     }
 }
