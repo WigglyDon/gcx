@@ -388,3 +388,12 @@ same age limit. Preserve/open that whole capture before any further guest action
 Changed pixels refuse; there is no blind gesture, implicit refresh or age extension.
 This changes test pacing, not emulator input policy, game speed or performance
 qualification. Tool/inspection expiry remains missing evidence, not a game freeze.
+
+A later inspected navigation attempt moved into water and then returned to the
+dock without another contact. Its changed context correctly refused the next
+input. Preserve those images and the normal joined Stop/backup/return result;
+do not call this a product freeze or an ordinary-save result. Use shorter steps
+near edges. Under the current finite lab procedure, prepare enough time for
+individual image inspection and both Stop protections before requesting another
+job. The helper permits a constructor-declared ceiling up to96 captures, retaining
+its eight-capture default, existing byte limit and strict per-contact guards.

@@ -327,6 +327,13 @@ pin request, OS pin observation and real cold/warm/repeated taps distinct. A
 second-title failure preserves the first checkpoint and leaves switching unqualified.
 Retain ordinary in-game-save/clean-Stop/reload as a separate resulting-build check.
 
+The later current-build guarded navigation pass made two finite Control Stick
+contacts, entered water, and returned to the dock before the next proposed input.
+Changed scene pixels refused that contact. Same-job generation/profile backups,
+normal joined Stop and verified physical return passed. No new ordinary save or
+cold menu reload was earned. The original later-play freeze remains open; these
+brief observations establish neither its cause nor its absence.
+
 Record actual phone checkpoint bytes, capture/publication and restore timing
 intervals, observed process memory and audio interruptions. Label observation
 bounds where unchanged diagnostics cannot separate internal phases. Observe the

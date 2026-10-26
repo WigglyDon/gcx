@@ -241,7 +241,7 @@ class Driver:
                  capture_limit=8, byte_limit=268435456, stick_ms_limit=1000):
         # These are prepared task bounds, not authority or policy overrides.
         # Existing callers retain their original eight/ten-image and byte caps.
-        if type(capture_limit) is not int or not 1 <= capture_limit <= 48:
+        if type(capture_limit) is not int or not 1 <= capture_limit <= 96:
             raise Refused("invalid admitted capture ceiling")
         if type(byte_limit) is not int or not 1 <= byte_limit <= 402653184:
             raise Refused("invalid admitted collected-byte ceiling")
