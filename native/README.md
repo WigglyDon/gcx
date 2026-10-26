@@ -1,6 +1,35 @@
 # Direct Dolphin integration
 
-## Next: first playable Fold session, prepared off-device only
+## Current: Pixel4 world lifecycle and bounded diagnostic evidence
+
+Source `f9de0b0bac37f3087802f4d0e8ab7afcf9c1acac`, installed private APK
+`b4c921276bb21f5b4392a5f058ad75168203dfdf9099484cb8e3c816f253ff3a`.
+Native engine remains byte-identical `d419cc59...`, ABI8/stateABI1 and the selected
+resources unchanged. Only the Rust library changed. Nine focused lifecycle checks,
+three readiness checks,24 packet checks, relevant warnings-denied host/Android
+Clippy, package/ABI/signature/notices/16KiB checks and all65 corresponding-source
+checksums pass. Earlier exact APK/native/Rust symbols and all backups are retained.
+
+The [actual handback](https://github.com/WigglyDon/gcx/issues/2#issuecomment-6408382857)
+records existing-quest bridge-world Pause/Resume, one same-process Home/return,
+final paused/durable checkpoint acknowledgment and automatic same-lease complete
+backup/normal joined Stop/verified return. Routine lifecycle records cannot spend
+the44 reserved state/Stop slots; state acknowledgments preserve12 for Stop, within
+the original128/overall192 caps. The old flat policy fails the focused regression;
+the reserve passes. One optional-limit marker appeared on device, no state limit,
+and required final Pause/Stop records survived. The earlier initial cleanup refusal
+and separate original-deadline recovery are preserved as distinct evidence.
+
+Latest complete payload93,250,868bytes/archive110,038,528bytes and both current
+ordinary profiles are independently verified. Cards unchanged; changed current
+console data protected. PhysicalOFF/nonsecure keyguard, client absence and kernel
+release verified2026-10-26T04:37:23.252457Z.462.535seconds is operational duration,
+not game speed. No human sound/feel, full control matrix, new in-game-save or
+performance acceptance. Original later-play freeze remains open. Pixel4 is the
+working device under current stock-lab admission; Fold remains released and
+untouched. Historical Fold-first preparation below is not current device scope.
+
+## Historical Fold-first preparation
 
 Master6391781406 accepts the bounded Pixel4 footer/normal-Stop result below and
 directs real Wind Waker gameplay on the Fold, then a focused Home-return → Pause/
@@ -30,7 +59,7 @@ return. If intro or feedback reaches cutoff, retain partial results and clean up
 Ordinary-save/cold-reload, exact-scene restore, extended controls/folds and shortcuts
 remain separate. Original later-play freeze stays open. No phone queried here.
 
-## Current: fixed footer and normal Stop qualified on Pixel4
+## Earlier Pixel4 fixed-footer and normal Stop qualification
 
 Installed source `efcd11e6468a982e0ba8ad3d289c7359dbbc52cf`, APK SHA256
 `6241dc2c49b2afac8636a16c4df9f06f49ebb5887e9ccc2374c447cc91b4fca7`.

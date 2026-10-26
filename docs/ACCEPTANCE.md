@@ -6,6 +6,20 @@ automated host tests, APK checks and owner gameplay are separate evidence classe
 
 ## Current alpha review and gameplay investigation
 
+[The f9de0b0/b4c92127 handback](https://github.com/WigglyDon/gcx/issues/2#issuecomment-6408382857)
+records actual Pixel4 bridge-world Pause/Resume, same-process Home/return and
+final native paused/durable checkpoint acknowledgment, followed by independently
+verified backups and fully traced joined/durable/profile-released normal Stop
+under the same lease. The fixed128-event lifecycle budget retained state/Stop
+evidence after optional records reached their limit; overall192 cap unchanged.
+Both ordinary cards are unchanged, current console data is protected, and device
+return is verified. This is the bounded diagnostic/lifecycle result, pending
+acceptance. Original later-play freeze remains open; no human sound/control feel,
+movement/trigger matrix, new in-game-save, latency, FPS or endurance row transfers.
+The earlier85eaf46 initial-finalizer refusal and separate original-deadline cleanup
+remain distinct history. Do not repeat completed cold-return/library/shortcut or
+title/footer campaigns. Fold and launcher settings stay untouched.
+
 [Master6403418064](https://github.com/WigglyDon/gcx/issues/2#issuecomment-6403418064)
 accepts the b8f1843/307910ef Pixel4 presentation-evidence repair and bounded
 same-process Home/Pause/Resume/normal Stop row below, as recorded rather than an

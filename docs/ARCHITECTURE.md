@@ -115,9 +115,12 @@ including12 that state acknowledgments cannot spend. Routine records, native-sta
 acknowledgments and Stop use the existing atomic budget at their respective
 priorities. Exhaustion markers spend existing slots too; total lifecycle128 and
 overall192 limits stay fixed. State-evidence exhaustion still refuses native
-coordinate input. This candidate has focused regression/lint coverage, not a new
-phone or performance result. Player input, rendering and persistence policy are
-unchanged.
+coordinate input. Source f9de0b0/APK b4c92127 passed actual Pixel4 world Pause,
+same-process Home/return, final paused/durable acknowledgment and fully traced
+joined Stop, with independently verified current-data backups and return in that
+same lease. One optional-limit marker appeared; state evidence remained available.
+This is diagnostic qualification, not a performance or original-freeze fix.
+Player input, rendering and persistence policy are unchanged.
 App-local API30+ WindowInsetsController (API28/29 immersive-sticky fallback) hides
 bars only while playing; menus/picker restore ordinary navigation. Main-thread
 callbacks are checked against the bound Activity; posted work also checks its
