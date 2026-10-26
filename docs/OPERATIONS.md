@@ -298,3 +298,24 @@ interval begins at the baseline's latest frame, which can predate the first
 read. These are completed surface presentation intervals, not unique game FPS,
 emulation speed, audio quality or touch-to-photon latency. At most 32 snapshots
 and 512 KiB input keep this an offline diagnostic, not a monitoring service.
+
+The same decoder describes the slow tail using a fixed, strict `>40 ms`
+threshold, its fraction of completed intervals, consecutive runs and the largest
+number of slow endpoints in a half-open one-second window. It retains ordered
+positions/relative offsets privately; publish only aggregate counts and coarse
+positions. Elapsed-time thirds include the baseline interval. Display-period
+bins are `<1.5`, `[1.5,2.5)`, `[2.5,3.5)`, `[3.5,4.5)` and `>=4.5` times the
+observed refresh period. They do not count missed emulated frames. A refresh
+change withholds pooled interval statistics; history and refresh validity are
+reported separately. Keep the original raw observations and decoder reports.
+
+A matched presentation packet keeps source, scene/camera, settings, sampling
+method and window size fixed, with a declared interval between paired windows.
+Use repeated no-Home control pairs as well as Home-return pairs. Record exact
+private process/start/layer identity and actual refresh; rediscover the owned
+layer after Home. A no-Home pair also needs overlapping bridge histories across
+its gap, not just two individually complete windows. A deliberate Home surface
+transition is a separate segment, never a fabricated continuous stream. Refuse
+to pool changed-process/layer/refresh, missing-history and nonadvancing cases.
+Keep the finite profiling bound inside the original new-work/cleanup deadlines;
+no refresh/speed/audio/save-durability change is part of this observation.

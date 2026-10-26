@@ -6,6 +6,9 @@ use std::{collections::BTreeSet, io::Read};
 
 const MAX_INPUT: u64 = 512 * 1024;
 const PENDING: i64 = i64::MAX;
+// A descriptive threshold, applied unchanged to controls and Home observations.
+// It is not a game frame budget or a count of missed emulated frames.
+const SLOW_NS: u64 = 40_000_000;
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -36,6 +39,28 @@ struct Intervals {
     p95_ns: u64,
     max_ns: u64,
     completed_interval_rate_hz: f64,
+    display_period_bins: [usize; 5],
+    slower: SlowerIntervals,
+}
+
+#[derive(Serialize, Debug, PartialEq, Eq)]
+struct Run {
+    first_interval_1_based: usize,
+    count: usize,
+}
+
+#[derive(Serialize, Debug)]
+struct SlowerIntervals {
+    strictly_greater_than_ns: u64,
+    count: usize,
+    fraction: f64,
+    positions_1_based: Vec<usize>,
+    end_offsets_from_baseline_ns: Vec<u64>,
+    consecutive_runs: Vec<Run>,
+    max_consecutive: usize,
+    count_by_elapsed_third: [usize; 3],
+    max_ends_in_one_second: usize,
+    scope: &'static str,
 }
 
 #[derive(Serialize, Debug)]
@@ -44,6 +69,8 @@ struct Report {
     snapshots: usize,
     observation_ns: u64,
     refresh_periods_ns: BTreeSet<u64>,
+    history_continuous: bool,
+    refresh_constant: bool,
     unique_new_presentations: usize,
     pending_records_observed: usize,
     unresolved_records_observed: usize,
@@ -52,6 +79,77 @@ struct Report {
     trailing_no_progress_at_least_ns: u64,
     intervals: Option<Intervals>,
     scope: &'static str,
+}
+
+fn interval_stats(times: &[u64], refresh_ns: u64) -> Intervals {
+    let elapsed = times.last().unwrap() - times[0];
+    let intervals: Vec<_> = times.windows(2).map(|pair| pair[1] - pair[0]).collect();
+    let mut bins = [0; 5];
+    let mut slower = SlowerIntervals {
+        strictly_greater_than_ns: SLOW_NS,
+        count: 0,
+        fraction: 0.0,
+        positions_1_based: Vec::new(),
+        end_offsets_from_baseline_ns: Vec::new(),
+        consecutive_runs: Vec::new(),
+        max_consecutive: 0,
+        count_by_elapsed_third: [0; 3],
+        max_ends_in_one_second: 0,
+        scope: "ordered interval endpoints; one-second windows are half-open; thirds use elapsed presentation time; positions/offsets stay private; not unique game frames or a scheduling cause",
+    };
+    for (index, &interval) in intervals.iter().enumerate() {
+        // Bins: <1.5, [1.5,2.5), [2.5,3.5), [3.5,4.5), >=4.5
+        // observed display periods. Wide integers avoid threshold overflow.
+        let bin = [3_u128, 5, 7, 9]
+            .iter()
+            .position(|limit| u128::from(interval) * 2 < limit * u128::from(refresh_ns))
+            .unwrap_or(4);
+        bins[bin] += 1;
+        if interval <= SLOW_NS {
+            continue;
+        }
+        let position = index + 1;
+        let offset = times[index + 1] - times[0];
+        slower.positions_1_based.push(position);
+        slower.end_offsets_from_baseline_ns.push(offset);
+        let third = ((u128::from(offset) * 3 / u128::from(elapsed)) as usize).min(2);
+        slower.count_by_elapsed_third[third] += 1;
+        match slower.consecutive_runs.last_mut() {
+            Some(run) if run.first_interval_1_based + run.count == position => run.count += 1,
+            _ => slower.consecutive_runs.push(Run {
+                first_interval_1_based: position,
+                count: 1,
+            }),
+        }
+    }
+    slower.count = slower.positions_1_based.len();
+    slower.fraction = slower.count as f64 / intervals.len() as f64;
+    slower.max_consecutive = slower
+        .consecutive_runs
+        .iter()
+        .map(|run| run.count)
+        .max()
+        .unwrap_or(0);
+    let mut left = 0;
+    for (right, &end) in slower.end_offsets_from_baseline_ns.iter().enumerate() {
+        while end - slower.end_offsets_from_baseline_ns[left] >= 1_000_000_000 {
+            left += 1;
+        }
+        slower.max_ends_in_one_second = slower.max_ends_in_one_second.max(right - left + 1);
+    }
+    let mut sorted = intervals.clone();
+    sorted.sort_unstable();
+    let percentile = |percent: usize| sorted[(sorted.len() * percent).div_ceil(100) - 1];
+    Intervals {
+        count: intervals.len(),
+        min_ns: sorted[0],
+        p50_ns: percentile(50),
+        p95_ns: percentile(95),
+        max_ns: *sorted.last().unwrap(),
+        completed_interval_rate_hz: intervals.len() as f64 * 1e9 / elapsed as f64,
+        display_period_bins: bins,
+        slower,
+    }
 }
 
 fn history(text: &str) -> Result<History, &'static str> {
@@ -122,6 +220,8 @@ fn analyze(observation: Observation) -> Result<Report, &'static str> {
         snapshots: n,
         observation_ns: 0,
         refresh_periods_ns: BTreeSet::new(),
+        history_continuous: true,
+        refresh_constant: true,
         unique_new_presentations: 0,
         pending_records_observed: 0,
         unresolved_records_observed: 0,
@@ -154,6 +254,7 @@ fn analyze(observation: Observation) -> Result<Report, &'static str> {
             }
             if !h.completed.contains(&previous) {
                 report.status = "history_gap";
+                report.history_continuous = false;
             }
             if latest == Some(previous) {
                 report.unchanged_observations += 1;
@@ -173,8 +274,13 @@ fn analyze(observation: Observation) -> Result<Report, &'static str> {
     report.observation_ns = last.end_ns - first.start_ns;
     report.trailing_no_progress_at_least_ns = last.start_ns.saturating_sub(last_progress_end);
     report.unique_new_presentations = frames.len();
+    report.refresh_constant = report.refresh_periods_ns.len() == 1;
     if let Some(baseline) = baseline {
         if report.status == "history_gap" {
+            return Ok(report);
+        }
+        if !report.refresh_constant {
+            report.status = "changed_refresh";
             return Ok(report);
         }
         report.status = match frames.len() {
@@ -184,19 +290,10 @@ fn analyze(observation: Observation) -> Result<Report, &'static str> {
         };
         if frames.len() >= 2 {
             let times: Vec<_> = std::iter::once(baseline).chain(frames).collect();
-            let mut intervals: Vec<_> = times.windows(2).map(|pair| pair[1] - pair[0]).collect();
-            intervals.sort_unstable();
-            let percentile =
-                |percent: usize| intervals[(intervals.len() * percent).div_ceil(100) - 1];
-            report.intervals = Some(Intervals {
-                count: intervals.len(),
-                min_ns: intervals[0],
-                p50_ns: percentile(50),
-                p95_ns: percentile(95),
-                max_ns: *intervals.last().unwrap(),
-                completed_interval_rate_hz: intervals.len() as f64 * 1e9
-                    / (times.last().unwrap() - times[0]) as f64,
-            });
+            report.intervals = Some(interval_stats(
+                &times,
+                *report.refresh_periods_ns.first().unwrap(),
+            ));
         }
     } else {
         report.status = "no_baseline_history";
@@ -349,6 +446,97 @@ mod tests {
             ],
         })
         .unwrap();
-        assert_eq!(report.intervals.unwrap().max_ns, 1_000_000_000);
+        let intervals = report.intervals.unwrap();
+        assert_eq!(intervals.max_ns, 1_000_000_000);
+        assert_eq!(intervals.slower.positions_1_based, vec![1]);
+    }
+
+    fn stats(deltas: &[u64]) -> Intervals {
+        let mut times = vec![1];
+        for delta in deltas {
+            times.push(times.last().unwrap() + delta);
+        }
+        interval_stats(&times, 10)
+    }
+
+    #[test]
+    fn slow_frequency_keeps_order_and_distinguishes_runs_from_temporal_clusters() {
+        let slower = stats(&[50_000_000, 20_000_000, 50_000_000, 20_000_000, 50_000_000]).slower;
+        assert_eq!(slower.count, 3);
+        assert_eq!(slower.fraction, 0.6);
+        assert_eq!(slower.positions_1_based, vec![1, 3, 5]);
+        assert_eq!(
+            slower.end_offsets_from_baseline_ns,
+            vec![50_000_000, 120_000_000, 190_000_000]
+        );
+        assert_eq!(slower.max_consecutive, 1);
+        assert_eq!(slower.consecutive_runs.len(), 3);
+        assert_eq!(slower.count_by_elapsed_third, [1, 1, 1]);
+        assert_eq!(slower.max_ends_in_one_second, 3);
+    }
+
+    #[test]
+    fn strict_threshold_and_adjacent_runs_have_explicit_boundaries() {
+        let slower = stats(&[SLOW_NS, SLOW_NS + 1, SLOW_NS + 2, 1, SLOW_NS + 3]).slower;
+        assert_eq!(slower.positions_1_based, vec![2, 3, 5]);
+        assert_eq!(slower.max_consecutive, 2);
+        assert_eq!(
+            slower.consecutive_runs,
+            vec![
+                Run {
+                    first_interval_1_based: 2,
+                    count: 2
+                },
+                Run {
+                    first_interval_1_based: 5,
+                    count: 1
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn one_second_clustering_does_not_include_both_ends_of_a_half_open_window() {
+        let slower = stats(&[50_000_000, 950_000_000, 50_000_000]).slower;
+        assert_eq!(slower.count, 3);
+        assert_eq!(slower.max_consecutive, 3);
+        assert_eq!(slower.max_ends_in_one_second, 2);
+    }
+
+    #[test]
+    fn display_period_bins_use_observed_refresh_and_exact_half_period_boundaries() {
+        assert_eq!(
+            stats(&[14, 15, 24, 25, 34, 35, 44, 45]).display_period_bins,
+            [1, 2, 2, 2, 1]
+        );
+        assert_eq!(stats(&[14, 15, 24]).slower.count, 0);
+    }
+
+    #[test]
+    fn refresh_changes_withhold_pooled_interval_and_slow_group_statistics() {
+        let mut changed = snapshot(1, &[1, 2, 3, 4]);
+        changed.stats = changed.stats.replacen("16666667", "11111111", 1);
+        let report = analyze(Observation {
+            snapshots: vec![snapshot(0, &[1, 2]), changed],
+        })
+        .unwrap();
+        assert_eq!(report.status, "changed_refresh");
+        assert!(report.history_continuous);
+        assert!(!report.refresh_constant);
+        assert!(report.intervals.is_none());
+    }
+
+    #[test]
+    fn history_gap_and_refresh_change_remain_separately_visible() {
+        let mut changed = snapshot(1, &[3, 4]);
+        changed.stats = changed.stats.replacen("16666667", "11111111", 1);
+        let report = analyze(Observation {
+            snapshots: vec![snapshot(0, &[1, 2]), changed],
+        })
+        .unwrap();
+        assert_eq!(report.status, "history_gap");
+        assert!(!report.history_continuous);
+        assert!(!report.refresh_constant);
+        assert!(report.intervals.is_none());
     }
 }
