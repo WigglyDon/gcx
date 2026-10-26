@@ -56,6 +56,10 @@ updates/migration, retain the signer/application ID and a workable restore route
 No active progress is sacrificed for a test. Return the device in the agreed state
 and verify screen/lock/lease release as required; disclose any unresolved return.
 
+Select the accountable prior handoff and pending undo for the bound physical
+unit/profile. The newest receipt across a shared multi-device store can belong
+to another unit; its timestamp neither replaces nor blocks the target's handoff.
+
 ### gcx-local test helper after Master6386389871
 
 `scripts/android_packet.py` is the versioned repair of gcx's existing private
@@ -264,6 +268,13 @@ beside returned=true. A free lock alone does not prove handback. Cite actual
 client retirement, physical display/keyguard and kernel-release evidence. Product
 failures or a deferred read-only backup remain product follow-up, not an active
 lease; never relabel them as a successful native Stop to clear custody.
+
+A later independent operator may acquire the physical lock before gcx's host
+audit. Record the original physical return, normal transaction exit and later
+audit separately. A distinct holder's exclusive kernel FD lock on the identical
+mount/inode/path can corroborate the earlier release; retain that evidence and
+make no current free-device claim. Do not query or interrupt the new owner to
+obtain a free-lock observation, or rewrite that owner's receipt/lock metadata.
 
 A readiness check must require the newest presented frame after the most recent
 surface init/termination, invalid measurement or unavailable-frame marker, plus
