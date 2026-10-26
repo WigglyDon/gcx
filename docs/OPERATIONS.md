@@ -211,6 +211,14 @@ whole frame before any further guest action. Limit Start to ordinary title entry
 A to the inspected existing quest route and one observed-world action, preserve
 the Pause/cleanup capture reserve, and stop at the first refusal. Never overwrite
 a quest or interpret an intro as controllable play.
+Matching controls alone does not identify the guest screen. An observed title
+can enter its attract intro before the next contact while every control still
+matches. The scoped Start setup must independently compare its inspected guest
+title regions in that same fresh capture before contact; an intro, fade or
+different scene refuses. Keep those game captures/private reference pixels out
+of public source. A bounded pre-input title wait holds no control and supplies
+no readiness proof by itself. Record authored contact duration separately from
+product input policy, and preserve the zero-duration result as its own evidence.
 The standard helper retains its eight-image default. The explicitly admitted
 gameplay packet may select ten at construction, within the current stock-lab
 maximum; per-command input cannot raise that ceiling. Its18-minute hard limit,
