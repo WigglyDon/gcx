@@ -220,6 +220,11 @@ original absolute deadlines. An interval left over from the preceding capture
 must not reject a later observation before any transport call. Never renew the
 transaction/cleanup deadlines to repair that helper error, or label it a native
 timeout/freeze.
+The wrapper's command wait must consult the existing cleanup predicate before
+waiting for more operator input. A completed focused sequence or first failure
+that requests cleanup enters the finalizer immediately, without requiring a
+separate Finish command or waiting for the fixed cutoff. Keep both original
+absolute deadlines and the return reserve intact.
 
 A process-loss first failure must also retain gcx's OS exit/scoped crash evidence
 and current data, even when there is no PID to Pause/Stop. The prepared post-exit
