@@ -243,7 +243,7 @@ void gcx_engine_pad_status(gcx_pad_status* status)
   if (!status)
     return;
   const auto lock = ControllerEmu::EmulatedController::GetStateLock();
-  const auto pad = Pad::GetStatus(0);
+  const auto pad = Pad::PollAndGetStatus(0);
   *status = {pad.button, {pad.stickX, pad.stickY, pad.substickX, pad.substickY},
              {pad.triggerLeft, pad.triggerRight}, static_cast<uint8_t>(pad.isConnected), 0};
 }

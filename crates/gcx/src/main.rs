@@ -13,6 +13,10 @@ static STOP: AtomicBool = AtomicBool::new(false);
 static ERROR: AtomicBool = AtomicBool::new(false);
 static CARD_ERROR: AtomicBool = AtomicBool::new(false);
 static INPUT: Mutex<gcx::touch::TouchPad> = Mutex::new(gcx::touch::TouchPad::new());
+enum InputProbe {
+    Pad,
+    SerialInterface,
+}
 unsafe extern "C" fn sample_input(controls: *mut f64) {
     let pad = INPUT
         .lock()
@@ -114,6 +118,79 @@ fn input_poll_fixture() -> Result<(), Box<dyn std::error::Error>> {
     }
     Ok(())
 }
+
+#[cfg(not(target_os = "android"))]
+fn input_si_fixture() -> Result<(), Box<dyn std::error::Error>> {
+    use gcx::touch::{Layout, Target};
+    unsafe extern "C" {
+        fn gcx_fixture_si_request(operation: u32) -> u64;
+    }
+    let layout = Layout::for_display(2280.0, 948.0, 2.75);
+    let mut errors = Vec::new();
+    // SAFETY: initialized/paused original fixture, static callback and host-only
+    // SI shim. No guest image, real card, timing hold or device input is used.
+    unsafe {
+        gcx_engine_input_sampler(Some(sample_input));
+        for (control, mask) in [(Control::Start, 0x1000), (Control::A, 0x0100)] {
+            for (name, probe, packet) in [
+                ("direct packet", None, 2),
+                ("periodic packet", None, 3),
+                ("status then direct", Some(0), 2),
+                ("origin then periodic", Some(1), 3),
+            ] {
+                gcx_engine_input(Pad::default().values().as_ptr());
+                {
+                    let mut input = INPUT.lock().unwrap();
+                    input.begin_runtime();
+                    let (x, y) = layout
+                        .zones
+                        .iter()
+                        .find(|z| z.target == Target::Button(control))
+                        .unwrap()
+                        .area
+                        .center();
+                    input.down(1, x, y, &layout);
+                    input.up(1);
+                }
+                if let Some(probe) = probe {
+                    let _ = gcx_fixture_si_request(probe);
+                    if INPUT.lock().unwrap().delivery().native_polls != 0 {
+                        errors.push(format!("{control:?}/{name}: non-data probe consumed input"));
+                    }
+                }
+                let before = INPUT.lock().unwrap().delivery().native_polls;
+                let response = gcx_fixture_si_request(packet);
+                let polls = INPUT.lock().unwrap().delivery().native_polls - before;
+                let buttons = (response as u32) >> 16;
+                if response >> 32 != 8 || buttons & mask == 0 || polls != 1 {
+                    errors.push(format!(
+                        "{control:?}/{name}: size={} buttons={buttons:#x} native_polls={polls}",
+                        response >> 32
+                    ));
+                }
+                let next = gcx_fixture_si_request(packet);
+                if ((next as u32) >> 16) & mask != 0 {
+                    errors.push(format!("{control:?}/{name}: pulse replayed in next packet"));
+                }
+                INPUT.lock().unwrap().cancel();
+            }
+        }
+        gcx_engine_input_sampler(None);
+        gcx_engine_input(Pad::default().values().as_ptr());
+    }
+    if !errors.is_empty() {
+        return Err(errors.join("; ").into());
+    }
+    println!(
+        "PASS actual GameCube SI requests: zero-wait Start/A survive status/origin probes, reach direct/periodic packets exactly once and do not replay. Host-only protocol regression, not Wind Waker gameplay or latency acceptance."
+    );
+    Ok(())
+}
+
+#[cfg(target_os = "android")]
+fn input_si_fixture() -> Result<(), Box<dyn std::error::Error>> {
+    Err("The SI fixture shim is host-only and never packaged.".into())
+}
 struct EngineGuard;
 impl Drop for EngineGuard {
     fn drop(&mut self) {
@@ -152,9 +229,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             && (args[2] == "--unavailable-audio"
                 || args[2] == "--reentry"
                 || args[2] == "--card-retry"
-                || args[2] == "--input-poll"))
+                || args[2] == "--input-poll"
+                || args[2] == "--input-si"))
     {
-        return Err("usage: gcx-probe <new-private-directory> <Dolphin-Data/Sys> [--unavailable-audio|--reentry|--card-retry|--input-poll]".into());
+        return Err("usage: gcx-probe <new-private-directory> <Dolphin-Data/Sys> [--unavailable-audio|--reentry|--card-retry|--input-poll|--input-si]".into());
     }
     let root = PathBuf::from(&args[0]);
     let sys = PathBuf::from(&args[1]).canonicalize()?;
@@ -176,7 +254,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let b = root.join("B");
         std::fs::create_dir(&a)?;
         std::fs::create_dir(&b)?;
-        fixture(&a, &sys, false, false, false)?;
+        fixture(&a, &sys, false, false, None)?;
         let card = raw_card(&a)?;
         let mut expected = std::fs::read(&card)?;
         let marker = b"original gcx card reentry fixture";
@@ -189,11 +267,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let _writer = ProfileLock::acquire(&a)?;
             gcx::storage::atomic_replace(&card, &expected)?;
         }
-        fixture(&b, &sys, false, false, false)?;
+        fixture(&b, &sys, false, false, None)?;
         if std::fs::read(raw_card(&b)?)? == expected {
             return Err("native fixture profiles unexpectedly shared a card".into());
         }
-        fixture(&a, &sys, false, false, false)?;
+        fixture(&a, &sys, false, false, None)?;
         if std::fs::read(&card)? != expected {
             return Err("native card marker was lost across profile reentry".into());
         }
@@ -206,7 +284,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             &sys,
             args.len() == 3 && args[2] == "--unavailable-audio",
             args.len() == 3 && args[2] == "--card-retry",
-            args.len() == 3 && args[2] == "--input-poll",
+            if args.len() == 3 && args[2] == "--input-poll" {
+                Some(InputProbe::Pad)
+            } else if args.len() == 3 && args[2] == "--input-si" {
+                Some(InputProbe::SerialInterface)
+            } else {
+                None
+            },
         )?;
     }
     println!(
@@ -236,7 +320,7 @@ fn fixture(
     sys: &std::path::Path,
     unavailable_audio: bool,
     card_retry: bool,
-    input_poll: bool,
+    input_probe: Option<InputProbe>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     STOP.store(false, Ordering::Relaxed);
     ERROR.store(false, Ordering::Relaxed);
@@ -310,8 +394,10 @@ fn fixture(
                 eprintln!("fixture neutral pad={status:?}");
                 input_verified &=
                     status.buttons == 0 && status.axes == [128; 4] && status.triggers == [0; 2];
-                if input_poll {
-                    input_poll_fixture()?;
+                match input_probe {
+                    Some(InputProbe::Pad) => input_poll_fixture()?,
+                    Some(InputProbe::SerialInterface) => input_si_fixture()?,
+                    None => {}
                 }
                 break;
             }

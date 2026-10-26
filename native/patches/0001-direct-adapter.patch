@@ -1,10 +1,11 @@
-gcx maintained Dolphin changes, 2026-10-23
+gcx maintained Dolphin changes, 2026-10-25
 Upstream revision: cf5cb7ef81c3e8e7af5c9d566334219ffda9f68b
-All modifications represented below were made for gcx on 2026-10-21/22/23.
+All modifications represented below were made for gcx on 2026-10-21/22/23/25.
 Purpose: Rust-hosted Android/native boundary, surface ownership, durable raw-card
 writer, console-data persistence, private checkpoint protocol/completion, optional
-Android metadata, complete input-poll sampling and audio-init cleanup. Upstream authorship and
-GPL/dependency terms remain intact. This patch is not an upstream Dolphin release.
+Android metadata, SI data-packet input sampling (excluding status/origin probes)
+and audio-init cleanup. Upstream authorship and GPL/dependency terms remain intact.
+This patch is not an upstream Dolphin release.
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
 index 64b9f1b..d779d4f 100644
@@ -587,7 +588,7 @@ index 96e7a29..48ae7fe 100644
    Common::Flag m_dirty;
    u32 m_memory_card_size;
 diff --git a/Source/Core/Core/HW/GCPad.cpp b/Source/Core/Core/HW/GCPad.cpp
-index 188882c..1f73b45 100644
+index 188882c..ca26830 100644
 --- a/Source/Core/Core/HW/GCPad.cpp
 +++ b/Source/Core/Core/HW/GCPad.cpp
 @@ -12,6 +12,12 @@
@@ -603,30 +604,111 @@ index 188882c..1f73b45 100644
  InputConfig* GetConfig()
  {
    return &s_config;
-@@ -55,6 +61,9 @@ bool IsInitialized()
+@@ -55,9 +61,18 @@ bool IsInitialized()
  
  GCPadStatus GetStatus(int pad_num)
  {
 +  const auto lock = ControllerEmu::EmulatedController::GetStateLock();
-+  if (s_input_poll_callback)
-+    s_input_poll_callback(pad_num);
    return static_cast<GCPad*>(s_config.GetController(pad_num))->GetInput();
  }
  
++GCPadStatus PollAndGetStatus(int pad_num)
++{
++  const auto lock = ControllerEmu::EmulatedController::GetStateLock();
++  if (s_input_poll_callback)
++    s_input_poll_callback(pad_num);
++  return GetStatus(pad_num);
++}
++
+ ControllerEmu::ControlGroup* GetGroup(int pad_num, PadGroup group)
+ {
+   return static_cast<GCPad*>(s_config.GetController(pad_num))->GetGroup(group);
 diff --git a/Source/Core/Core/HW/GCPad.h b/Source/Core/Core/HW/GCPad.h
-index 0ed5ff5..6335a19 100644
+index 0ed5ff5..6c2ef7b 100644
 --- a/Source/Core/Core/HW/GCPad.h
 +++ b/Source/Core/Core/HW/GCPad.h
-@@ -26,6 +26,9 @@ bool IsInitialized();
+@@ -26,6 +26,11 @@ bool IsInitialized();
  InputConfig* GetConfig();
  
  GCPadStatus GetStatus(int pad_num);
++// Consume host input only for a returned controller packet, not connection/origin probes.
++GCPadStatus PollAndGetStatus(int pad_num);
 +// Optional host input sample, once per complete pad read under the state lock.
 +// The host owns input policy; clear this callback after native workers join.
 +void SetInputPollCallback(void (*callback)(int pad_num));
  ControllerEmu::ControlGroup* GetGroup(int pad_num, PadGroup group);
  void Rumble(int pad_num, ControlState strength);
  void ResetRumble(int pad_num);
+diff --git a/Source/Core/Core/HW/SI/SI_DeviceGCAdapter.cpp b/Source/Core/Core/HW/SI/SI_DeviceGCAdapter.cpp
+index 6067a9e..a3c06e1 100644
+--- a/Source/Core/Core/HW/SI/SI_DeviceGCAdapter.cpp
++++ b/Source/Core/Core/HW/SI/SI_DeviceGCAdapter.cpp
+@@ -28,7 +28,7 @@ CSIDevice_GCAdapter::CSIDevice_GCAdapter(Core::System& system, SIDevices device,
+     m_simulate_konga = Config::Get(Config::GetInfoForSimulateKonga(pad_num));
+ }
+ 
+-GCPadStatus CSIDevice_GCAdapter::GetPadStatus()
++GCPadStatus CSIDevice_GCAdapter::GetPadStatus(bool)
+ {
+   GCPadStatus pad_status = {};
+ 
+diff --git a/Source/Core/Core/HW/SI/SI_DeviceGCAdapter.h b/Source/Core/Core/HW/SI/SI_DeviceGCAdapter.h
+index 9e9fa9a..b508359 100644
+--- a/Source/Core/Core/HW/SI/SI_DeviceGCAdapter.h
++++ b/Source/Core/Core/HW/SI/SI_DeviceGCAdapter.h
+@@ -14,7 +14,7 @@ class CSIDevice_GCAdapter final : public CSIDevice_GCController
+ public:
+   CSIDevice_GCAdapter(Core::System& system, SIDevices device, int device_number);
+ 
+-  GCPadStatus GetPadStatus() override;
++  GCPadStatus GetPadStatus(bool poll_input = false) override;
+   int RunBuffer(u8* buffer, int request_length) override;
+ 
+   DataResponse GetData(u32& hi, u32& low) override;
+diff --git a/Source/Core/Core/HW/SI/SI_DeviceGCController.cpp b/Source/Core/Core/HW/SI/SI_DeviceGCController.cpp
+index 1f7a7b6..5f442af 100644
+--- a/Source/Core/Core/HW/SI/SI_DeviceGCController.cpp
++++ b/Source/Core/Core/HW/SI/SI_DeviceGCController.cpp
+@@ -138,7 +138,7 @@ void CSIDevice_GCController::HandleMoviePadStatus(Movie::MovieManager& movie, in
+   }
+ }
+ 
+-GCPadStatus CSIDevice_GCController::GetPadStatus()
++GCPadStatus CSIDevice_GCController::GetPadStatus(bool poll_input)
+ {
+   GCPadStatus pad_status = {};
+ 
+@@ -146,7 +146,7 @@ GCPadStatus CSIDevice_GCController::GetPadStatus()
+   // the remote controllers receive their status there as well
+   if (!NetPlay::IsNetPlayRunning())
+   {
+-    pad_status = Pad::GetStatus(m_device_number);
++    pad_status = poll_input ? Pad::PollAndGetStatus(m_device_number) : Pad::GetStatus(m_device_number);
+   }
+ 
+   HandleMoviePadStatus(m_system.GetMovie(), m_device_number, &pad_status);
+@@ -167,7 +167,7 @@ GCPadStatus CSIDevice_GCController::GetPadStatus()
+ //  |_ ERR_STATUS (error on last GetData or SendCmd?)
+ DataResponse CSIDevice_GCController::GetData(u32& hi, u32& low)
+ {
+-  GCPadStatus pad_status = GetPadStatus();
++  GCPadStatus pad_status = GetPadStatus(true);
+ 
+   if (!pad_status.isConnected)
+     return DataResponse::ErrorNoResponse;
+diff --git a/Source/Core/Core/HW/SI/SI_DeviceGCController.h b/Source/Core/Core/HW/SI/SI_DeviceGCController.h
+index 19b5bdb..b5f2800 100644
+--- a/Source/Core/Core/HW/SI/SI_DeviceGCController.h
++++ b/Source/Core/Core/HW/SI/SI_DeviceGCController.h
+@@ -71,7 +71,7 @@ public:
+   // Savestate support
+   void DoState(PointerWrap& p) override;
+ 
+-  virtual GCPadStatus GetPadStatus();
++  virtual GCPadStatus GetPadStatus(bool poll_input = false);
+   virtual u32 MapPadStatus(const GCPadStatus& pad_status);
+   virtual EButtonCombo HandleButtonCombos(const GCPadStatus& pad_status);
+ 
 diff --git a/Source/Core/Core/HW/Sram.cpp b/Source/Core/Core/HW/Sram.cpp
 index db30134..d3f33b4 100644
 --- a/Source/Core/Core/HW/Sram.cpp

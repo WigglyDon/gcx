@@ -1144,6 +1144,14 @@ A's ordinary raw card survives without appearing in B. `--card-retry` blocks onl
 a new fixture's candidate path with a directory, checks failure reporting and
 retention of its prior card/RAM, removes that obstruction and verifies retry.
 Both checks passed. Neither is an in-game save or machine-resume test.
+`--input-si` exercises the actual donor GameCube serial-interface command path
+with zero-wait Start/A presses. Status/origin probes must not consume them;
+direct and periodic data packets sample once, deliver the pulse and do not replay
+it. The old generic-status hook failed this regression because connection probes
+consumed the pulse before packet assembly. The maintained hook now consumes at
+the SI data read under the controller lock. No input dwell is added. The
+host-only mechanical SI fixture is excluded from Android; its passing result
+does not qualify Wind Waker play, game input latency, sound or Pause/reentry.
 `cargo xtask check-android-analytics` repeats the absent-provider regression after
 the normal host engine and Rust probe are built. It compiles only the real
 analytics translation unit with its Android branch, using preincluded host window

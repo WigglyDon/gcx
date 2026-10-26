@@ -215,6 +215,11 @@ The standard helper retains its eight-image default. The explicitly admitted
 gameplay packet may select ten at construction, within the current stock-lab
 maximum; per-command input cannot raise that ceiling. Its18-minute hard limit,
 five-minute cleanup and45-second final-return reserve remain the original bounds.
+Each new named observation starts its own bounded command interval inside those
+original absolute deadlines. An interval left over from the preceding capture
+must not reject a later observation before any transport call. Never renew the
+transaction/cleanup deadlines to repair that helper error, or label it a native
+timeout/freeze.
 
 A process-loss first failure must also retain gcx's OS exit/scoped crash evidence
 and current data, even when there is no PID to Pause/Stop. The prepared post-exit

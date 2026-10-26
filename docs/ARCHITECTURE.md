@@ -275,8 +275,15 @@ preserve ordinary card saves independently of version-bound machine checkpoints.
 
 ## Native picture, audio and controls
 
-ABI8 samples the Rust touch packet at `Pad::GetStatus`, under Dolphin's controller
-state lock, immediately before its GameCube SI input read. Rust owns fixed16-slot
+The ABI8 callback samples the Rust touch packet through `Pad::PollAndGetStatus`,
+under Dolphin's controller state lock, at the GameCube SI `GetData` packet read.
+Generic `GetStatus` connection/status/origin probes do not consume a queued press.
+The earlier hook on every status read consumed a pulse in `RunBuffer`'s connection
+check before its second read assembled the direct packet. The original host SI
+regression failed on that path and non-data probes, then passed after moving the
+hook to packet consumption. This is no timed hold or repeated input. The explicit
+native pad diagnostic also consumes a sample and must not run alongside a live
+game as a passive observer. Rust owns fixed16-slot
 pointer captures, latest analog positions and digital presses retained until one
 actual native poll; draw callbacks and the Android host tick never consume them.
 All18 GameCube channels remain independent. The callback lives through native
