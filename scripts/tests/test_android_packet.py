@@ -10,6 +10,7 @@ import json
 import tarfile
 import tempfile
 import unittest
+from unittest.mock import patch
 
 SPEC = importlib.util.spec_from_file_location(
     "android_packet", Path(__file__).resolve().parents[1] / "android_packet.py")
@@ -105,6 +106,20 @@ class Fixture:
 
 
 class CaptureBudgetTests(unittest.TestCase):
+    def test_receipt_reader_keeps_complete_prior_json_until_replacement(self):
+        with tempfile.TemporaryDirectory() as root:
+            path = Path(root) / 'receipt.private.json'
+            packet.write_private_json(path, {'stage': 'before'})
+            replace = packet.os.replace
+            def inspect_then_replace(source, target):
+                self.assertEqual(json.loads(path.read_text()), {'stage': 'before'})
+                self.assertEqual(json.loads(Path(source).read_text()), {'stage': 'after'})
+                return replace(source, target)
+            with patch.object(packet.os, 'replace', side_effect=inspect_then_replace):
+                packet.write_private_json(path, {'stage': 'after'})
+            self.assertEqual(json.loads(path.read_text()), {'stage': 'after'})
+            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+
     def test_existing_packets_keep_eight_capture_default(self):
         with tempfile.TemporaryDirectory() as root:
             fixture = Fixture(root)
@@ -518,6 +533,27 @@ class PacketTests(unittest.TestCase):
         with self.assertRaises(packet.Refused):
             self.f.driver.execute(command)
         self.assertFalse(any('input' in call for call in self.f.calls))
+
+    def test_prepared_longer_stick_contact_keeps_its_task_bound_and_single_use(self):
+        driver = packet.Driver(self.temp.name, self.f.budget, self.f.invoke,
+                               lambda: self.f.now, self.f.sleep, stick_ms_limit=4000)
+        driver.execute(dict(op='capture', name='long-stick.png'))
+        command = dict(op='gcx_stick', target='Control Stick', capture='long-stick.png',
+                       bounds=[30, 290, 150, 390], delta=[20, 0], duration_ms=4001)
+        with self.assertRaises(packet.Refused):
+            driver.execute(command)
+        command['duration_ms'] = 4000
+        driver.execute(command)
+        self.assertEqual(self.f.calls[-1][-1], '4000')
+        self.assertEqual(driver.receipt['stick_ms_limit'], 4000)
+        with self.assertRaises(packet.Refused):
+            driver.execute(command)
+
+    def test_stick_contact_default_and_invalid_constructor_bounds(self):
+        self.assertEqual(self.f.driver.stick_ms_limit, 1000)
+        for value in (0, 99, 4001, True, 4000.):
+            with self.subTest(value=value), self.assertRaises(packet.Refused):
+                packet.Driver('/unused', None, None, stick_ms_limit=value)
 
     def test_focus_metadata_is_batched_without_dropping_either_observation(self):
         self.f.driver.focus()

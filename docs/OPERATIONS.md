@@ -364,3 +364,22 @@ Respect this task's no-immediate-reacquisition instruction; preparation alone
 submits no request or reservation. A nonprogressing pending startup is reported
 through fleet issue21 with its job ID, never cleared by editing custody records.
 Fold requires its own fresh personal window and is excluded from this packet.
+
+Keep live job admission separate from prepared audit copies: a template must never
+overwrite the actual job ID or original deadline. Preserve failed originals and
+use the installed cleanup-only recovery ancestry, with the exact original task
+reference; successful recovery does not rewrite an earlier failed return as success.
+Create the task's output directory with its required private mode before request.
+Local receipt readers must see complete JSON across publication; atomic replacement
+prevents a truncate/write interval from looking like missing state.
+
+An unchanged APK may bind to an independently verified, pinned off-device signature
+receipt when its actual readback digest matches exactly. Do not mislabel a bounded
+host verifier's startup failure as a changed app signer. Prepare resource compatibility
+before custody; the executor's memory/virtual-address bounds apply to child tools too.
+The next packet keeps a constructor-declared stick duration, at most four seconds,
+while earlier callers retain their one-second default. These are individual finite
+contacts on a current inspected frame, with full named-control matching and the
+same source/settings/geometry/focus/process/single-use guards. Refresh an expired
+observation explicitly; no blind gesture or silent replacement frame. This changes
+test pacing, not emulator input policy, game speed or performance qualification.

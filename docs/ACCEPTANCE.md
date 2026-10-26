@@ -16,15 +16,43 @@ C Stick, meaningful ordinary progress saved through the game, normal joined
 Stop, then a fresh-process game-menu reload of that progress. Older ordinary
 save/reload results remain earned only on their recorded source/build.
 
-The owner is away and chose guarded automation preparation. The prepared packet
+The owner is away and uses guarded automation. The task packet
 binds each finite contact to the inspected guest context, complete named control,
 unchanged source/APK/settings and current presentation/focus. It requires visible
 play outcomes, a persisted marker and actual game-save completion; sent input,
 camera position or changed card hashes cannot substitute. Two Stop stages share
 the original deadlines and aggregate evidence bounds, with distinct protected
-generations. A checkpoint restore cannot satisfy ordinary reload. These are
-off-device guards, not a new gameplay/save result; audible sound and control feel
-require real human observations. No new device admission has been requested.
+generations. A checkpoint restore cannot satisfy ordinary reload. These
+guards alone do not earn a gameplay/save result; audible sound and control feel
+require real human observations.
+
+The subsequent admitted pass on that unchanged build reached the existing quest
+through normal game menus. Two declared one-second Control Stick contacts and
+one half-second C Stick contact produced visible movement and camera changes.
+The original card progress remained unchanged. No game action or new persisted
+marker was earned, and no in-game save or fresh-process menu reload was attempted.
+This is a partial result, not completion of the ordinary-progress objective.
+Final Pause, independently protected current generation/both ordinary profiles,
+paired native joined/durable/profile-released Stop and custodian-verified return
+passed. Fourteen still images were opened. The original freeze was not reproduced
+under these brief inputs; no continuous-play, audio/feel or timing claim follows.
+
+An earlier zero-input/no-launch preflight failed because Java could not reserve
+its heap under the executor's address-space bound, while the exact same APK's
+signature verified off-device. A task audit copy also overwrote its live admission
+record and blocked cleanup. Separate installed cleanup-only recovery verified
+return; the failed/invalidated requests and original failed-return fields remain
+distinct. The revised packet preserves live admission and binds device readback
+to the pinned verified APK/signature without starting Java under custody. Its
+read-only checkpoint verifier also passed the actual executor memory bound.
+These are test-harness repairs, not an emulator, signer or original-freeze fix.
+
+Next preparation permits individually admitted stick contacts up to four seconds,
+with the one-second default preserved for prior packets. Contacts still require
+the actual inspected frame within thirty seconds and cannot silently replace it.
+Local test receipts now publish atomically after a transient reader/truncation
+race was observed. The missing meaningful game-save/reload objective remains due;
+another actual session requires normal fleet admission after the current holder.
 
 [The f9de0b0/b4c92127 handback](https://github.com/WigglyDon/gcx/issues/2#issuecomment-6408382857)
 records actual Pixel4 bridge-world Pause/Resume, same-process Home/return and

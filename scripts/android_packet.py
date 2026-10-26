@@ -28,6 +28,16 @@ class Refused(RuntimeError):
     pass
 
 
+def write_private_json(path, value):
+    """Publish one local test receipt without exposing a truncated JSON file."""
+    path = Path(path)
+    temporary = path.with_name(path.name + ".writing")
+    with temporary.open("w") as output:
+        os.fchmod(output.fileno(), 0o600)
+        json.dump(value, output, indent=2)
+    os.replace(temporary, path)
+
+
 def physical_displays_off(text):
     states = re.findall(r"\bDisplay State=([A-Z_]+)\b", text)
     return bool(states) and all(state == "OFF" for state in states)
@@ -228,15 +238,18 @@ def hash_arguments(paths):
 
 class Driver:
     def __init__(self, root, budget, invoke, clock=time.monotonic, sleep=time.sleep, *,
-                 capture_limit=8, byte_limit=268435456):
+                 capture_limit=8, byte_limit=268435456, stick_ms_limit=1000):
         # These are prepared task bounds, not authority or policy overrides.
         # Existing callers retain their original eight/ten-image and byte caps.
         if type(capture_limit) is not int or not 1 <= capture_limit <= 48:
             raise Refused("invalid admitted capture ceiling")
         if type(byte_limit) is not int or not 1 <= byte_limit <= 402653184:
             raise Refused("invalid admitted collected-byte ceiling")
+        if type(stick_ms_limit) is not int or not 100 <= stick_ms_limit <= 4000:
+            raise Refused("invalid admitted stick-contact ceiling")
         self.capture_limit = capture_limit
         self.byte_limit = byte_limit
+        self.stick_ms_limit = stick_ms_limit
         self.root, self.budget, self.invoke = Path(root), budget, invoke
         self.clock, self.sleep = clock, sleep
         self.operation_end = budget.commands_end
@@ -249,12 +262,12 @@ class Driver:
         self.receipt = {"started": time.time(), "operations": [], "handback": False,
                         "capture_limit": capture_limit,
                         "byte_limit": byte_limit,
+                        "stick_ms_limit": stick_ms_limit,
                         "phase": "admitted", "recovery_resolved": False}
 
     def save(self):
         p = self.root / "receipt.private.json"
-        p.write_text(json.dumps(self.receipt, indent=2))
-        p.chmod(0o600)
+        write_private_json(p, self.receipt)
 
     def call(self, args):
         if self.timeout:
@@ -530,8 +543,8 @@ class Driver:
                         or not any(delta)
                         or sum(v*v for v in delta) > (min(c-a, d-b)//3)**2):
                     raise Refused("stick displacement must stay inside its inspected thumb well")
-                if type(duration) is not int or not 100 <= duration <= 1000:
-                    raise Refused("one stick contact must be 100..1000ms")
+                if type(duration) is not int or not 100 <= duration <= self.stick_ms_limit:
+                    raise Refused("stick duration exceeds this task's admitted contact bound")
                 # Stock swipe supplies down/move/up as one finite command.
                 # The fixture must prove the complete named well, source,
                 # settings and live geometry; no arbitrary screen trajectory.
