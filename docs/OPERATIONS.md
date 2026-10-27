@@ -515,3 +515,10 @@ Save. Bounds cannot grow during execution; both Stop backups and return remain
 reserved. An actual inspected item purchase with its exact rupee debit can be a
 new persisted marker, as can collected rupees. An arbitrary changed count, unchanged
 marker, sent input or card hash does not establish new saved progress.
+
+A saved inventory acquisition is also a meaningful ordinary-progress marker.
+The prepared continuation starts from visibly casual clothes, observes the actual
+Hero’s Clothes acquisition text and the later green-clothes world, then requires
+that outfit after actual Save, normal joined Stop and fresh-process game-menu
+loading. An unchanged rupee count alone cannot satisfy this alternative. Keep the
+actual acquisition, save completion and cold world captures distinct and private.

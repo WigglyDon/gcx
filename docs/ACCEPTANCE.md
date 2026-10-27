@@ -398,6 +398,24 @@ and task guards pass off-device. This adds no device, native-core latency,
 audible-sound or control-feel result, and changes no application binary. Older
 declared swipe durations include the ramp; they are not time held at full stick.
 
+Retained unchanged-build automated play supplies two software source-age samples:
+1,989 and6,215 synthetic foreground motion events, with maxima16.927ms and
+25.244ms respectively; each has zero invalid timestamps and more than99.94% at
+or below16ms. These are injected event-to-dispatch observations, including MOVE
+events, not physical touch latency or character response. Their13-contact/35-contact
+sequences contain substantial inspection gaps and do not constitute continuous
+play or endurance qualification. Native poll maxima span the runtime and cannot
+identify a particular delayed contact or freeze cause.
+
+One retained normal cleanup spans5.440ms for native Pause,909.483ms for checkpoint
+capture and8.038ms for session publication. Capture includes native serialization,
+Rust hashing, payload publication/sync/readback and generation validation; it does
+not isolate native serialization. Stop handler to joined/durable/profile-release
+completion spans721.651ms, including562.273ms for join. The22.600-second gap before
+Stop includes independent host backup verification and is not app Stop latency.
+These single-process trace spans guide further diagnosis; no optimization,
+physical latency, original-freeze closure or general timing guarantee is earned.
+
 ## Release gates distinct from playable acceptance
 
 App Bundle delivery, current target requirements, 4/16 KiB native runtime support,
