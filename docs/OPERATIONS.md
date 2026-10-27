@@ -557,3 +557,13 @@ The prepared world-only test admits L analog and neither Save-menu nor cleanup
 analog input. It does not combine travel/clicks or infer game-camera behavior from
 the earlier unsuccessful digital-click centering attempt. No app/native changes
 or new hardware result follow from the host checks.
+
+Retain the actual component/display/geometry or coherence error from every read
+of the existing12-observation wake/Home guard. A coherent but nonmatching
+component previously failed without retaining that predicate evidence. Later
+coherent Home in cleanup does not identify the earlier cause. Keep the same
+guard, reads, wait bound and refusal of foreign input. A pre-launch failure can
+use named cleanup-only recovery after proving gcx absent, independently verifying
+the existing ordinary archive against unchanged current data and checking stock
+physical return. Keep that recovery separate from the failed original return;
+it earns no new normal Stop, play or in-game save result.
