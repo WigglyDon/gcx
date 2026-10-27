@@ -136,6 +136,26 @@ class InterruptedCleanupTests(unittest.TestCase):
             with self.subTest(sequence=value), self.assertRaises(packet.Refused):
                 self.admit({"sequence": value, "op": "capture"})
 
+    def test_prepared_command_ceiling_preserves_default_and_identity_checks(self):
+        operation = {"sequence": 200, "op": "capture"}
+        with self.assertRaises(packet.Refused):
+            self.admit(operation)
+        args = (operation, self.job, self.job_id, self.cleanup, self.supervisor)
+        self.assertEqual(packet.interrupted_capture_cleanup(
+            *args, sequence_limit=256), operation)
+        for limit in (True, 0, 257, "256"):
+            with self.subTest(limit=limit), self.assertRaises(packet.Refused):
+                packet.interrupted_capture_cleanup(*args, sequence_limit=limit)
+        for change in ({"children_retired": False}, {"state": "RUNNING"}):
+            with self.subTest(change=change), self.assertRaises(packet.Refused):
+                packet.interrupted_capture_cleanup(
+                    operation, dict(self.job, **change), self.job_id,
+                    self.cleanup, self.supervisor, sequence_limit=256)
+        with self.assertRaises(packet.Refused):
+            packet.interrupted_capture_cleanup(
+                dict(operation, sequence=257), self.job, self.job_id,
+                self.cleanup, self.supervisor, sequence_limit=256)
+
     def test_live_missing_or_different_worker_does_not_authorize_retirement(self):
         changes = ({"id": "b" * 32}, {"state": "RUNNING"}, {"phase": "work"},
                    {"children_retired": False}, {"children_retired": 1},

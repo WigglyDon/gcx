@@ -508,7 +508,7 @@ return. Keep the original monitor interruption and recovery records; they remain
 separate from the unresolved later-play freeze.
 
 The next independently prepared ordinary-progress job may declare up to160 images
-(the default remains eight),64 individually inspected play/save contacts and
+(the default remains eight),80 individually inspected play/save contacts and
 768MiB collected data within its original finite90minute task. The prior35-contact
 pass reached the house but exhausted navigation headroom without a new marker or
 Save. Bounds cannot grow during execution; both Stop backups and return remain
@@ -531,3 +531,18 @@ existing64-pixel minimum. No color tolerance is added. Changed interior RGB or
 shape still refuses, as do title/menu/fade scenes; complete native-control regions
 remain exact. Retain the original refusal and its separately verified normal
 Stop/backup/return. This is a test reference repair, not an emulator fix.
+
+The task command reader and interrupted-observation cleanup must use the same
+prepared sequence ceiling. Cleanup keeps its old160-command default; a prepared
+caller may declare at most256, with the original actual-job, live-parent, retired
+work, inherited-lease and capture-only proofs unchanged. This is command numbering,
+not an action, image, deadline or custody increase. A256-command task cannot rely
+on the160 default for late interrupted observations.
+
+A matching HUD proves its declared context, not unchanged terrain or character
+position. Water/fall returns can change that position while the count remains
+identical. After a transition, wait for a settled new whole frame and prefer the
+existing direct route within30seconds; never extend its age or assume a previous
+water view still applies. Shorter inspected bridge movements may use the task's
+prepared80-contact budget, still inside100actions/160images and original cleanup
+and return reserves. Do not enlarge any admitted job's bounds.

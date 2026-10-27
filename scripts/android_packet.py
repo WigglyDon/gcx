@@ -44,22 +44,24 @@ def physical_displays_off(text):
 
 
 def interrupted_capture_cleanup(inflight, job, expected_job, cleanup_process,
-                                supervisor_process):
+                                supervisor_process, *, sequence_limit=160):
     """Recognize a retired observation worker, never grant custody or new work.
 
     The caller must hold the inherited lease and obtain both live process
     identities itself. The supervisor's current child must be this cleanup
     process; children_retired describes the preceding work, not this child.
     Preserve the interrupted operation separately before cleanup proceeds.
+    The caller supplies its pinned command-reader bound; old callers retain 160.
     """
     def identity(value):
         return (isinstance(value, dict) and set(value) == {"pid", "start_ticks"}
                 and all(type(value[k]) is int and value[k] > 0 for k in value))
-    if (not isinstance(expected_job, str)
+    if (type(sequence_limit) is not int or not 1 <= sequence_limit <= 256
+            or not isinstance(expected_job, str)
             or not re.fullmatch(r"[a-f0-9]{32}", expected_job)
             or not isinstance(inflight, dict) or set(inflight) != {"sequence", "op"}
             or inflight["op"] != "capture" or type(inflight["sequence"]) is not int
-            or not 1 <= inflight["sequence"] <= 160
+            or not 1 <= inflight["sequence"] <= sequence_limit
             or not isinstance(job, dict)
             or not identity(cleanup_process) or not identity(supervisor_process)
             or cleanup_process["pid"] == supervisor_process["pid"]
