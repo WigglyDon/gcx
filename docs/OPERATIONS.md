@@ -492,3 +492,11 @@ individually inspected contact on safe ground. Keep prior movement observations
 bound to their actual ramp gestures. The new packet has 86 helper and 69 task
 checks plus two Rust tests; device qualification is still due. Product/engine
 binaries, ordinary saves and protected checkpoints remain unchanged.
+
+The next guarded world route also admits the already present **L click** button.
+Its complete region derives from the unchanged Rust `Control::LClick` target and
+matches retained current-build world/camera/cleanup frames. It is a short digital
+contact, independent of L analog travel, and is excluded from Save menus and
+cleanup input. Nintendo's [GameCube controls](https://www.guiasnintendo.com/2_GAMECUBE/Zelda_Wind_Waker/zeldawindwaker_sp/apie.html)
+identify L for targeting/centering the camera. This repairs a missing test control;
+it changes no application binary and does not infer partial trigger travel.

@@ -645,7 +645,7 @@ class Driver:
             # own image. Bind one tap to its live window AND display geometry;
             # never reuse a guessed historical layout or a batch of points.
             admitted = (("Control Stick", "C Stick") if op == "gcx_stick"
-                        else ("Pause", "Start", "A", "B"))
+                        else ("Pause", "Start", "A", "B", "L click"))
             if command["target"] not in admitted:
                 raise Refused("unadmitted native control")
             if cleanup and command["target"] != "Pause":

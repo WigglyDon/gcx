@@ -72,3 +72,24 @@ fn interruption_neutralizes_both_stationary_sticks_and_rejects_old_moves() {
     }
     assert_eq!(touch.sample_pad().values(), &[0.0; 18]);
 }
+
+#[test]
+fn digital_l_click_never_infers_analog_trigger_travel() {
+    let layout = Layout::new(830.0, 393.0);
+    let area = layout
+        .zones
+        .iter()
+        .find(|zone| zone.target == Target::Button(Control::LClick))
+        .unwrap()
+        .area;
+    let (x, y) = area.center();
+    let mut touch = TouchPad::new();
+    assert_eq!(touch.down_report(1, x, y, &layout), DownReport::Captured);
+    let pad = touch.sample_pad();
+    assert_eq!(pad.values()[Control::LClick as usize], 1.0);
+    for control in [Control::LTravel, Control::RTravel, Control::RClick] {
+        assert_eq!(pad.values()[control as usize], 0.0);
+    }
+    touch.up(1);
+    assert_eq!(touch.sample_pad().values(), &[0.0; 18]);
+}

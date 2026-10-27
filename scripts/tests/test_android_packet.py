@@ -629,6 +629,20 @@ class PacketTests(unittest.TestCase):
         self.assertEqual(self.f.driver.actions, 1)
         with self.assertRaises(packet.Refused):self.f.driver.execute(command)
 
+    def test_only_explicit_digital_l_click_is_admitted_as_a_finite_button_contact(self):
+        self.f.driver.execute(dict(op='capture', name='l-click.png'))
+        command = dict(op='gcx_tap', target='L click', capture='l-click.png',
+                       bounds=[30, 80, 90, 140], press_ms=100)
+        for change in ({'target': 'L analog'}, {'target': 'L'}, {'target': 'R click'},
+                       {'cleanup': True}, {'press_ms': 251}):
+            with self.subTest(change=change), self.assertRaises(packet.Refused):
+                self.f.driver.execute(dict(command, **change))
+        self.assertFalse(any('input' in call for call in self.f.calls))
+        self.f.driver.execute(command)
+        self.assertEqual(self.f.calls[-1],
+                         ['shell', 'input', 'swipe', '60', '110', '60', '110', '100'])
+        with self.assertRaises(packet.Refused):self.f.driver.execute(command)
+
     def test_hold_retains_fresh_frame_geometry_target_duration_and_well_guards(self):
         self.f.driver.execute(dict(op='capture', name='held-stick.png'))
         command = dict(op='gcx_stick', target='C Stick', capture='held-stick.png',
