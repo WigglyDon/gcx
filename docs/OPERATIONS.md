@@ -397,3 +397,16 @@ near edges. Under the current finite lab procedure, prepare enough time for
 individual image inspection and both Stop protections before requesting another
 job. The helper permits a constructor-declared ceiling up to96 captures, retaining
 its eight-capture default, existing byte limit and strict per-contact guards.
+
+Retain scoped diagnostic history across logd prefix eviction only when a fresh
+read overlaps its exact prior tail under the same PID and process start time.
+Keep all earlier invalidations and append new records in order. Empty/disjoint,
+reordered, unscoped or oversized reads refuse input; an old ready flag alone is
+never a fallback. A new process requires its own initialization history. Keep
+the fresh focus, physical viewport, complete control/context and single-use
+capture checks. This repairs evidence retention, not game timing or the freeze.
+The missing ordinary-save packet may first finish its exact protected current
+checkpoint through real resume/Pause/joined Stop, without changing card files by
+hand. Its three Stop protections declare576MiB aggregate collected data. Earlier
+callers retain their original byte defaults and bounds; the constructor maximum
+is768MiB. A recovered/quiescent retirement remains distinct from normal Stop.

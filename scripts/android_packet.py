@@ -112,6 +112,39 @@ def playing_presentation_ready(trace):
     return bool(states and states[-1] == "playing" and ready > invalid)
 
 
+def merge_diagnostic_history(previous, current, previous_process, current_process):
+    """Retain scoped history only across a fresh, exactly overlapping read.
+
+    Logd may evict a prefix while retaining the previous tail. This preserves
+    invalidations as well as readiness; no overlap or process change refuses.
+    It neither proves current frame rate nor replaces fresh UI/display checks.
+    """
+    if (not isinstance(current_process, (tuple, list)) or len(current_process) != 2
+            or any(not isinstance(n, str) or not n.isdecimal() for n in current_process)
+            or (previous and tuple(previous_process) != tuple(current_process))):
+        raise Refused("diagnostic process identity changed")
+    pattern = re.compile(r"^\d\d-\d\d \d\d:\d\d:\d\d\.\d+\s+"
+                         + re.escape(current_process[0]) + r"\s+\d+\s+[VDIWEF]\s+gcx\s*:")
+    def records(text):
+        if not isinstance(text, str) or len(text.encode()) > 1024 * 1024:
+            raise Refused("diagnostic history byte bound exceeded")
+        rows = [line for line in text.splitlines() if line and line != "--------- beginning of main"]
+        if len(rows) > 2048 or any(not pattern.match(line) for line in rows):
+            raise Refused("diagnostic scope/record bound changed")
+        return rows
+    old, fresh = records(previous), records(current)
+    if not old:
+        return "\n".join(fresh)
+    for overlap in range(min(len(old), len(fresh)), 0, -1):
+        if old[-overlap:] == fresh[:overlap]:
+            if set(old).intersection(fresh[overlap:]):
+                raise Refused("diagnostic history reordered or ambiguously repeated")
+            merged = "\n".join(old + fresh[overlap:])
+            records(merged)
+            return merged
+    raise Refused("diagnostic history continuity lost; no cached readiness fallback")
+
+
 def matching_inspected_region(reference_size, reference_rgb, current_size, current_rgb, bounds):
     """Match a complete previously inspected control against fresh RGB pixels.
 
@@ -243,7 +276,7 @@ class Driver:
         # Existing callers retain their original eight/ten-image and byte caps.
         if type(capture_limit) is not int or not 1 <= capture_limit <= 96:
             raise Refused("invalid admitted capture ceiling")
-        if type(byte_limit) is not int or not 1 <= byte_limit <= 402653184:
+        if type(byte_limit) is not int or not 1 <= byte_limit <= 805306368:
             raise Refused("invalid admitted collected-byte ceiling")
         if type(stick_ms_limit) is not int or not 100 <= stick_ms_limit <= 4000:
             raise Refused("invalid admitted stick-contact ceiling")

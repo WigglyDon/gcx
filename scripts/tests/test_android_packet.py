@@ -184,7 +184,7 @@ class CaptureBudgetTests(unittest.TestCase):
             fixture = Fixture(root)
             self.assertEqual(fixture.driver.byte_limit, 256 * 1024**2)
             self.assertEqual(fixture.driver.receipt['byte_limit'], 256 * 1024**2)
-        for invalid in (0, -1, True, 1., 384 * 1024**2 + 1):
+        for invalid in (0, -1, True, 1., 768 * 1024**2 + 1):
             with self.subTest(limit=invalid), self.assertRaises(packet.Refused):
                 packet.Driver('/unused', None, None, byte_limit=invalid)
 
@@ -802,6 +802,67 @@ class PacketTests(unittest.TestCase):
         self.assertFalse(self.f.driver.receipt["handback"])
         self.assertTrue(self.f.live)
         self.assertFalse(any("force-stop" in c for c in self.f.calls))
+
+
+class DiagnosticHistoryTests(unittest.TestCase):
+    identity = ('1234', '5678')
+
+    def line(self, number, body):
+        return f'10-26 12:00:00.{number:03d} 1234 1235 E gcx : Lifecycle +{number}us {body}'
+
+    def test_evicted_prefix_requires_exact_tail_and_retains_all_records(self):
+        old = [self.line(i, str(i)) for i in range(8)]
+        fresh = old[-2:] + [self.line(8, 'new')]
+        merged = packet.merge_diagnostic_history('\n'.join(old), '\n'.join(fresh),
+                                                  self.identity, self.identity)
+        self.assertEqual(merged.splitlines(), old + fresh[-1:])
+
+    def test_new_surface_invalidation_stays_after_old_readiness(self):
+        old = [self.line(1, 'native.pause.end playing'),
+               self.line(2, 'geometry present.ready'), self.line(3, 'input')]
+        fresh = old[-2:] + [self.line(4, 'surface.terminate')]
+        merged = packet.merge_diagnostic_history('\n'.join(old), '\n'.join(fresh),
+                                                  self.identity, self.identity)
+        self.assertFalse(packet.playing_presentation_ready(merged))
+        fresh += [self.line(5, 'geometry present.ready')]
+        merged = packet.merge_diagnostic_history(merged, '\n'.join(fresh),
+                                                  self.identity, self.identity)
+        self.assertTrue(packet.playing_presentation_ready(merged))
+
+    def test_empty_disjoint_or_reordered_reads_refuse_cached_readiness(self):
+        old = [self.line(i, str(i)) for i in range(4)]
+        for fresh in ([], [self.line(5, 'new')], old[:2], old[-1:] + old[-2:-1]):
+            with self.subTest(fresh=fresh), self.assertRaises(packet.Refused):
+                packet.merge_diagnostic_history('\n'.join(old), '\n'.join(fresh),
+                                                self.identity, self.identity)
+
+    def test_process_reuse_and_unscoped_lines_refuse(self):
+        old = self.line(1, 'old')
+        for identity in (('1234', '5679'), ('4321', '5678'), None):
+            with self.subTest(identity=identity), self.assertRaises(packet.Refused):
+                packet.merge_diagnostic_history(old, old, self.identity, identity)
+        for extra in ('foreign text', old.replace('1234', '4321'), '--------- truncated'):
+            with self.subTest(extra=extra), self.assertRaises(packet.Refused):
+                packet.merge_diagnostic_history('', extra, None, self.identity)
+
+    def test_first_read_and_history_growth_remain_bounded(self):
+        self.assertEqual(packet.merge_diagnostic_history('', '--------- beginning of main\n'
+                                                         + self.line(1, 'first'), None, self.identity),
+                         self.line(1, 'first'))
+        for oversized in ('x' * (1024 * 1024 + 1), '\n'.join(self.line(i, str(i)) for i in range(2049))):
+            with self.assertRaises(packet.Refused):
+                packet.merge_diagnostic_history('', oversized, None, self.identity)
+
+    def test_prepared_three_stop_byte_bound_cannot_be_raised_by_command(self):
+        with tempfile.TemporaryDirectory() as root:
+            fixture = Fixture(root)
+            driver = packet.Driver(root, fixture.budget, fixture.invoke,
+                                   lambda: fixture.now, fixture.sleep, byte_limit=576 * 1024**2)
+            self.assertEqual(driver.receipt['byte_limit'], 576 * 1024**2)
+            driver.received = driver.byte_limit
+            with self.assertRaises(packet.Refused):
+                driver.call(['shell', packet.FOCUS_QUERY])
+            self.assertTrue(fixture.budget.forced_cleanup)
 
 
 if __name__ == "__main__":
