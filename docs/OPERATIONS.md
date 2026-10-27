@@ -475,3 +475,20 @@ then return. This neither relaxes game-input guards nor closes the original
 freeze. The refinement has 84 public helper and 67 private task checks, including
 the retained shade metadata; device qualification is still due after the monitor
 owner resolves its observed failure. No new device job is queued.
+
+For a prepared stick contact, `motion="hold"` uses a single bounded stock swipe
+whose start and end are the same inspected displaced point. The existing default
+`motion="ramp"` keeps the center-to-target interpolation. Both retain the same
+named-well radius, duration, source/frame/focus/geometry and single-use guards.
+There is no additional motion-event stream or input client. This interpretation
+follows the pinned [Android 13 input implementation](https://raw.githubusercontent.com/aosp-mirror/platform_frameworks_base/android-13.0.0_r1/services/core/java/com/android/server/input/InputShellCommand.java).
+
+The current Rust policy starts from the well center and applies an in-well DOWN
+displacement immediately. Focused host tests cover both sticks, fixed/following
+preferences, first sample, steady held values, release and interruption. This
+establishes a prepared test gesture, not device latency or game responsiveness.
+Do not reuse old ramp durations as hold trajectories: begin with one short
+individually inspected contact on safe ground. Keep prior movement observations
+bound to their actual ramp gestures. The new packet has 86 helper and 69 task
+checks plus two Rust tests; device qualification is still due. Product/engine
+binaries, ordinary saves and protected checkpoints remain unchanged.

@@ -618,6 +618,34 @@ class PacketTests(unittest.TestCase):
                 self.f.driver.execute(dict(command, **change))
         self.assertFalse(any('input' in call for call in self.f.calls))
 
+    def test_explicit_stick_hold_is_one_bounded_stationary_contact_and_single_use(self):
+        self.f.driver.execute(dict(op='capture', name='held-stick.png'))
+        command = dict(op='gcx_stick', target='Control Stick', capture='held-stick.png',
+                       bounds=[30, 290, 150, 390], delta=[20, -15], duration_ms=500,
+                       motion='hold')
+        self.f.driver.execute(command)
+        self.assertEqual(self.f.calls[-1],
+                         ['shell', 'input', 'swipe', '110', '325', '110', '325', '500'])
+        self.assertEqual(self.f.driver.actions, 1)
+        with self.assertRaises(packet.Refused):self.f.driver.execute(command)
+
+    def test_hold_retains_fresh_frame_geometry_target_duration_and_well_guards(self):
+        self.f.driver.execute(dict(op='capture', name='held-stick.png'))
+        command = dict(op='gcx_stick', target='C Stick', capture='held-stick.png',
+                       bounds=[30, 290, 150, 390], delta=[20, -15], duration_ms=500,
+                       motion='hold')
+        for change in ({'motion': 'other'}, {'motion': True}, {'motion': None},
+                       {'target': 'A'}, {'cleanup': True}, {'delta': [34, 0]},
+                       {'duration_ms': 1001}):
+            with self.subTest(change=change), self.assertRaises(packet.Refused):
+                self.f.driver.execute(dict(command, **change))
+        self.f.now += 31
+        with self.assertRaises(packet.Refused):self.f.driver.execute(command)
+        self.f.now -= 31
+        self.f.windows = WINDOW.replace('r=0', 'r=1')
+        with self.assertRaises(packet.Refused):self.f.driver.execute(command)
+        self.assertFalse(any('input' in call for call in self.f.calls))
+
     def test_stick_capture_expiry_and_window_change_refuse(self):
         self.f.driver.execute(dict(op='capture', name='stick.png'))
         command = dict(op='gcx_stick', target='Control Stick', capture='stick.png',

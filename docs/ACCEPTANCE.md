@@ -390,6 +390,14 @@ software timestamps are not touch-to-photon, character response, FPS or a hard
 real-time guarantee. Confirm real touch/control feel with both actual games under
 ordinary play; do not infer hardware latency from host timing or a build.
 
+The prepared automated stick route now distinguishes a center-to-target ramp
+from an explicit stationary hold at an inspected displacement. Two focused Rust
+tests show first-sample delivery, stable held values, release and interruption
+neutralization for both sticks under the existing policy. Mechanical dispatch
+and task guards pass off-device. This adds no device, native-core latency,
+audible-sound or control-feel result, and changes no application binary. Older
+declared swipe durations include the ramp; they are not time held at full stick.
+
 ## Release gates distinct from playable acceptance
 
 App Bundle delivery, current target requirements, 4/16 KiB native runtime support,

@@ -682,10 +682,16 @@ class Driver:
                     raise Refused("stick displacement must stay inside its inspected thumb well")
                 if type(duration) is not int or not 100 <= duration <= self.stick_ms_limit:
                     raise Refused("stick duration exceeds this task's admitted contact bound")
+                motion = command.get("motion", "ramp")
+                if motion not in ("ramp", "hold"):
+                    raise Refused("unprepared stick motion")
+                start_x, start_y = (x+delta[0], y+delta[1]) if motion == "hold" else (x, y)
                 # Stock swipe supplies down/move/up as one finite command.
+                # Equal endpoints hold the inspected displacement from DOWN;
+                # the default retains the earlier center-to-target ramp.
                 # The fixture must prove the complete named well, source,
                 # settings and live geometry; no arbitrary screen trajectory.
-                result = self.action(["shell", "input", "swipe", str(x), str(y),
+                result = self.action(["shell", "input", "swipe", str(start_x), str(start_y),
                                       str(x+delta[0]), str(y+delta[1]), str(duration)])
             else:
                 press = command.get("press_ms", 0)
