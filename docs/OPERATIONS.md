@@ -500,3 +500,18 @@ contact, independent of L analog travel, and is excluded from Save menus and
 cleanup input. Nintendo's [GameCube controls](https://www.guiasnintendo.com/2_GAMECUBE/Zelda_Wind_Waker/zeldawindwaker_sp/apie.html)
 identify L for targeting/centering the camera. This repairs a missing test control;
 it changes no application binary and does not infer partial trigger travel.
+
+The installed monitor correction has now been read back against its owner’s source
+and exercised with an actual atomic rename fixture. Subsequent gcx play jobs
+earned normal joined Stop, protected ordinary profiles/generation and verified
+return. Keep the original monitor interruption and recovery records; they remain
+separate from the unresolved later-play freeze.
+
+The next independently prepared ordinary-progress job may declare up to160 images
+(the default remains eight),64 individually inspected play/save contacts and
+768MiB collected data within its original finite90minute task. The prior35-contact
+pass reached the house but exhausted navigation headroom without a new marker or
+Save. Bounds cannot grow during execution; both Stop backups and return remain
+reserved. An actual inspected item purchase with its exact rupee debit can be a
+new persisted marker, as can collected rupees. An arbitrary changed count, unchanged
+marker, sent input or card hash does not establish new saved progress.

@@ -228,7 +228,7 @@ class CaptureBudgetTests(unittest.TestCase):
             self.assertEqual(len(fixture.calls), before)
 
     def test_invalid_or_unimplemented_capture_ceiling_refuses_before_transport(self):
-        for limit in [0, 97, 10., True]:
+        for limit in [0, 161, 10., True]:
             with self.subTest(limit=limit), self.assertRaises(packet.Refused):
                 packet.Driver('/unused', None, None, capture_limit=limit)
 
@@ -244,6 +244,19 @@ class CaptureBudgetTests(unittest.TestCase):
             with self.assertRaises(packet.Refused):
                 driver.execute(dict(op='capture', name='extra.png', capture_limit=97))
             self.assertEqual(driver.captures, 96)
+            self.assertEqual(len(fixture.calls), before)
+
+    def test_larger_prepared_navigation_retains_its_own_capture_ceiling(self):
+        with tempfile.TemporaryDirectory() as root:
+            fixture = Fixture(root)
+            driver = packet.Driver(root, fixture.budget, fixture.invoke,
+                                   lambda: fixture.now, fixture.sleep, capture_limit=160)
+            driver.captures = 159
+            driver.execute(dict(op='capture', name='last.png'))
+            before = len(fixture.calls)
+            with self.assertRaises(packet.Refused):
+                driver.execute(dict(op='capture', name='extra.png', capture_limit=161))
+            self.assertEqual(driver.captures, 160)
             self.assertEqual(len(fixture.calls), before)
 
     def test_prepared_two_stop_packet_has_one_aggregate_evidence_budget(self):
