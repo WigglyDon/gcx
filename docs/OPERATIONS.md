@@ -423,3 +423,11 @@ Real checkpoint durability and joined Stop acknowledgments remain required.
 This task declares one hour including five minutes of cleanup, at most96 images,
 36 play/save contacts,100 actions and576MiB collected data. Inspection time is
 included; these bounds grant neither endurance stress nor renewed live deadlines.
+
+For the inspected Wind Waker numeral context, scenery can move behind the text.
+The task may compare its pinned opaque numeral palette instead of background
+pixels: foreground position/shape and every selected RGB value must match exactly,
+with a bounded nonempty text signal. This applies only to that declared guest HUD
+context. Native buttons/thumb wells still require every complete-region pixel.
+Keep menu/transition negatives and the actual moving-background fixture. Pause
+uses the ordinary stock tap; held contacts remain GameCube game controls only.

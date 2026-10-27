@@ -899,5 +899,48 @@ class ActiveBoundEntryTests(unittest.TestCase):
                 packet.active_bound_entry(collection, binding)
 
 
+class InspectedTextTests(unittest.TestCase):
+    colours = [[255, 255, 139], [254, 254, 139]]
+    bounds = [0, 0, 32, 32]
+
+    def plane(self, background):
+        pixels = [tuple(background)] * 1024
+        for y in range(5, 15):
+            for x in range(6, 16):
+                pixels[y * 32 + x] = tuple(self.colours[(x + y) % 2])
+        return bytearray(v for pixel in pixels for v in pixel)
+
+    def matches(self, reference, current):
+        return packet.matching_inspected_text((32, 32), reference, (32, 32), current,
+                                               self.bounds, self.colours)
+
+    def test_moving_background_is_excluded_but_complete_control_match_stays_exact(self):
+        reference, current = self.plane([0, 50, 150]), self.plane([80, 90, 100])
+        self.assertTrue(self.matches(reference, current))
+        self.assertFalse(packet.matching_inspected_region((32, 32), reference,
+                                                          (32, 32), current, self.bounds))
+
+    def test_changed_foreground_colour_shape_missing_or_uniform_text_refuses(self):
+        reference = self.plane([0, 50, 150])
+        changed = bytearray(reference)
+        offset = (5 * 32 + 6) * 3
+        changed[offset:offset+3] = bytes(self.colours[0])
+        self.assertFalse(self.matches(reference, changed))
+        changed[offset:offset+3] = bytes([0, 50, 150])
+        self.assertFalse(self.matches(reference, changed))
+        self.assertFalse(self.matches(reference, bytes([0, 50, 150]) * 1024))
+        self.assertFalse(self.matches(bytes(self.colours[0]) * 1024, bytes(self.colours[0]) * 1024))
+
+    def test_palette_geometry_and_plane_bounds_are_checked(self):
+        plane = self.plane([0, 50, 150])
+        for palette in ([], [[True, 0, 0]], [[256, 0, 0]], [[1, 2]], [[1, 2, 3]] * 257):
+            with self.subTest(palette=palette[:2]):
+                self.assertFalse(packet.matching_inspected_text((32, 32), plane,
+                                 (32, 32), plane, self.bounds, palette))
+        self.assertFalse(packet.matching_inspected_text((32, 32), plane,
+                         (16, 64), plane, self.bounds, self.colours))
+        self.assertFalse(self.matches(plane, plane[:-1]))
+
+
 if __name__ == "__main__":
     unittest.main()

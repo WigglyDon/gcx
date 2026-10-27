@@ -193,6 +193,38 @@ def matching_inspected_region(reference_size, reference_rgb, current_size, curre
     return digest(reference_rgb) == digest(current_rgb)
 
 
+def matching_inspected_text(reference_size, reference_rgb, current_size, current_rgb,
+                            bounds, opaque_colours):
+    """Exact inspected text pixels over moving scenery; never a control proof.
+
+    The task pins its text palette/region. Both the foreground shape and every
+    selected RGB value must match. Native controls still use complete regions.
+    """
+    if (not isinstance(opaque_colours, list) or not 1 <= len(opaque_colours) <= 256
+            or any(not isinstance(c, list) or len(c) != 3
+                   or any(type(v) is not int or not 0 <= v <= 255 for v in c)
+                   for c in opaque_colours)
+            or not matching_inspected_region(reference_size, reference_rgb,
+                                              current_size, reference_rgb, bounds)
+            or not isinstance(current_rgb, (bytes, bytearray))
+            or len(current_rgb) != len(reference_rgb)):
+        return False
+    palette = {tuple(c) for c in opaque_colours}
+    left, top, right, bottom = bounds
+    width = reference_size[0]
+    def selected(rgb):
+        result = []
+        for y in range(top, bottom):
+            for x in range(left, right):
+                offset = (y * width + x) * 3
+                colour = tuple(rgb[offset:offset + 3])
+                if colour in palette:
+                    result.append((offset, colour))
+        return result
+    expected = selected(reference_rgb)
+    return 64 <= len(expected) <= (right-left)*(bottom-top)*3//4 and expected == selected(current_rgb)
+
+
 def component(text):
     matches = re.findall(r"\b([\w.]+)/([\w.$]+)", text)
     normalized = {(p, p + a if a.startswith(".") else a) for p, a in matches}
