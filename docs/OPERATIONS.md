@@ -546,3 +546,14 @@ existing direct route within30seconds; never extend its age or assume a previous
 water view still applies. Shorter inspected bridge movements may use the task's
 prepared80-contact budget, still inside100actions/160images and original cleanup
 and return reserves. Do not enlarge any admitted job's bounds.
+
+The mechanical helper can issue one balanced analog-trigger contact independently
+of a digital click: a named L/R analog bar, an interior1..99percent point and a
+100..500ms stock DOWN/MOVE/UP sequence. Rust still owns the horizontal travel
+mapping. Pixel quantization is not an exact hardware fraction. Native age,
+single-use, window/display and cleanup refusal checks remain; the task caller
+must additionally prove the complete current bar pixels/source/settings/identity.
+The prepared world-only test admits L analog and neither Save-menu nor cleanup
+analog input. It does not combine travel/clicks or infer game-camera behavior from
+the earlier unsuccessful digital-click centering attempt. No app/native changes
+or new hardware result follow from the host checks.

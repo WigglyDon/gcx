@@ -662,6 +662,47 @@ class PacketTests(unittest.TestCase):
         self.assertEqual(self.f.driver.actions, 1)
         with self.assertRaises(packet.Refused):self.f.driver.execute(command)
 
+    def test_analog_travel_is_separate_balanced_finite_and_single_use(self):
+        self.f.driver.execute(dict(op='capture', name='analog.png'))
+        command = dict(op='gcx_trigger', target='L analog', capture='analog.png',
+                       bounds=[30, 80, 130, 140], travel_percent=35, duration_ms=100)
+        self.f.driver.execute(command)
+        self.assertEqual(self.f.calls[-1],
+                         ['shell', 'input', 'swipe', '65', '110', '65', '110', '100'])
+        self.assertEqual(self.f.driver.actions, 1)
+        with self.assertRaises(packet.Refused):self.f.driver.execute(command)
+
+    def test_analog_contact_rejects_ambiguous_button_travel_and_cleanup(self):
+        self.f.driver.execute(dict(op='capture', name='analog.png'))
+        command = dict(op='gcx_trigger', target='L analog', capture='analog.png',
+                       bounds=[30, 80, 130, 140], travel_percent=95, duration_ms=100)
+        for change in ({'target':'L click'}, {'target':'L'}, {'cleanup':True},
+                       {'travel_percent':True}, {'travel_percent':0}, {'travel_percent':100},
+                       {'duration_ms':True}, {'duration_ms':99}, {'duration_ms':501},
+                       {'bounds':[30,80,32,140]}):
+            with self.subTest(change=change),self.assertRaises(packet.Refused):
+                self.f.driver.execute(dict(command, **change))
+        self.assertFalse(any('input' in call for call in self.f.calls))
+
+    def test_right_analog_near_full_travel_stays_inside_its_bar(self):
+        self.f.driver.execute(dict(op='capture', name='right-analog.png'))
+        self.f.driver.execute(dict(op='gcx_trigger', target='R analog',
+            capture='right-analog.png', bounds=[30, 80, 130, 140],
+            travel_percent=99, duration_ms=500))
+        self.assertEqual(self.f.calls[-1],
+            ['shell', 'input', 'swipe', '129', '110', '129', '110', '500'])
+
+    def test_analog_contact_keeps_foreground_freshness_and_frame_guards(self):
+        self.f.driver.execute(dict(op='capture', name='analog.png'))
+        command = dict(op='gcx_trigger', target='R analog', capture='analog.png',
+                       bounds=[30, 80, 130, 140], travel_percent=95, duration_ms=100)
+        self.f.now +=31
+        with self.assertRaises(packet.Refused):self.f.driver.execute(command)
+        self.f.now -=31
+        self.f.windows = f"mCurrentFocus=Window{{1 u0 {OTHER}}}"
+        with self.assertRaises(packet.Refused):self.f.driver.execute(command)
+        self.assertFalse(any('input' in call for call in self.f.calls))
+
     def test_only_explicit_digital_l_click_is_admitted_as_a_finite_button_contact(self):
         self.f.driver.execute(dict(op='capture', name='l-click.png'))
         command = dict(op='gcx_tap', target='L click', capture='l-click.png',

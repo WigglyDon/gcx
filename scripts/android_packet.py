@@ -642,12 +642,13 @@ class Driver:
             p.chmod(0o600)
             self.last_capture = (name, self.clock(), before, dimensions)
             return {"capture": str(p), "bytes": len(result.stdout)}
-        if op in ("gcx_tap", "gcx_stick"):
+        if op in ("gcx_tap", "gcx_stick", "gcx_trigger"):
             # Automated native-button checks use an agent-inspected, just-taken
             # own image. Bind one tap to its live window AND display geometry;
             # never reuse a guessed historical layout or a batch of points.
             admitted = (("Control Stick", "C Stick") if op == "gcx_stick"
-                        else ("Pause", "Start", "A", "B", "L click"))
+                        else (("L analog", "R analog") if op == "gcx_trigger"
+                              else ("Pause", "Start", "A", "B", "L click")))
             if command["target"] not in admitted:
                 raise Refused("unadmitted native control")
             if cleanup and command["target"] != "Pause":
@@ -674,7 +675,19 @@ class Driver:
             if not (0 <= a < c <= width and 0 <= b < d <= height):
                 raise Refused("native button outside current image")
             x, y = (a+c)//2, (b+d)//2
-            if op == "gcx_stick":
+            if op == "gcx_trigger":
+                percent = command.get("travel_percent")
+                duration = command.get("duration_ms")
+                if type(percent) is not int or not 1 <= percent <= 99 or c - a < 3:
+                    raise Refused("analog travel requires an interior percentage 1..99")
+                if type(duration) is not int or not 100 <= duration <= 500:
+                    raise Refused("analog contact must be 100..500ms")
+                # Rust owns the horizontal travel mapping. A bounded stock
+                # DOWN/MOVE/UP contact releases it; no digital click is emitted.
+                x = min(c - 1, max(a + 1, round(a + (c - a) * percent / 100)))
+                result = self.action(["shell", "input", "swipe", str(x), str(y),
+                                      str(x), str(y), str(duration)])
+            elif op == "gcx_stick":
                 delta = command.get("delta")
                 duration = command.get("duration_ms")
                 if (not isinstance(delta, list) or len(delta) != 2
