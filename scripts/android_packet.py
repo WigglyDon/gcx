@@ -43,6 +43,65 @@ def physical_displays_off(text):
     return bool(states) and all(state == "OFF" for state in states)
 
 
+def interrupted_capture_cleanup(inflight, job, expected_job, cleanup_process,
+                                supervisor_process):
+    """Recognize a retired observation worker, never grant custody or new work.
+
+    The caller must hold the inherited lease and obtain both live process
+    identities itself. The supervisor's current child must be this cleanup
+    process; children_retired describes the preceding work, not this child.
+    Preserve the interrupted operation separately before cleanup proceeds.
+    """
+    def identity(value):
+        return (isinstance(value, dict) and set(value) == {"pid", "start_ticks"}
+                and all(type(value[k]) is int and value[k] > 0 for k in value))
+    if (not isinstance(expected_job, str)
+            or not re.fullmatch(r"[a-f0-9]{32}", expected_job)
+            or not isinstance(inflight, dict) or set(inflight) != {"sequence", "op"}
+            or inflight["op"] != "capture" or type(inflight["sequence"]) is not int
+            or not 1 <= inflight["sequence"] <= 160
+            or not isinstance(job, dict)
+            or not identity(cleanup_process) or not identity(supervisor_process)
+            or cleanup_process["pid"] == supervisor_process["pid"]
+            or job.get("id") != expected_job or job.get("state") != "RETURNING"
+            or job.get("phase") != "cleanup" or job.get("children_retired") is not True
+            or job.get("remaining_children") != [] or job.get("child") != cleanup_process
+            or job.get("supervisor") != supervisor_process):
+        raise Refused("interrupted capture lacks actual retired-work/owned-cleanup proof")
+    return dict(inflight)
+
+
+def cleanup_shade_context(focus, display, keyguard):
+    """Only an unlocked SystemUI shade above gcx on the default lab display.
+
+    Non-content metadata is sufficient. This is not own_focus(), a gameplay
+    input exception, or permission to dismiss another app's overlay. Recheck
+    the same context before one stock collapse and require own_focus afterward.
+    """
+    if any(not isinstance(value, str) for value in (focus, display, keyguard)):
+        raise Refused("shade cleanup metadata unavailable")
+    states = re.findall(r"\bDisplay State=([A-Z_]+)\b", display)
+    if (not states or any(state != "ON" for state in states)
+            or re.findall(r"\bsecure=(true|false)\b", keyguard) != ["false"]
+            or re.findall(r"\bshowing=(true|false)\b", keyguard) != ["false"]):
+        raise Refused("shade cleanup requires observed on/unlocked/nonsecure state")
+    windows = re.split(r"Display: mDisplayId=(\d+)[^\n]*", focus)
+    activities = re.split(r"Display #(\d+)[^\n]*", focus)
+    if (windows[1::2] != ["0"] or activities[1::2] != ["0"]
+            or set(re.findall(r"mTopFocusedDisplayId=(\d+)", focus)) - {"0"}):
+        raise Refused("shade cleanup requires the unique default display")
+    current = re.findall(r"mCurrentFocus=([^\n]+)", windows[2])
+    frames = re.findall(r"DisplayFrames w=(\d+) h=(\d+) r=(\d+)", windows[2])
+    if (len(current) != 1
+            or not re.fullmatch(r"Window\{[a-fA-F0-9]+ u0 NotificationShade\}", current[0].strip())
+            or len(frames) != 1 or any(int(n) <= 0 for n in frames[0][:2])
+            or int(frames[0][2]) not in (0, 1, 2, 3)
+            or component(activities[2]) != (PACKAGE, PACKAGE + ".GcxActivity")):
+        raise Refused("shade is not above the exact owned resumed activity")
+    return {"display": 0, "window": current[0].strip(),
+            "geometry": [int(n) for n in frames[0]], "activity": ACTIVITY}
+
+
 def active_physical_viewport(text, logical):
     """Resolve only the focused logical display's currently active local panel."""
     panels = set()

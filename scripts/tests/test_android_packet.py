@@ -105,6 +105,89 @@ class Fixture:
         return subprocess.CompletedProcess(args, 0, out, b"")
 
 
+class InterruptedCleanupTests(unittest.TestCase):
+    def setUp(self):
+        self.job_id = "a" * 32
+        self.cleanup = {"pid": 71, "start_ticks": 120}
+        self.supervisor = {"pid": 70, "start_ticks": 110}
+        self.job = {"id": self.job_id, "state": "RETURNING", "phase": "cleanup",
+                    "child": self.cleanup, "supervisor": self.supervisor,
+                    "children_retired": True, "remaining_children": []}
+        self.inflight = {"sequence": 14, "op": "capture"}
+
+    def admit(self, operation=None, job=None):
+        return packet.interrupted_capture_cleanup(
+            self.inflight if operation is None else operation,
+            self.job if job is None else job, self.job_id,
+            self.cleanup, self.supervisor)
+
+    def test_retired_observation_preserves_the_original_failed_operation(self):
+        original = json.dumps(self.job, sort_keys=True)
+        proof = self.admit()
+        proof["op"] = "preserved elsewhere"
+        self.assertEqual(self.inflight, {"sequence": 14, "op": "capture"})
+        self.assertEqual(json.dumps(self.job, sort_keys=True), original)
+
+    def test_input_and_lifecycle_interruptions_are_not_capture_cleanup(self):
+        for op in ("contact", "guest_button", "open_save", "ordinary_stop", "reopen", "observe"):
+            with self.subTest(op=op), self.assertRaises(packet.Refused):
+                self.admit({"sequence": 14, "op": op})
+        for value in (True, 0, 161, "14"):
+            with self.subTest(sequence=value), self.assertRaises(packet.Refused):
+                self.admit({"sequence": value, "op": "capture"})
+
+    def test_live_missing_or_different_worker_does_not_authorize_retirement(self):
+        changes = ({"id": "b" * 32}, {"state": "RUNNING"}, {"phase": "work"},
+                   {"children_retired": False}, {"children_retired": 1},
+                   {"remaining_children": [self.supervisor]}, {"child": None},
+                   {"child": dict(self.cleanup, start_ticks=121)},
+                   {"supervisor": dict(self.supervisor, start_ticks=111)})
+        for change in changes:
+            with self.subTest(change=change), self.assertRaises(packet.Refused):
+                self.admit(job=dict(self.job, **change))
+        for key in self.job:
+            missing = {k: v for k, v in self.job.items() if k != key}
+            with self.subTest(missing=key), self.assertRaises(packet.Refused):
+                self.admit(job=missing)
+
+
+class ShadeCleanupTests(unittest.TestCase):
+    def setUp(self):
+        self.focus = (WINDOW.replace(f"{OWN}/{OWN}.GcxActivity", "NotificationShade")
+                      + "\n" + RESUMED)
+        self.display = "Display State=ON"
+        self.keyguard = "showing=false secure=false"
+
+    def context(self, focus=None, display=None, keyguard=None):
+        return packet.cleanup_shade_context(
+            self.focus if focus is None else focus,
+            self.display if display is None else display,
+            self.keyguard if keyguard is None else keyguard)
+
+    def test_owned_unlocked_shade_is_not_misrepresented_as_game_focus(self):
+        proof = self.context()
+        self.assertEqual(proof["activity"], packet.ACTIVITY)
+        self.assertEqual(proof["geometry"], [800, 400, 0])
+        with self.assertRaises(packet.Refused):packet.own_focus(self.focus, self.focus)
+
+    def test_foreign_secure_locked_off_or_ambiguous_overlay_never_matches(self):
+        changes = (
+            {"focus": self.focus.replace(f"{OWN}/.GcxActivity", OTHER)},
+            {"focus": self.focus.replace("NotificationShade", "PermissionDialog")},
+            {"focus": self.focus.replace(" u0 NotificationShade", " u10 NotificationShade")},
+            {"focus": self.focus + "\nDisplay #1:\n" + OTHER},
+            {"focus": self.focus + "\nDisplay: mDisplayId=1 rootTasks=1"},
+            {"focus": self.focus.replace("mTopFocusedDisplayId=0", "mTopFocusedDisplayId=1")},
+            {"focus": self.focus.replace("DisplayFrames w=800", "DisplayFrames w=0")},
+            {"keyguard": "showing=false secure=true"},
+            {"keyguard": "showing=true secure=false"},
+            {"keyguard": "showing=false secure=false secure=true"},
+            {"display": "Display State=OFF"}, {"display": ""})
+        for change in changes:
+            with self.subTest(change=change), self.assertRaises(packet.Refused):
+                self.context(**change)
+
+
 class CaptureBudgetTests(unittest.TestCase):
     def test_receipt_reader_keeps_complete_prior_json_until_replacement(self):
         with tempfile.TemporaryDirectory() as root:

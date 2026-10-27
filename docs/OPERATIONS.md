@@ -456,3 +456,22 @@ resumed gcx activity on the nonsecure lab device, then exact Activity AND focuse
 window guards must pass again. No notification capture, Back/game input, foreign
 app interaction, launcher or settings changes. Keep normal joined Stop distinct
 from independently protected quiescent retirement and post-exit backup.
+
+The prepared continuation can protect an interrupted **capture** under the same
+job without treating it as completed work. Require the inherited lease, matching
+job/admission, `RETURNING` cleanup phase, positive retirement of preceding work,
+and live PID/start identities showing that this cleanup process is the recorded
+supervisor's direct current child. Preserve the original receipt and operation
+before proceeding. Game/lifecycle input, unknown foreground, transport timeout,
+missing facts, changed owner or surviving work require named recovery instead.
+Recheck the exact acknowledged native process and game/profile, or actual
+absence. Conservatively charge one interrupted image and a 16 MiB output allowance within the original
+budget; those charges are not measured traffic or renewed authority.
+
+During terminal cleanup, the known shade context must match fresh non-content
+observations, native process identity, default display geometry and unlocked
+nonsecure state before one stock collapse. Exact gcx Activity/window focus must
+then return. This neither relaxes game-input guards nor closes the original
+freeze. The refinement has 84 public helper and 67 private task checks, including
+the retained shade metadata; device qualification is still due after the monitor
+owner resolves its observed failure. No new device job is queued.
