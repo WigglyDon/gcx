@@ -865,5 +865,39 @@ class DiagnosticHistoryTests(unittest.TestCase):
             self.assertTrue(fixture.budget.forced_cleanup)
 
 
+class ActiveBoundEntryTests(unittest.TestCase):
+    def fixture(self):
+        binding = dict(game_id='a' * 32, profile_id='b' * 32)
+        entry = dict(binding, paused=False, stopped=False, restart_required=False,
+                     runtime_incomplete=True)
+        return binding, entry, dict(selected=binding['game_id'], entries=[entry])
+
+    def test_live_writer_intent_is_separate_from_a_previous_incomplete_runtime(self):
+        binding, entry, collection = self.fixture()
+        self.assertIs(packet.active_bound_entry(collection, binding), entry)
+
+    def test_each_stop_pause_error_or_missing_flag_refuses(self):
+        for key in ('paused', 'stopped', 'restart_required'):
+            for value in (True, None, 0):
+                binding, entry, collection = self.fixture()
+                entry[key] = value
+                with self.subTest(key=key, value=value), self.assertRaises(packet.Refused):
+                    packet.active_bound_entry(collection, binding)
+
+    def test_selection_profile_duplicates_and_invalid_identity_refuse(self):
+        for change in ('selected', 'profile', 'duplicate', 'invalid'):
+            binding, entry, collection = self.fixture()
+            if change == 'selected':
+                collection['selected'] = 'c' * 32
+            elif change == 'profile':
+                entry['profile_id'] = 'c' * 32
+            elif change == 'duplicate':
+                collection['entries'].append(dict(entry))
+            else:
+                binding['game_id'] = 'invalid'
+            with self.subTest(change=change), self.assertRaises(packet.Refused):
+                packet.active_bound_entry(collection, binding)
+
+
 if __name__ == "__main__":
     unittest.main()

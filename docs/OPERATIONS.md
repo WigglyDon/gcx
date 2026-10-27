@@ -410,3 +410,16 @@ checkpoint through real resume/Pause/joined Stop, without changing card files by
 hand. Its three Stop protections declare576MiB aggregate collected data. Earlier
 callers retain their original byte defaults and bounds; the constructor maximum
 is768MiB. A recovered/quiescent retirement remains distinct from normal Stop.
+
+Complete logd eviction can remove even the overlap. Preserve that gap; it is not
+a freeze diagnosis. The current fixed-layout Pixel4 ordinary-progress recipe may
+guard a contact with current selected-game/profile intent, rechecked PID/start,
+fresh focus/physical viewport and exact complete source-bound control plus
+inspected guest-context pixels. It requires the initial native boot/presentation
+acknowledgment once for each actual process. It never returns cached history as a
+fresh log read. The complete Pause button uses the same current-frame proof;
+paused/stopped/error metadata, changed pixels, source, layout or identity refuse.
+Real checkpoint durability and joined Stop acknowledgments remain required.
+This task declares one hour including five minutes of cleanup, at most96 images,
+36 play/save contacts,100 actions and576MiB collected data. Inspection time is
+included; these bounds grant neither endurance stress nor renewed live deadlines.

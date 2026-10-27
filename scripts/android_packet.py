@@ -94,6 +94,19 @@ class Budget:
         return self.commands_end if self.cleanup(now) else self.cleanup_at
 
 
+def active_bound_entry(collection, binding):
+    """Current gcx intent for one source/frame-guarded test input, not FPS proof."""
+    if (any(not re.fullmatch(r"[a-f0-9]{32}", binding.get(k, ""))
+            for k in ("game_id", "profile_id"))
+            or collection.get("selected") != binding["game_id"]):
+        raise Refused("current selected game binding differs")
+    entries = [e for e in collection.get("entries", []) if e.get("game_id") == binding["game_id"]]
+    if (len(entries) != 1 or entries[0].get("profile_id") != binding["profile_id"]
+            or any(entries[0].get(k) is not False for k in ("paused", "stopped", "restart_required"))):
+        raise Refused("current bound game is not logically active")
+    return entries[0]
+
+
 def playing_presentation_ready(trace):
     """Require current playing intent and a frame newer than invalidation.
 
