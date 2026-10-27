@@ -420,8 +420,8 @@ acknowledgment once for each actual process. It never returns cached history as 
 fresh log read. The complete Pause button uses the same current-frame proof;
 paused/stopped/error metadata, changed pixels, source, layout or identity refuse.
 Real checkpoint durability and joined Stop acknowledgments remain required.
-This task declares one hour including five minutes of cleanup, at most96 images,
-36 play/save contacts,100 actions and576MiB collected data. Inspection time is
+The latest prepared task declares 90 minutes including five minutes of cleanup,
+at most 96 images, 36 play/save contacts, 100 actions and 576 MiB collected data. Inspection time is
 included; these bounds grant neither endurance stress nor renewed live deadlines.
 
 For the inspected Wind Waker numeral context, scenery can move behind the text.
@@ -431,3 +431,28 @@ with a bounded nonempty text signal. This applies only to that declared guest HU
 context. Native buttons/thumb wells still require every complete-region pixel.
 Keep menu/transition negatives and the actual moving-background fixture. Pause
 uses the ordinary stock tap; held contacts remain GameCube game controls only.
+
+Terminal current-frame cleanup attempts Pause independently of evictable log
+history, then always reaches the existing protection/finalizer path when transport
+permits. A fresh ordinary-process evidence directory copies the exact pinned
+navigation proof and retains the immutable original command root. Preserve the
+current actual checkpoint or clean stopped state; never reattach an old pointer
+to avoid game navigation.
+
+The installed custodian output monitor has an observed atomic-publication race:
+an enumerated temporary receipt pathname can disappear before its later size
+query. The resulting host failure does not establish a game stall. Preserve the
+original in-flight operation and failed return, use installed named cleanup-only
+recovery, and retain all recovery attempts. An isolated host reproduction runs
+the actual installed function without phone or custody mutation. Correct that
+monitor with its owner; do not edit shared tools or bypass output accounting from
+the product checkout. No new play job is prepared as though the cause were fixed.
+
+A separately admitted cleanup-only recovery has its own finite cleanup deadline;
+it does not revive expired gameplay authority. Record fresh non-content focus,
+display and keyguard evidence before any stock cleanup action. An unlocked
+SystemUI shade may be collapsed only when it overlays the exact same owned
+resumed gcx activity on the nonsecure lab device, then exact Activity AND focused
+window guards must pass again. No notification capture, Back/game input, foreign
+app interaction, launcher or settings changes. Keep normal joined Stop distinct
+from independently protected quiescent retirement and post-exit backup.

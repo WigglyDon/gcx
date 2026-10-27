@@ -37,6 +37,35 @@ paired native joined/durable/profile-released Stop and custodian-verified return
 passed. Fourteen still images were opened. The original freeze was not reproduced
 under these brief inputs; no continuous-play, audio/feel or timing claim follows.
 
+Later navigation on the same build established a visible A-button interaction:
+the game's Open prompt led to the house door opening and Link entering the room.
+That pass used six Control Stick, four C Stick and one A contact. Declared contact
+time totaled 17.8 seconds over a 2589.911 second first-to-last wall span including
+inspection and idle time. It earned normal joined Stop, current generation and
+both ordinary-profile protection, and verified return. The ordinary AA marker
+remained 23 rupees; no new in-game Save or ordinary fresh-process reload was earned.
+An earlier ten-contact pass returned through protected quiescent recovery only;
+its outcome remains separate.
+
+The latest attempt made two four-second movements before the host custodian's
+output monitor failed during a capture. Its size query raced an atomic receipt
+publication. An isolated host fixture executing the installed monitor function
+reproduces that race; no product-freeze inference follows. The original failed
+work/return fields and unsuccessful recovery attempts are retained. A separate
+cleanup-only recovery ultimately verified current-generation/both-profile
+protection, paired native joined/durable/profile-release Stop acknowledgments,
+clean stopped metadata, app absence and physical OFF/keyguard return. SystemUI
+focus refusal and expired-deadline refusals remain in the recovery history.
+That final normal Stop belongs to recovery, not the interrupted work job.
+Both ordinary cards match the latest attempt's preflight copies; the actual
+selected entry is cleanly stopped with a null checkpoint reference. Current
+console data and protected generations remain recoverable without rollback.
+
+The current-build ordinary-progress row is still incomplete. Keep the original
+later-play freeze open and the installed candidate/backups unchanged. Resolve the
+demonstrated output-monitor failure with its owner before another play/save job;
+do not replace this objective with the accepted stationary Home comparison.
+
 An earlier zero-input/no-launch preflight failed because Java could not reserve
 its heap under the executor's address-space bound, while the exact same APK's
 signature verified off-device. A task audit copy also overwrote its live admission
