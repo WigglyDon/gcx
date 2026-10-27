@@ -522,3 +522,12 @@ Hero’s Clothes acquisition text and the later green-clothes world, then requir
 that outfit after actual Save, normal joined Stop and fresh-process game-menu
 loading. An unchanged rupee count alone cannot satisfy this alternative. Keep the
 actual acquisition, save completion and cold world captures distinct and private.
+
+A retained ordinary-world refusal isolated one background-sensitive low-brightness
+edge pixel in the numeral reference, while the displayed count stayed unchanged.
+The next private proof narrows its declared exact palette to bright glyph interiors
+(red=green, at least248). The actual pair retains120 selected pixels, above the
+existing64-pixel minimum. No color tolerance is added. Changed interior RGB or
+shape still refuses, as do title/menu/fade scenes; complete native-control regions
+remain exact. Retain the original refusal and its separately verified normal
+Stop/backup/return. This is a test reference repair, not an emulator fix.
