@@ -573,3 +573,18 @@ privately, including expected component and actual display/frame metadata, befor
 the unchanged refusal and forced cleanup. No extra query, window token, input,
 capture, wait or readiness cache is added. A later cleanup refusal must not
 overwrite that first observation.
+
+A finite partial-play task may retain its actual scene through direct Home,
+the existing independent complete-generation check and quiescent process
+retirement before verified stock return. Use this only for observed world play
+with active playing intent, no failure, foreground mismatch, timeout or inflight
+operation, and the original cleanup reserve. Do not Pause before that departure
+or probe launcher content. Failed protection retains the checkpoint, writer and
+error for guarded cleanup; it must not silently fall back to Stop and discard
+the scene. This departure is explicitly not normal joined Stop or ordinary-save
+reload evidence. A later normal admission may continue only the actual current
+checkpoint whose binding and bytes match its independently protected archive;
+never reattach an archived pointer. Completed Save and cold-reload stages retain
+normal cleanup. The missing ordinary-save row still requires actual new progress,
+in-game Save completion, joined Stop and a fresh-process game-menu reload with
+no checkpoint restoration.
