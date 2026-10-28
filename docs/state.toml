@@ -298,6 +298,16 @@ foreground_failure = "Next scene observation saw PSX Activity instead of gcx; re
 original_cleanup = "Actual current playing-intent checkpoint independently protected; quiescent retirement refused from foreign foreground. No normal joined Stop or verified return"
 recovery_first = "Metadata-only polling inherited30second helper interval and timed out during non-mutating policy read; no input or retirement. Original traceback and stale inherited receipt timeout flag retained separately"
 recovery_correction = "Eight focused checks pass: each metadata read uses existing bounded cleanup interval inside immutable recovery deadline; final receipt serializes actual driver timeout/counters. Actual30predicate run had no timeout, still foreign PSX; safely refused with no input/retirement"
-resource_status = "RECOVERY_PENDING_UNAVAILABLE; owner says not using phone; explicitly authorized focused coordination with existing PSX worker, report sent. No lock/server reset or peer preemption"
-next_preparation = "134absolute pins and14focused continuation/manifest/partial-cleanup checks pass. Prepared only; actual recovery/return and latest-generation reconciliation required before fresh normal admission. No archived pointer writeback"
+resource_status = "NAMED_CLEANUP_RECOVERY_AND_ACTUAL_RETURN_VERIFIED; original failed work and recoveries retained separately. Owner-authorized sibling-window coordination/one-Home exception; no lock/server reset or peer preemption"
+next_preparation = "134absolute pins and14focused continuation/manifest/partial-cleanup checks pass; latest actual recovered generation reconciled and8affected manifest/continuation checks rechecked. Fresh normal admission remains required. No archived pointer writeback"
 original_later_play_freeze = "OPEN; no cause or closure established by navigation or unrelated foreground refusal"
+
+[ordinary_progress_recovered_continuation]
+product_source = "f9de0b0bac37f3087802f4d0e8ab7afcf9c1acac"
+apk_prefix = "b4c92127"
+recovery = "Actual fresh owned native pause/checkpoint barrier, independent current generation and ordinary-profile protection, quiescent gcx retirement/process absence, physicalOFF and custodian COMPLETED/returned=true"
+normal_joined_stop = false
+evidence_limit = "Earlier scoped log had become empty; original retained acknowledgment was not accepted as fresh quiescence. Same owned runtime reentry from observed Home supplied a new acknowledgment before protection/retirement. Original failures retained"
+protected_continuation = "Prepared startup binds newly captured actual current playing-intent generation/card bytes and independently checked archive; no device file/pointer writeback or preparation Stop"
+ordinary_save_reload = "INCOMPLETE; no new ordinary-progress marker, actual Save or cold game-menu reload earned"
+original_later_play_freeze = "OPEN; no causal fix or closure"
