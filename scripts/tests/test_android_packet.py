@@ -604,6 +604,24 @@ class PacketTests(unittest.TestCase):
                                          OWN + "/" + OWN + ".GcxActivity", WINDOW)[0],
                          (OWN, OWN + ".GcxActivity"))
 
+    def test_coherent_foreign_refusal_retains_first_predicate_without_extra_query(self):
+        own = f"{OWN}/{OWN}.GcxActivity"
+        self.f.windows = WINDOW.replace(own, OTHER)
+        self.f.resumed = RESUMED.replace(f'{OWN}/.GcxActivity', OTHER)
+        with self.assertRaises(packet.Refused):self.f.driver.focus()
+        proof = self.f.driver.receipt['foreground_refusal_observation']
+        self.assertEqual(proof['component'],list(packet.component(OTHER)))
+        self.assertEqual((proof['at'],proof['display']),(100,'0'))
+        self.assertEqual(len(self.f.calls),1)
+        self.assertTrue(self.f.driver.budget.forced_cleanup)
+        self.assertTrue(self.f.driver.mismatch)
+        self.f.windows = WINDOW.replace(own,'second.app/.Second')
+        self.f.resumed = RESUMED.replace(f'{OWN}/.GcxActivity','second.app/.Second')
+        with self.assertRaises(packet.Refused):self.f.driver.focus()
+        self.assertEqual(self.f.driver.receipt['foreground_refusal_observation'],proof)
+        self.assertEqual(len(self.f.calls),2)
+        self.assertFalse(any('input' in call or 'screencap' in call for call in self.f.calls))
+
     def test_mismatch_blocks_capture_and_touch_before_mutation(self):
         self.f.windows = f"mCurrentFocus=Window{{1 u0 {OTHER}}}"
         for command in ({"op": "capture", "name": "wrong.png"},

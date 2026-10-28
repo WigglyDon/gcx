@@ -433,6 +433,13 @@ class Driver:
         try:
             observed = self.observe_focus()
             if observed[0] != (PACKAGE, PACKAGE + ".GcxActivity"):
+                # Private predicate metadata only; preserve the first refusal.
+                # This is not readiness, a UI capture or authority to act there.
+                self.receipt.setdefault("foreground_refusal_observation", {
+                    "at": self.clock(), "component": list(observed[0]),
+                    "display": observed[1][0], "frames": observed[1][2],
+                    "expected": [PACKAGE, PACKAGE + ".GcxActivity"],
+                })
                 raise Refused("expected gcx Activity AND focused window do not match")
             self.own_ui_observed = True
             return observed

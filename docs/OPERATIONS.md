@@ -567,3 +567,9 @@ use named cleanup-only recovery after proving gcx absent, independently verifyin
 the existing ordinary archive against unchanged current data and checking stock
 physical return. Keep that recovery separate from the failed original return;
 it earns no new normal Stop, play or in-game save result.
+
+The runtime focus guard likewise retains its first coherent component mismatch
+privately, including expected component and actual display/frame metadata, before
+the unchanged refusal and forced cleanup. No extra query, window token, input,
+capture, wait or readiness cache is added. A later cleanup refusal must not
+overwrite that first observation.
