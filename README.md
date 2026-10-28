@@ -85,6 +85,14 @@ actual-world Pause/Resume, same-process Home/return and final paused/checkpoint
 acknowledgments passed, followed by automatic same-lease backup, fully traced
 joined Stop and verified return. No latency or original-freeze fix is claimed.
 
+The unchanged f9de0b0 / b4c92127 candidate now passes an automated ordinary-save
+check on Pixel4: actual movement/action/C Stick, newly acquired Hero’s Clothes,
+in-game Save, normal joined Stop and a fresh-process game-menu reload retaining
+the green outfit and 23 rupees. Final protected joined Stop and device return passed.
+Both ordinary profiles and prior backups remain protected. The owner was away;
+this adds no human audio/control-feel, latency or endurance result. The original
+later-play freeze remains open. See [acceptance](docs/ACCEPTANCE.md).
+
 GameCube is the initial scope. Dolphin's Wii capability is not a promise of Wii
 support in gcx. A Wii expansion, iOS implementation and multiple resident games
 are separate decisions. Google Play and ordinary Apple App Store distribution

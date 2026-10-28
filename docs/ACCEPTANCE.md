@@ -11,82 +11,45 @@ accepts the retained analysis and eight matched stationary windows on unchanged
 f9de0b0/b4c92127. That comparison is complete for the present Home timing
 hypothesis: no repeat or Home-specific performance fix without new evidence.
 The original later-play freeze remains open, separately from Fold process loss.
-The next missing current-build result is actual Wind Waker movement/action and
-C Stick, meaningful ordinary progress saved through the game, normal joined
-Stop, then a fresh-process game-menu reload of that progress. Older ordinary
-save/reload results remain earned only on their recorded source/build.
+The current candidate now passes the missing ordinary-progress row on Pixel4:
+actual world movement/action and a visible C Stick camera change, acquisition of
+Hero’s Clothes from a casual-outfit baseline, saving through Wind Waker, normal
+joined Stop, then a genuinely fresh process and ordinary game-menu reload showing
+the green outfit and 23 rupees. The unchanged count alone is not the new marker;
+the acquired outfit is. The game loaded its ordinary dock spawn, rather than the
+unsaved house position. No machine-checkpoint restoration was used for reload.
 
-The owner is away and uses guarded automation. The task packet
-binds each finite contact to the inspected guest context, complete named control,
-unchanged source/APK/settings and current presentation/focus. It requires visible
-play outcomes, a persisted marker and actual game-save completion; sent input,
-camera position or changed card hashes cannot substitute. Two Stop stages share
-the original deadlines and aggregate evidence bounds, with distinct protected
-generations. A checkpoint restore cannot satisfy ordinary reload. These
-guards alone do not earn a gameplay/save result; audible sound and control feel
-require real human observations.
+The actual Save entry and Yes confirmation were inspected separately. After the
+write, the game displayed “Would you like to continue playing?” Before Stop,
+the complete current generation and ordinary profiles were independently protected.
+Normal Stop recorded native join, durable clean metadata and profile release;
+checkpoint reference was null and the old process absent before launch. The fresh
+process followed Start → existing quest → Start through the game menus. A
+second protected normal joined Stop, process absence and stock physical OFF return
+completed under the same admission. Both ordinary profiles and all earlier
+backups/candidates remain protected. There was no rebuild or reinstall.
 
-The subsequent admitted pass on that unchanged build reached the existing quest
-through normal game menus. Two declared one-second Control Stick contacts and
-one half-second C Stick contact produced visible movement and camera changes.
-The original card progress remained unchanged. No game action or new persisted
-marker was earned, and no in-game save or fresh-process menu reload was attempted.
-This is a partial result, not completion of the ordinary-progress objective.
-Final Pause, independently protected current generation/both ordinary profiles,
-paired native joined/durable/profile-released Stop and custodian-verified return
-passed. Fourteen still images were opened. The original freeze was not reproduced
-under these brief inputs; no continuous-play, audio/feel or timing claim follows.
+This pass used 71 individually inspected play/save contacts: 68 during play and 3 for
+Start/Save/Yes. Declared contact duration totaled 67.85 seconds across 2155.019 seconds
+from first to last contact, including inspection and idle gaps. There were no
+context refusals or fatal work failure in this pass. 155 images and 89 actions remained
+within the original task bounds, including cleanup. These observations are not
+continuous play, endurance, physical input latency or game-FPS measurements. The
+owner was away: no new human sound or control-feel result is claimed. The original
+later-play freeze remains OPEN / NOT REPRODUCED in these inspected conditions.
+Fold process loss/lag remains a separate incident; no Fold or launcher action.
 
-Later navigation on the same build established a visible A-button interaction:
-the game's Open prompt led to the house door opening and Link entering the room.
-That pass used six Control Stick, four C Stick and one A contact. Declared contact
-time totaled 17.8 seconds over a 2589.911 second first-to-last wall span including
-inspection and idle time. It earned normal joined Stop, current generation and
-both ordinary-profile protection, and verified return. The ordinary AA marker
-remained 23 rupees; no new in-game Save or ordinary fresh-process reload was earned.
-An earlier ten-contact pass returned through protected quiescent recovery only;
-its outcome remains separate.
-
-The latest attempt made two four-second movements before the host custodian's
-output monitor failed during a capture. Its size query raced an atomic receipt
-publication. An isolated host fixture executing the installed monitor function
-reproduces that race; no product-freeze inference follows. The original failed
-work/return fields and unsuccessful recovery attempts are retained. A separate
-cleanup-only recovery ultimately verified current-generation/both-profile
-protection, paired native joined/durable/profile-release Stop acknowledgments,
-clean stopped metadata, app absence and physical OFF/keyguard return. SystemUI
-focus refusal and expired-deadline refusals remain in the recovery history.
-That final normal Stop belongs to recovery, not the interrupted work job.
-Both ordinary cards match the latest attempt's preflight copies; the actual
-selected entry is cleanly stopped with a null checkpoint reference. Current
-console data and protected generations remain recoverable without rollback.
-
-The current-build ordinary-progress row is still incomplete. Keep the original
-later-play freeze open and the installed candidate/backups unchanged. Resolve the
-demonstrated output-monitor failure with its owner before another play/save job;
-do not replace this objective with the accepted stationary Home comparison.
-
-An earlier zero-input/no-launch preflight failed because Java could not reserve
-its heap under the executor's address-space bound, while the exact same APK's
-signature verified off-device. A task audit copy also overwrote its live admission
-record and blocked cleanup. Separate installed cleanup-only recovery verified
-return; the failed/invalidated requests and original failed-return fields remain
-distinct. The revised packet preserves live admission and binds device readback
-to the pinned verified APK/signature without starting Java under custody. Its
-read-only checkpoint verifier also passed the actual executor memory bound.
-These are test-harness repairs, not an emulator, signer or original-freeze fix.
-
-Next preparation permits individually admitted stick contacts up to four seconds,
-with the one-second default preserved for prior packets. Contacts still require
-either the actual inspected frame within thirty seconds, or an explicitly requested
-fresh capture whose complete control and inspected guest-context pixels match
-exactly before dispatch. The dispatched frame's age limit is unchanged, and its
-whole image is retained/opened before another guest input. Direct-only dispatch
-subsequently refused an expired first world observation; no world input occurred,
-and that failed work returned with protected saves and normal joined Stop.
-Local test receipts now publish atomically after a transient reader/truncation
-race was observed. The missing meaningful game-save/reload objective remains due;
-another actual session requires normal fleet admission after the current holder.
+Earlier unsuccessful attempts and recoveries remain separately retained. One
+acquisition attempt ended before Save when a refused matching image consumed
+evidence but not a successful-contact number; the next explicit observation then
+collided with that filename. The helper now numbers attempts independently and
+surfaces contact results. 19 affected dispatch/refusal/frame checks, 12 manifest/
+continuation/history checks and 6 current-intent/manifest checks passed; the next
+prepared graph verified 146 absolute inputs. No automatic retry, deadline extension
+or input-guard relaxation was introduced. An omitted private output directory
+caused a later pre-work startup refusal; named cleanup-only recovery verified gcx
+absent, ordinary archives matching current data and actual return before this
+successful admission. No shared custody record was cleared or rewritten.
 
 [The f9de0b0/b4c92127 handback](https://github.com/WigglyDon/gcx/issues/2#issuecomment-6408382857)
 records actual Pixel4 bridge-world Pause/Resume, same-process Home/return and
@@ -276,8 +239,9 @@ unexpected non-gcx foreground. Normal Stop did not complete. Bounded recovery
 protected and freshly verified the latest complete checkpoint/current saves before
 controlled own-process retirement and verified return. Custody recovery is resolved;
 the product defect remains open and prevents an unqualified lifecycle pass. The
-live WW reference is retained; two rupees are machine-state evidence only. Separate
-ABI8 ordinary in-game saving/reload remains unrun; do not roll back current files
+live WW reference is retained; two rupees are machine-state evidence only.
+At that stage ABI8 ordinary in-game saving/reload remained unrun; the current
+source-bound result is recorded above. Do not roll back current files
 or repeat completed campaigns to hide the late failure.
 
 [Master6379842357](https://github.com/WigglyDon/gcx/issues/2#issuecomment-6379842357)
@@ -319,7 +283,8 @@ unchanged ordinary card, clean joined Stop and verified return are recorded in
 [the ABI8 handback](https://github.com/WigglyDon/gcx/issues/2#issuecomment-6379745602).
 This supersedes ABI8's earlier unqualified scene-return status, while preserving
 the historical ABI7 evidence below. Automatic paused=false return, two-game library
-return, real shortcuts, full controls and a new ABI8 ordinary-save/reload remain due.
+return, real shortcuts and full controls remained due at that stage. The later
+current-candidate ordinary-save/reload result is recorded above.
 
 ABI7 source `dae7e3f1326fb320a231efa5ffd89c853482f417`, APK
 `261a4976606117c29b70df2a7485f48188a64067d6224c5d1721b546c3763b75`, earned
