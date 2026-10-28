@@ -598,3 +598,12 @@ Transport, focus, process, source, complete-control and other refusals still end
 work under the existing cleanup owner. Animated dialogue can use the existing
 direct route from its newly inspected whole frame inside the same 30-second
 limit. Prior failed attempts and their actual Stop/return evidence remain intact.
+
+A typed pre-dispatch context refusal consumes capture evidence without consuming a
+successful game contact. Number each attempted contact's image and diagnostics
+independently of successful contacts, so a newly inspected observation can proceed
+without colliding with the refused frame. Preserve both frames and the original
+no-overwrite guard. Surface the contact result to the operator: a capture and a
+null fatal error do not prove input was dispatched. The actual refusal/reobserve/
+contact sequence has an isolated regression; existing action/image/deadline bounds
+and the eight-refusal limit remain unchanged. No automatic retry is admitted.
