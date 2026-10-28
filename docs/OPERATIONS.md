@@ -588,3 +588,13 @@ never reattach an archived pointer. Completed Save and cold-reload stages retain
 normal cleanup. The missing ordinary-save row still requires actual new progress,
 in-game Save completion, joined Stop and a fresh-process game-menu reload with
 no checkpoint restoration.
+
+A changed guest-context rectangle in an explicit matching contact is a known
+pre-dispatch refusal. Keep its actual capture/process/reference and no-contact
+record, invalidate the prior scene and capture, and require a new explicit whole
+image observation. At most eight such observations fit this prepared task; the
+ninth ends work. There is no automatic retry, deadline renewal or reused frame.
+Transport, focus, process, source, complete-control and other refusals still end
+work under the existing cleanup owner. Animated dialogue can use the existing
+direct route from its newly inspected whole frame inside the same 30-second
+limit. Prior failed attempts and their actual Stop/return evidence remain intact.
