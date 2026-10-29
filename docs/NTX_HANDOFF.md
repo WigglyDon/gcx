@@ -14,8 +14,13 @@ public, branch main. It was renamed IN PLACE from gcx; commits/issues were not
 recreated. Pre-succession source is b3a02e570e9f63e94d897c688a2f5f850b054ae6.
 The handoff commit(s) at HEAD change current guidance/launch inputs and location
 binding only. Resolve their actual SHA with git log; no new app build is implied.
-The existing checkout is intended to live in an ntx-named directory in the same
-approved workspace. The local-only supplement records actual relocation/verification.
+The existing checkout was relocated to an ntx-named directory in the same approved
+workspace, preserving root/.git inodes. Preparation commit:
+ecb606e07f6aea2e79c0e605bc96078cf9e76c50. The local-only supplement records the
+actual location and verified66770real-host entries,8critical file hashes/inodes,
+147read-only rebased input pins and26nested Git heads/dirty states. Three empty
+sandbox-only mountpoint entries were classified separately; no host files were
+missing. The old path is absent, with no alias. The old seed publisher is retired.
 Never reconstruct the old directory or leave a compatibility symlink.
 
 Top-level source was clean on entry, with one worktree and no registered top-level
