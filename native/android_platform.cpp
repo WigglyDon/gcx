@@ -7,13 +7,13 @@
 #include <cstdlib>
 #include <limits>
 
-extern "C" int64_t gcx_platform_dispatch(uint32_t, const char*, const char*, char*, uintptr_t);
+extern "C" int64_t ntx_platform_dispatch(uint32_t, const char*, const char*, char*, uintptr_t);
 static int64_t Request(uint32_t op, std::string_view path = {}, std::string_view arg = {}, char* out = nullptr, size_t capacity = 0)
 {
-  return gcx_platform_dispatch(op, std::string(path).c_str(), std::string(arg).c_str(), out, capacity);
+  return ntx_platform_dispatch(op, std::string(path).c_str(), std::string(arg).c_str(), out, capacity);
 }
 // Mechanical thread preparation; Rust owns VM attachment and thread-exit detach.
-extern "C" void gcx_prepare_render_thread()
+extern "C" void ntx_prepare_render_thread()
 {
   // Continuing a final window release without a JNIEnv is unsafe on Android 13.
   if (Request(10) != 1)

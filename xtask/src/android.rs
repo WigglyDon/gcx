@@ -36,7 +36,7 @@ fn copy(source: &Path, destination: &Path) -> Result<()> {
 pub fn prepare(root: &Path, source: &Path) -> Result<()> {
     crate::receipt::write(root, source)?;
     let tools = Tools::existing()?;
-    let out = root.join("build/android-package");
+    let out = root.join("build/ntx-android-package");
     let assets = out.join("assets");
     if assets.exists() {
         fs::remove_dir_all(&assets)?;
@@ -68,7 +68,7 @@ pub fn prepare(root: &Path, source: &Path) -> Result<()> {
         resources.join("\n") + "\n",
     )?;
     let notices = assets.join("notices");
-    copy(&root.join("LICENSE"), &notices.join("gcx-MIT.txt"))?;
+    copy(&root.join("LICENSE"), &notices.join("ntx-MIT.txt"))?;
     copy(
         &root.join("native/COPYING"),
         &notices.join("Dolphin-COPYING.txt"),
@@ -183,7 +183,7 @@ pub fn prepare(root: &Path, source: &Path) -> Result<()> {
         .ok_or("missing Cargo graph")?;
     let android = packages
         .iter()
-        .find(|p| p["name"] == "gcx-android")
+        .find(|p| p["name"] == "ntx-android")
         .ok_or("missing Android package")?;
     let mut pending = vec![
         android["id"]
@@ -302,7 +302,7 @@ pub fn prepare(root: &Path, source: &Path) -> Result<()> {
         .arg(&tools.platform)
         .arg("-d")
         .arg(&classes)
-        .arg(root.join("android/GcxActivity.java")))?;
+        .arg(root.join("android/NtxActivity.java")))?;
     let dex = out.join("dex");
     fs::create_dir_all(&dex)?;
     run(Command::new(tools.build.join("d8"))
@@ -311,7 +311,7 @@ pub fn prepare(root: &Path, source: &Path) -> Result<()> {
         .arg("--output")
         .arg(&dex)
         .args(
-            fs::read_dir(classes.join("com/machinerhythm/gcx"))?
+            fs::read_dir(classes.join("com/machinerhythm/ntx"))?
                 .map(|entry| entry.map(|e| e.path()))
                 .collect::<std::io::Result<Vec<_>>>()?,
         ))?;
@@ -364,7 +364,7 @@ fn audit_elf(file: &Path, ndk: &Path) -> Result<()> {
             .map(|(s, _)| s)
             .ok_or("invalid NEEDED entry")?;
         let allowed = [
-            "libgcx_engine.so",
+            "libntx_engine.so",
             "libc++_shared.so",
             "libandroid.so",
             "liblog.so",
@@ -385,7 +385,7 @@ fn audit_elf(file: &Path, ndk: &Path) -> Result<()> {
     }
     Ok(())
 }
-pub fn package(root: &Path, source: &Path) -> Result<()> {
+pub fn package(root: &Path, source: &Path, signed: bool) -> Result<()> {
     let tools = Tools::existing()?;
     let ndk = PathBuf::from(
         std::env::var_os("ANDROID_NDK_HOME").ok_or("set ANDROID_NDK_HOME to reviewed NDK r30")?,
@@ -396,7 +396,7 @@ pub fn package(root: &Path, source: &Path) -> Result<()> {
     {
         return Err("expected NDK 30.0.16248370".into());
     }
-    let engine = root.join("build/android/gcx/libgcx_engine.so");
+    let engine = root.join("build/ntx-android/ntx/libntx_engine.so");
     if !engine.is_file() {
         return Err("build the pinned Android native engine first".into());
     }
@@ -410,7 +410,7 @@ pub fn package(root: &Path, source: &Path) -> Result<()> {
         use std::os::unix::fs::PermissionsExt;
         fs::set_permissions(&symbols, fs::Permissions::from_mode(0o700))?;
     }
-    let debug = symbols.join(format!("{engine_hash}.libgcx_engine.so"));
+    let debug = symbols.join(format!("{engine_hash}.libntx_engine.so"));
     if !debug.exists() {
         copy(&engine, &debug)?;
         #[cfg(unix)]
@@ -432,7 +432,7 @@ pub fn package(root: &Path, source: &Path) -> Result<()> {
             "--locked",
             "--release",
             "-p",
-            "gcx-android",
+            "ntx-android",
             "--target",
             "aarch64-linux-android",
             "--",
@@ -440,7 +440,7 @@ pub fn package(root: &Path, source: &Path) -> Result<()> {
             "link-arg=-Wl,-z,max-page-size=16384",
         ])
         .env(
-            "GCX_ENGINE_LIB_DIR",
+            "NTX_ENGINE_LIB_DIR",
             engine.parent().ok_or("missing engine directory")?,
         )
         .env("CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER", &linker)
@@ -449,14 +449,14 @@ pub fn package(root: &Path, source: &Path) -> Result<()> {
             "AR_aarch64_linux_android",
             ndk.join("toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar"),
         ))?;
-    let out = root.join("build/android-package");
+    let out = root.join("build/ntx-android-package");
     let payload = out.join("payload");
     if payload.exists() {
         fs::remove_dir_all(&payload)?;
     }
     let native = payload.join("lib/arm64-v8a");
     fs::create_dir_all(&native)?;
-    let rust = root.join("target/aarch64-linux-android/release/libgcx_android.so");
+    let rust = root.join("target/aarch64-linux-android/release/libntx_android.so");
     let cpp=ndk.join("toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so");
     let mut native_hashes = String::from("source_sha256\tpackaged_sha256\tname\n");
     for p in [&engine, &rust, &cpp] {
@@ -484,20 +484,20 @@ pub fn package(root: &Path, source: &Path) -> Result<()> {
     let symbols = output(
         Command::new(ndk.join("toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"))
             .args(["--dyn-syms", "--wide"])
-            .arg(native.join("libgcx_android.so")),
+            .arg(native.join("libntx_android.so")),
     )?;
     for symbol in [
         "ANativeActivity_onCreate",
-        "Java_com_machinerhythm_gcx_GcxActivity_documentResult",
-        "Java_com_machinerhythm_gcx_GcxActivity_uiAction",
-        "Java_com_machinerhythm_gcx_GcxActivity_beforeDestroy",
-        "Java_com_machinerhythm_gcx_GcxActivity_windowChanged",
-        "Java_com_machinerhythm_gcx_GcxActivity_windowFocus",
-        "Java_com_machinerhythm_gcx_GcxActivity_gameAction",
-        "Java_com_machinerhythm_gcx_GcxActivity_launchIntent",
-        "Java_com_machinerhythm_gcx_GcxActivity_controlsDraw",
-        "Java_com_machinerhythm_gcx_GcxActivity_controlsTouch",
-        "Java_com_machinerhythm_gcx_GcxActivity_controlsValue",
+        "Java_com_machinerhythm_ntx_NtxActivity_documentResult",
+        "Java_com_machinerhythm_ntx_NtxActivity_uiAction",
+        "Java_com_machinerhythm_ntx_NtxActivity_beforeDestroy",
+        "Java_com_machinerhythm_ntx_NtxActivity_windowChanged",
+        "Java_com_machinerhythm_ntx_NtxActivity_windowFocus",
+        "Java_com_machinerhythm_ntx_NtxActivity_gameAction",
+        "Java_com_machinerhythm_ntx_NtxActivity_launchIntent",
+        "Java_com_machinerhythm_ntx_NtxActivity_controlsDraw",
+        "Java_com_machinerhythm_ntx_NtxActivity_controlsTouch",
+        "Java_com_machinerhythm_ntx_NtxActivity_controlsValue",
     ] {
         if !symbols.lines().any(|line| {
             line.split_whitespace().last() == Some(symbol)
@@ -509,11 +509,11 @@ pub fn package(root: &Path, source: &Path) -> Result<()> {
     let exports = output(
         Command::new(ndk.join("toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"))
             .args(["--dyn-syms", "--wide"])
-            .arg(native.join("libgcx_engine.so")),
+            .arg(native.join("libntx_engine.so")),
     )?;
     for line in include_str!("../../native/bridge.h")
         .lines()
-        .filter(|s| s.starts_with("GCX_EXPORT "))
+        .filter(|s| s.starts_with("NTX_EXPORT "))
     {
         let symbol = line
             .split('(')
@@ -529,7 +529,7 @@ pub fn package(root: &Path, source: &Path) -> Result<()> {
     }
     copy(&out.join("dex/classes.dex"), &payload.join("classes.dex"))?;
     let unsigned = out.join("unsigned.apk");
-    let compiled_resources = out.join("gcx-resources.zip");
+    let compiled_resources = out.join("ntx-resources.zip");
     run(Command::new(tools.build.join("aapt2"))
         .args(["compile", "--dir"])
         .arg(root.join("android/res"))
@@ -555,85 +555,33 @@ pub fn package(root: &Path, source: &Path) -> Result<()> {
         .args(["-f", "-P", "16", "4"])
         .arg(&unsigned)
         .arg(&aligned))?;
-    let signing = root.join(".local/signing");
-    fs::create_dir_all(&signing)?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(&signing, fs::Permissions::from_mode(0o700))?;
-    }
-    let key = signing.join("gcx-development.p12");
-    let password = signing.join("password.private");
-    if !key.exists() {
-        if password.exists() {
-            return Err("partial gcx signer exists; preserve and reconcile it".into());
-        }
-        use std::io::{Read, Write};
-        let mut bytes = [0_u8; 32];
-        fs::File::open("/dev/urandom")?.read_exact(&mut bytes)?;
-        let secret: String = bytes.iter().map(|b| format!("{b:02x}")).collect();
-        let mut options = fs::OpenOptions::new();
-        options.write(true).create_new(true);
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::OpenOptionsExt;
-            options.mode(0o600);
-        }
-        let mut file = options.open(&password)?;
-        file.write_all(secret.as_bytes())?;
-        file.sync_all()?;
-        run(Command::new("keytool")
-            .args(["-genkeypair", "-keystore"])
+    let apk = out.join(if signed {
+        "ntx-development.apk"
+    } else {
+        "ntx-unsigned.apk"
+    });
+    if signed {
+        let (key, password) = crate::legacy::preserved_signer(root)?;
+        crate::legacy::verify_certificate(root, &key, &password)?;
+        run(Command::new(tools.build.join("apksigner"))
+            .args(["sign", "--ks"])
             .arg(&key)
-            .args([
-                "-storetype",
-                "PKCS12",
-                "-alias",
-                "gcx-development",
-                "-keyalg",
-                "RSA",
-                "-keysize",
-                "3072",
-                "-validity",
-                "10000",
-                "-dname",
-                "CN=gcx local development",
-                "-storepass:file",
-            ])
-            .arg(&password))?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            fs::set_permissions(&key, fs::Permissions::from_mode(0o600))?;
-        }
-        let backup = root.join(".local/backups/signer-initial");
-        fs::create_dir_all(&backup)?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            fs::set_permissions(&backup, fs::Permissions::from_mode(0o700))?;
-        }
-        copy(&key, &backup.join("gcx-development.p12"))?;
-        copy(&password, &backup.join("password.private"))?;
+            .args(["--ks-key-alias", crate::legacy::SIGNER_ALIAS, "--ks-pass"])
+            .arg(format!("file:{}", password.display()))
+            .arg("--out")
+            .arg(&apk)
+            .arg(&aligned))?;
+        let verification = output(
+            Command::new(tools.build.join("apksigner"))
+                .args(["verify", "--verbose", "--print-certs"])
+                .arg(&apk),
+        )?;
+        fs::write(out.join("signature.txt"), verification)?;
+    } else {
+        // Independent corresponding-source reproduction needs no owner's key,
+        // private recovery receipt or replacement signing identity.
+        copy(&aligned, &apk)?;
     }
-    if !password.exists() {
-        return Err("gcx signer password unavailable; preserve signer".into());
-    }
-    let apk = out.join("gcx-development.apk");
-    run(Command::new(tools.build.join("apksigner"))
-        .args(["sign", "--ks"])
-        .arg(&key)
-        .args(["--ks-key-alias", "gcx-development", "--ks-pass"])
-        .arg(format!("file:{}", password.display()))
-        .arg("--out")
-        .arg(&apk)
-        .arg(&aligned))?;
-    let verification = output(
-        Command::new(tools.build.join("apksigner"))
-            .args(["verify", "--verbose", "--print-certs"])
-            .arg(&apk),
-    )?;
-    fs::write(out.join("signature.txt"), verification)?;
     run(Command::new(tools.build.join("zipalign"))
         .args(["-c", "-P", "16", "4"])
         .arg(&apk))?;
@@ -642,7 +590,7 @@ pub fn package(root: &Path, source: &Path) -> Result<()> {
             .args(["dump", "badging"])
             .arg(&apk),
     )?;
-    if !manifest.contains("package: name='com.machinerhythm.gcx'")
+    if !manifest.contains("package: name='com.machinerhythm.ntx'")
         || !manifest.contains("native-code: 'arm64-v8a'")
         || manifest.contains("uses-permission:")
     {
@@ -675,7 +623,7 @@ pub fn package(root: &Path, source: &Path) -> Result<()> {
             return Err("actual APK resource bytes differ from reviewed staging".into());
         }
     }
-    for name in ["libgcx_engine.so", "libgcx_android.so", "libc++_shared.so"] {
+    for name in ["libntx_engine.so", "libntx_android.so", "libc++_shared.so"] {
         let result = Command::new("unzip")
             .args(["-p"])
             .arg(&apk)
@@ -689,7 +637,7 @@ pub fn package(root: &Path, source: &Path) -> Result<()> {
     let digest = output(Command::new("sha256sum").arg(&apk))?;
     fs::write(out.join("apk-sha256.txt"), digest)?;
     println!(
-        "Private development APK built and checked; no install, gameplay or public release claimed"
+        "APK built and checked; signing requested={signed}; no install, gameplay or public release claimed"
     );
     Ok(())
 }

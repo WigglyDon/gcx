@@ -78,8 +78,8 @@ pub fn preserve(root: &Path, source: &Path) -> Result<()> {
             "commit reviewed public source before preserving the binary/source pair".into(),
         );
     }
-    let package = root.join("build/android-package");
-    let apk = package.join("gcx-development.apk");
+    let package = root.join("build/ntx-android-package");
+    let apk = package.join("ntx-development.apk");
     let binding = fs::read(root.join("build/source-receipt/binding.json"))?;
     let recorded: serde_json::Value = serde_json::from_slice(&binding)?;
     let head = String::from_utf8(output(
@@ -112,7 +112,7 @@ pub fn preserve(root: &Path, source: &Path) -> Result<()> {
     fs::create_dir_all(out.parent().ok_or("missing candidate parent")?)?;
     fs::create_dir(&out)?;
     for name in [
-        "gcx-development.apk",
+        "ntx-development.apk",
         "signature.txt",
         "manifest.txt",
         "apk-entries.txt",
@@ -123,7 +123,7 @@ pub fn preserve(root: &Path, source: &Path) -> Result<()> {
     }
     fs::write(out.join("binding.json"), binding)?;
     fs::write(out.join("source-files.sha256"), inventory)?;
-    bundle(root, &out, "gcx")?;
+    bundle(root, &out, "ntx")?;
     bundle(source, &out, "dolphin")?;
     let mut graph = String::from("dolphin\t.local/source/dolphin\n");
     for (index, path) in include_str!("../../native/dependencies.txt")

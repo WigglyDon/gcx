@@ -2,6 +2,8 @@
 mod analytics;
 mod android;
 mod corresponding;
+mod identity;
+mod legacy;
 mod receipt;
 use std::{path::PathBuf, process::Command};
 const PIN: &str = "cf5cb7ef81c3e8e7af5c9d566334219ffda9f68b";
@@ -121,6 +123,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let source = root.join(".local/source/dolphin");
     let action = std::env::args().nth(1).unwrap_or_default();
     match action.as_str() {
+        "check-identity" => identity::check(&root)?,
+        "check-signer" => {
+            let (key, password) = legacy::preserved_signer(&root)?;
+            legacy::verify_certificate(&root, &key, &password)?;
+            println!(
+                "Retained signer matches independent recovery and installed-candidate certificate; original retained"
+            );
+        }
         "fetch-dependencies" => {
             let mut command = Command::new("timeout");
             command
@@ -189,9 +199,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             source_check(&source)?;
             android::prepare(&root, &source)?;
         }
-        "package-android" => {
+        "package-android" | "package-android-unsigned" => {
             source_check(&source)?;
-            android::package(&root, &source)?;
+            android::package(&root, &source, action == "package-android")?;
         }
         "preserve-candidate" => {
             source_check(&source)?;
@@ -206,9 +216,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .arg(&source)
                 .arg("-B")
                 .arg(if android {
-                    "build/android"
+                    "build/ntx-android"
                 } else {
-                    "build/host"
+                    "build/ntx-host"
                 })
                 .args([
                     "-G",
@@ -238,10 +248,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     "-DENABLE_PULSEAUDIO=OFF",
                     "-DUSE_SANITIZERS=OFF",
                     "-DBUNDLE_SPEEX=ON",
-                    "-DDISTRIBUTOR=gcx",
+                    "-DDISTRIBUTOR=ntx",
                 ])
                 .arg(format!(
-                    "-DGCX_ADAPTER_DIR={}",
+                    "-DNTX_ADAPTER_DIR={}",
                     root.join("native").display()
                 ));
             if android {
@@ -280,12 +290,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             run(Command::new("cmake").args([
                 "--build",
                 if action == "build-android" {
-                    "build/android"
+                    "build/ntx-android"
                 } else {
-                    "build/host"
+                    "build/ntx-host"
                 },
                 "--target",
-                "gcx_engine",
+                "ntx_engine",
                 "--parallel",
                 "1",
             ]))?;

@@ -1,13 +1,13 @@
 <resources>
   <color name="launcher_plastic">#B9B9B2</color>
-  <color name="gcx_background">#111418</color>
-  <color name="gcx_accent">#85CA72</color>
-  <style name="GcxTheme" parent="android:style/Theme.Material.NoActionBar">
+  <color name="ntx_background">#111418</color>
+  <color name="ntx_accent">#85CA72</color>
+  <style name="NtxTheme" parent="android:style/Theme.Material.NoActionBar">
     <item name="android:fontFamily">sans</item>
-    <item name="android:colorAccent">@color/gcx_accent</item>
-    <item name="android:windowBackground">@color/gcx_background</item>
-    <item name="android:navigationBarColor">@color/gcx_background</item>
-    <item name="android:statusBarColor">@color/gcx_background</item>
+    <item name="android:colorAccent">@color/ntx_accent</item>
+    <item name="android:windowBackground">@color/ntx_background</item>
+    <item name="android:navigationBarColor">@color/ntx_background</item>
+    <item name="android:statusBarColor">@color/ntx_background</item>
     <item name="android:windowLightStatusBar">false</item>
     <item name="android:windowLightNavigationBar">false</item>
   </style>

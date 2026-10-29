@@ -1,4 +1,4 @@
-gcx private development candidate: corresponding-source reconstruction
+ntx private development candidate: corresponding-source reconstruction
 
 Verify SHA256SUMS in this directory before reconstruction. Keep this original
 candidate directory unchanged. It contains no signer, games or user saves.
@@ -10,10 +10,10 @@ not preserve shallow boundaries. An empty boundary means a complete repository.
 Each exported repository has passed connectivity fsck with its recorded boundary.
 
 In a new, capacity-admitted directory:
-1. git clone --no-checkout /candidate/gcx.bundle gcx
-   If gcx.shallow is nonempty, copy it to gcx/.git/shallow.
-   git -C gcx checkout --detach HEAD
-2. For each row of repositories.tsv, from the reconstructed gcx directory:
+1. git clone --no-checkout /candidate/ntx.bundle ntx
+   If ntx.shallow is nonempty, copy it to ntx/.git/shallow.
+   git -C ntx checkout --detach HEAD
+2. For each row of repositories.tsv, from the reconstructed ntx directory:
    git clone --no-checkout /candidate/NAME.bundle RELATIVE_PATH
    If NAME.shallow is nonempty, copy it to RELATIVE_PATH/.git/shallow.
    git -C RELATIVE_PATH checkout --detach HEAD
@@ -33,18 +33,21 @@ In a new, capacity-admitted directory:
    cargo xtask configure-android
    cargo xtask build-android
    cargo xtask prepare-android
-   cargo xtask package-android
+   cargo xtask package-android-unsigned
 
 Rust 1.96.1 and the Android target are required; rust-toolchain.toml pins them.
 The archive contains every locked Cargo package, selected native dependency
 sources, unmodified Dolphin sources/resources, the maintained patch and all
-gcx source/build scripts. Excluded native gitlinks are recorded but not needed
+ntx source/build scripts. Excluded native gitlinks are recorded but not needed
 by this configuration. SDK/NDK/compiler executables are not redistributed here;
 their observed versions/hashes and applicable runtime notices are retained.
 
-The rebuild creates a different development key unless the owner's separately
-protected gcx signer is intentionally supplied. Never use a new key to update an
-existing installation. Bit-identical APK reproduction is not claimed (signing,
+Unsigned reproduction requires no owner's signer or private certificate receipt.
+It produces ntx-unsigned.apk, with the same source/resource/ABI checks but no
+signature claim. Independent builders may sign their own copy separately; that
+cannot update an owner's installation. The continuing owner's package-android
+command requires the retained signer, independent recovery and installed-candidate
+certificate receipt and never generates a replacement key. Bit-identical APK reproduction is not claimed (signing,
 timestamps and environment differ). Compare code/resources and recorded source
 inputs independently. No gameplay, audio, save/reload or hardware result follows
 from archive verification or build success.

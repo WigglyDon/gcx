@@ -1,3 +1,5 @@
+> Historical source-selection research, retained at its original scope. Current work follows AGENTS.md, NTX-5 and docs/ARCHITECTURE.md. Legacy product names here describe that research.
+
 # Selective PSX transfer, not a merger
 
 Behavioral reference: Don reports that PSX's PS1 player resumes independent games

@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a reproducible gcx problem without private content.
+description: Report a reproducible ntx problem without private content.
 title: "Bug: "
 labels: ["bug"]
 body:

@@ -1,0 +1,46 @@
+# Pinned N64 integration boundary
+
+Selected core: [Mupen64Plus-Next at 15bada85906593376e8fd697f1b0b3af3a20f512](https://github.com/libretro/mupen64plus-libretro-nx/tree/15bada85906593376e8fd697f1b0b3af3a20f512).
+[source-lock.json](source-lock.json) records its complete root tree identity,
+recursive gitlink and the inspected file blobs. The repository has no .gitmodules
+at this pin; do not invent a dependency URL for the gnulib gitlink. Full component
+and selected-resource license audit/build reproduction remain pending.
+
+The [Android makefile](https://github.com/libretro/mupen64plus-libretro-nx/blob/15bada85906593376e8fd697f1b0b3af3a20f512/libretro/jni/Android.mk)
+selects the AArch64 dynarec, enables LLE/parallel components on ARM64 and chooses
+GLESv3 with GLES3=1. Merely setting optional flags to zero on its command line
+does not establish their exclusion: inspect the selected expanded graph. Its
+Application.mk defaults to four ABIs/android-21; ntx must explicitly select
+arm64-v8a and its supported API, output paths and 16 KiB ELF alignment. No upstream
+CI template is a complete ntx reproduction recipe or actual device qualification.
+
+The Rust n64 module now validates .z64/.v64/.n64 byte orders by cartridge magic,
+normalizes a bounded private in-memory copy and fingerprints canonical bytes.
+It does not derive/reallocate GameIds or scan/download games. Its own digital C
+buttons and shoulders map to the pinned core's default, non-alternate libretro
+mapping, independent from the GameCube pad. Cancellation and simultaneous input
+have host fixtures. This module is preparatory policy, not a running host adapter.
+
+Inspected actual boundaries:
+
+| Boundary | Finding and implementation consequence |
+| --- | --- |
+| libretro.c: retro_load_game | need_fullpath=false; copies content; formats save memory before initialization. Load ordinary data after formatting and before first execution. Passing a real filesystem path also probes .ndd/.gb/.sav sidecars; use scoped cartridge bytes and no path to avoid unintended subsystem discovery. |
+| libretro_memory.h / device headers | RETRO_MEMORY_SAVE_RAM exposes one 296960-byte image: EEPROM 2048, four Controller Paks of 32768, SRAM 32768, FlashRAM 131072. Rust parses these distinct regions. This is not a universal native-save converter; byte order/format validation of external saves remains due. |
+| Controller mapping | Default core maps joypad B/Y to N64 A/B, Select to L, R2 to R, L2 to Z, X/A/L/R to C-up/down/left/right. Fix core options accordingly; do not use alternate mapping or emulate C buttons as a GameCube stick. |
+| retro_serialize | Schedules a core job and switches coroutines until completion; returns retro_savestate_result. Caller owns buffer length and quiescence. |
+| retro_unserialize | Waits for completion but returns true unconditionally after the wait. It cannot acknowledge successful restore as-is; repair/fixture this selected core boundary before offering resume. |
+| savestates.c | Includes device protocol and FlashRAM page buffer/mode/status. Excluding ordinary filenames does not prove pending-save safety. Audit all cached/pending writes and failed-restore cleanup before enabling checkpoints. |
+| GLES/threading | GLSM owns hardware-context callbacks; threaded unload switches coroutines and joins emuThread. Actual EGL context/thread, framebuffer, audio, option callbacks and completion-bearing shutdown are still required in the Rust host. No UI-thread frame loop. |
+
+No core binary is downloaded or packaged, no RetroArch frontend is imported and
+no real cartridge is read in this increment. The app explicitly refuses the N64
+route until an execution adapter exists. Next work remains the linked ntx package
+and protected migration qualification, then the Rust host/GLES/audio/core package
+vertical slice. Ordinary N64 save durability, controllable play and cross-system
+continuity remain open acceptance outcomes.
+
+The root license is GPL version 2 text; inspected Mupen device files declare
+GPL-2.0-or-later and GLSM declares MIT terms. These observations are not a complete
+combined-distribution license conclusion. Retain all selected component notices
+and corresponding source before packaging or public binary consideration.

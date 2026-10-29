@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Dolphin Host implementations adapted from MainNoGUI.cpp at cf5cb7ef81c3e8e7af5c9d566334219ffda9f68b.
-// Copyright 2008 Dolphin Emulator Project; gcx adapter changes 2026.
+// Copyright 2008 Dolphin Emulator Project; ntx adapter changes 2026.
 #include "bridge.h"
 #include "Common/Config/Config.h"
 #include "Common/FileUtil.h"
@@ -31,12 +31,12 @@
 #include <algorithm>
 #include <atomic>
 
-static gcx_card_write_fn s_card_writer = nullptr;
-static gcx_saved_read_fn s_saved_reader = nullptr;
-static gcx_event_fn s_event = nullptr;
+static ntx_card_write_fn s_card_writer = nullptr;
+static ntx_saved_read_fn s_saved_reader = nullptr;
+static ntx_event_fn s_event = nullptr;
 static void* s_event_context = nullptr;
-static gcx_platform_fn s_platform = nullptr;
-static gcx_ui_fn s_ui = nullptr;
+static ntx_platform_fn s_platform = nullptr;
+static ntx_ui_fn s_ui = nullptr;
 static Common::EventHook s_overlay_hook;
 static Common::EventHook s_present_hook;
 static std::atomic<bool> s_checkpoint_failed = false;
@@ -65,22 +65,22 @@ bool Host_UpdateDiscordPresenceRaw(const std::string& details, const std::string
     int64_t start_timestamp, int64_t end_timestamp, int party_size, int party_max) { return false; }
 std::unique_ptr<GBAHostInterface> Host_CreateGBAHost(std::weak_ptr<HW::GBA::Core> core) { return nullptr; }
 
-static gcx_input_fn s_input_sampler = nullptr;
-void gcx_engine_input_sampler(gcx_input_fn sampler)
+static ntx_input_fn s_input_sampler = nullptr;
+void ntx_engine_input_sampler(ntx_input_fn sampler)
 {
   const auto lock = ControllerEmu::EmulatedController::GetStateLock();
   s_input_sampler = sampler;
 }
-uint32_t gcx_engine_abi() { return 8; }
-void gcx_engine_card_writer(gcx_card_write_fn writer) { s_card_writer = writer; }
-void gcx_engine_saved_reader(gcx_saved_read_fn reader) { s_saved_reader = reader; }
-void gcx_engine_platform(gcx_platform_fn platform) { s_platform = platform; }
-void gcx_engine_ui(gcx_ui_fn ui) { s_ui = ui; }
-extern "C" int64_t gcx_platform_dispatch(uint32_t op, const char* path, const char* argument, char* output, uintptr_t capacity)
+uint32_t ntx_engine_abi() { return 8; }
+void ntx_engine_card_writer(ntx_card_write_fn writer) { s_card_writer = writer; }
+void ntx_engine_saved_reader(ntx_saved_read_fn reader) { s_saved_reader = reader; }
+void ntx_engine_platform(ntx_platform_fn platform) { s_platform = platform; }
+void ntx_engine_ui(ntx_ui_fn ui) { s_ui = ui; }
+extern "C" int64_t ntx_platform_dispatch(uint32_t op, const char* path, const char* argument, char* output, uintptr_t capacity)
 {
   return s_platform ? s_platform(op, path, argument, output, capacity) : -1;
 }
-int gcx_engine_init(const char* user, const char* sys, gcx_event_fn event, void* event_context, const char* video, const char* audio)
+int ntx_engine_init(const char* user, const char* sys, ntx_event_fn event, void* event_context, const char* video, const char* audio)
 {
   s_event = event;
   s_checkpoint_failed = false;
@@ -149,7 +149,7 @@ int gcx_engine_init(const char* user, const char* sys, gcx_event_fn event, void*
     if (index == 0 && s_input_sampler) {
       double controls[18]{};
       s_input_sampler(controls);
-      gcx_engine_input(controls);
+      ntx_engine_input(controls);
     }
   });
   auto& events = GetVideoEvents();
@@ -186,9 +186,9 @@ static int Boot(const char* media, void* native_window, bool paused)
   SConfig::GetInstance().bBootToPause = paused;
   return BootManager::BootCore(Core::System::GetInstance(), std::move(boot), wsi);
 }
-int gcx_engine_boot(const char* media, void* native_window) { return Boot(media, native_window, false); }
-int gcx_engine_boot_paused(const char* media, void* native_window) { return Boot(media, native_window, true); }
-int gcx_engine_inspect(const char* media, gcx_media_info* info)
+int ntx_engine_boot(const char* media, void* native_window) { return Boot(media, native_window, false); }
+int ntx_engine_boot_paused(const char* media, void* native_window) { return Boot(media, native_window, true); }
+int ntx_engine_inspect(const char* media, ntx_media_info* info)
 {
   if (!info)
     return 0;
@@ -206,17 +206,17 @@ int gcx_engine_inspect(const char* media, gcx_media_info* info)
   info->disc = disc->volume->GetDiscNumber().value_or(0);
   return 1;
 }
-void gcx_engine_dispatch() { Core::HostDispatchJobs(Core::System::GetInstance()); }
-int gcx_engine_state() { return static_cast<int>(Core::GetState(Core::System::GetInstance())); }
-uint32_t gcx_engine_probe_word()
+void ntx_engine_dispatch() { Core::HostDispatchJobs(Core::System::GetInstance()); }
+int ntx_engine_state() { return static_cast<int>(Core::GetState(Core::System::GetInstance())); }
+uint32_t ntx_engine_probe_word()
 {
   auto& system = Core::System::GetInstance();
   const Core::CPUThreadGuard guard(system);
   return system.GetMemory().Read_U32(0x10000);
 }
-void gcx_engine_pause(int paused)
+void ntx_engine_pause(int paused)
 {
-  if (!paused && gcx_engine_recovery_required())
+  if (!paused && ntx_engine_recovery_required())
     return;
   Core::SetState(Core::System::GetInstance(), paused ? Core::State::Paused : Core::State::Running);
   if (paused && Core::IsRunning(Core::System::GetInstance()))
@@ -224,21 +224,21 @@ void gcx_engine_pause(int paused)
     const Core::CPUThreadGuard guard(Core::System::GetInstance());
   }
 }
-int gcx_engine_surface(void* native_window)
+int ntx_engine_surface(void* native_window)
 {
   if (!g_presenter)
     return 0;
   g_presenter->ChangeSurface(native_window);
   return 1;
 }
-void gcx_engine_resize() { if (g_presenter) g_presenter->ResizeSurface(); }
-void gcx_engine_input(const double* controls)
+void ntx_engine_resize() { if (g_presenter) g_presenter->ResizeSurface(); }
+void ntx_engine_input(const double* controls)
 {
   const auto lock = ControllerEmu::EmulatedController::GetStateLock();
   for (int i = 0; i < 18; ++i)
     ciface::Touch::SetControlState(0, static_cast<ciface::Touch::ControlID>(i), controls[i]);
 }
-void gcx_engine_pad_status(gcx_pad_status* status)
+void ntx_engine_pad_status(ntx_pad_status* status)
 {
   if (!status)
     return;
@@ -247,7 +247,7 @@ void gcx_engine_pad_status(gcx_pad_status* status)
   *status = {pad.button, {pad.stickX, pad.stickY, pad.substickX, pad.substickY},
              {pad.triggerLeft, pad.triggerRight}, static_cast<uint8_t>(pad.isConnected), 0};
 }
-int gcx_engine_flush_cards()
+int ntx_engine_flush_cards()
 {
   auto& system = Core::System::GetInstance();
   if (!Core::IsRunning(system) || s_persistence_blocked || ExpansionInterface::ImageReadFailed())
@@ -259,30 +259,30 @@ int gcx_engine_flush_cards()
   return static_cast<ExpansionInterface::CEXIMemoryCard*>(device)->FlushToStorage() &&
          system.GetExpansionInterface().FlushSRAM();
 }
-uint32_t gcx_engine_checkpoint_abi() { return 1; }
-int gcx_engine_recovery_required() { return s_checkpoint_failed || ExpansionInterface::ImageReadFailed(); }
-int gcx_engine_checkpoint_capture(uintptr_t limit, gcx_checkpoint_write_fn writer, void* context)
+uint32_t ntx_engine_checkpoint_abi() { return 1; }
+int ntx_engine_recovery_required() { return s_checkpoint_failed || ExpansionInterface::ImageReadFailed(); }
+int ntx_engine_checkpoint_capture(uintptr_t limit, ntx_checkpoint_write_fn writer, void* context)
 {
   auto& system = Core::System::GetInstance();
-  if (!writer || !limit || Core::GetState(system) != Core::State::Paused || gcx_engine_recovery_required())
+  if (!writer || !limit || Core::GetState(system) != Core::State::Paused || ntx_engine_recovery_required())
     return 0;
   const Core::CPUThreadGuard guard(system);
-  if (!gcx_engine_flush_cards())
+  if (!ntx_engine_flush_cards())
     return 0;
   // Dolphin is built without C++ exceptions. No exception can unwind over the
   // ABI; allocation is bounded before the engine buffer grows.
-  return State::CaptureGcx(system, limit, [writer, context](std::span<const u8> bytes) {
+  return State::CaptureNtx(system, limit, [writer, context](std::span<const u8> bytes) {
     return writer(context, bytes.data(), bytes.size()) != 0;
   });
 }
-int gcx_engine_checkpoint_load(uint8_t* bytes, uintptr_t length)
+int ntx_engine_checkpoint_load(uint8_t* bytes, uintptr_t length)
 {
   auto& system = Core::System::GetInstance();
-  if (!bytes || !length || Core::GetState(system) != Core::State::Paused || gcx_engine_recovery_required())
+  if (!bytes || !length || Core::GetState(system) != Core::State::Paused || ntx_engine_recovery_required())
     return 0;
   const Core::CPUThreadGuard guard(system);
   s_persistence_blocked = true;
-  const bool loaded = State::LoadGcx(system, {bytes, length});
+  const bool loaded = State::LoadNtx(system, {bytes, length});
   if (!loaded)
   {
     s_checkpoint_failed = true;
@@ -292,8 +292,8 @@ int gcx_engine_checkpoint_load(uint8_t* bytes, uintptr_t length)
   s_persistence_blocked = false;
   return 1;
 }
-void gcx_engine_stop() { Core::Stop(Core::System::GetInstance()); }
-void gcx_engine_shutdown()
+void ntx_engine_stop() { Core::Stop(Core::System::GetInstance()); }
+void ntx_engine_shutdown()
 {
   Core::Shutdown(Core::System::GetInstance());
   MemoryCard::SetWriteHandler(nullptr);
@@ -314,9 +314,9 @@ void gcx_engine_shutdown()
   s_ui = nullptr;
   s_platform = nullptr;
 }
-void gcx_ui_rect(float left, float top, float right, float bottom, uint32_t color)
+void ntx_ui_rect(float left, float top, float right, float bottom, uint32_t color)
 { ImGui::GetForegroundDrawList()->AddRectFilled({left, top}, {right, bottom}, color, 12.0f); }
-void gcx_ui_circle(float x, float y, float radius, uint32_t color)
+void ntx_ui_circle(float x, float y, float radius, uint32_t color)
 { ImGui::GetForegroundDrawList()->AddCircleFilled({x, y}, radius, color); }
-void gcx_ui_text(float x, float y, float size, const char* text, uint32_t color)
+void ntx_ui_text(float x, float y, float size, const char* text, uint32_t color)
 { ImGui::GetForegroundDrawList()->AddText(ImGui::GetFont(), size, {x, y}, color, text); }

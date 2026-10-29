@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/gcx", "crates/gcx-android", "xtask"]
+members = ["crates/ntx", "crates/ntx-android", "xtask"]
 resolver = "3"
 
 [workspace.package]

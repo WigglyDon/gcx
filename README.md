@@ -7,10 +7,12 @@ named gcx. It is the Nintendo member of Machine Rhythm's five emulator products.
 GameCube works through the maintained direct Dolphin adapter. Nintendo 64 through
 Mupen64Plus-Next is the next active implementation, not yet a playable claim.
 
-The repository/directory succession is separate from the unfinished application
-rename. The retained installed GameCube candidate is still the legacy package;
-source crates/JNI/artifact/data names and verified com.machinerhythm.ntx migration
-remain implementation work. Preserve its signer, existing games and progress.
+Active crates/native/JNI/build/branding now use ntx and com.machinerhythm.ntx.
+An offline staged migration tool preserves identities, ordinary progress and
+legacy recovery scenes; schema 2 separates system/backend routing. The retained
+installed GameCube candidate is still the legacy package. A newly linked APK,
+actual device migration and playable N64 remain unfinished. See the
+[migration boundary](docs/IDENTITY_MIGRATION.md) and [N64 pin/audit](native/mupen/README.md).
 
 Read [AGENTS.md](AGENTS.md), [successor handoff](docs/NTX_HANDOFF.md),
 [NTX-5](https://github.com/WigglyDon/ntx/issues/5) and its

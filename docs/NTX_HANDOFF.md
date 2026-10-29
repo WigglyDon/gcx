@@ -7,7 +7,24 @@ Read their latest comments and AGENTS.md. Acknowledge actual checkout, branch,
 HEAD, worktrees, dirt and ownership on NTX-5, then implement the next unfinished
 slice. This is succession of one worker, not a second concurrent implementation.
 
-## Source and relocation boundary
+## Current successor increment
+
+Sole ownership acknowledged on [NTX-5 comment6507741174](https://github.com/WigglyDon/ntx/issues/5#issuecomment-6507741174)
+from clean main 3fae28f in this checkout. Active crates/native hooks/JNI/package/
+resources/tooling now use ntx. Offline protected schema-1 import and schema-2
+system/backend routing are implemented; see [migration](IDENTITY_MIGRATION.md).
+The original patch is preserved in native/patches/history. Signer matches its
+independent recovery and installed-candidate certificate; original inputs remain.
+
+Pinned N64 source/interfaces and original cartridge/input/save-format policy now
+exist; [integration notes](../native/mupen/README.md) record the real restore-result
+hazard and remaining work. No libretro execution adapter or playable claim yet.
+No phone commands, native heavy build, source-data migration or new linked APK
+have been performed. Do not transfer old gameplay acceptance to this increment.
+The immediate next step is the linked ntx package and protected device-specific
+migration/relink qualification, followed by the pinned N64 execution vertical slice.
+
+## Source and relocation boundary (succession baseline)
 
 Canonical repository: https://github.com/WigglyDon/ntx ; stable ID1429193278,
 public, branch main. It was renamed IN PLACE from gcx; commits/issues were not
@@ -26,7 +43,8 @@ Never reconstruct the old directory or leave a compatibility symlink.
 Top-level source was clean on entry, with one worktree and no registered top-level
 submodules. The ignored Dolphin Git tree has38tracked reviewed modifications and
 its selected dependency gitlinks; they are required source, not dirt to reset.
-No application/crate/JNI rename or N64 implementation was started in this handoff.
+At that outgoing handoff no application/crate/JNI rename or N64 work had started;
+current successor source progress is recorded above.
 The outgoing worker starts no successor or phone tests and stops at the succession
 boundary. Check actual dirt and newer comments before assuming this remains current.
 
@@ -55,13 +73,12 @@ open; no guessed cause or clean broad lifecycle pass. Latest probe failed at a
 pre-dispatch controller range check, not an observed emulator freeze; same-job
 checkpoint/both-profile protection, normal joined Stop and actual return passed.
 
-## First unfinished implementation slice
+## Migration obligations still unfinished
 
-Begin the comprehensive source identity rename with explicit legacy boundaries,
-then package/data migration. Inventory active names in Cargo/crates, native
-exports/library names, JNI/classes, Android manifest/resources, xtask/build paths,
-artifacts/log labels, helpers, docs and source manifests. Rename coherently to ntx,
-including com.machinerhythm.ntx, app-private root ntx and canonical ntx game links.
+The source identity rename and offline protected import are implemented. Finish
+linked-package/data migration and its actual qualification. Check the residual
+reference ledger, actual source/patch graph and fresh output/tool bindings;
+canonical identity is com.machinerhythm.ntx, app-private root ntx and ntx links.
 Keep the direct Dolphin adapter; do not convert it to libretro or rewrite its core.
 Residual gcx references must be classified as real history/provenance or isolated
 legacy readers/fixtures. This is not a blanket replacement inside vendor code,

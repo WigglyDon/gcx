@@ -8,7 +8,7 @@ static thread_local bool attached = false;
 static std::atomic<int> preparations{0};
 static std::atomic<int> releases{0};
 static std::atomic<int> unsafe_releases{0};
-extern "C" void gcx_prepare_render_thread()
+extern "C" void ntx_prepare_render_thread()
 {
   attached = true;
   ++preparations;

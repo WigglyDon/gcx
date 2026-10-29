@@ -2,8 +2,9 @@
 
 Binding authority: [NTX-5](https://github.com/WigglyDon/ntx/issues/5) and
 [amendment6505289270](https://github.com/WigglyDon/ntx/issues/5#issuecomment-6505289270).
-These are required current contracts; the full migration and N64 adapter are not
-yet implemented. The preserved GameCube baseline is documented in
+These are required current contracts. Active identity, schema-2 routing and
+offline staged import are implemented; linked-package/device migration and the
+N64 execution adapter remain unfinished. The preserved GameCube baseline is documented in
 [historical architecture](history/GCX_ARCHITECTURE.md) and native/README.md.
 
 ## Three independent axes
@@ -69,8 +70,11 @@ scoped content, audio, N64 input and save publication at actual boundaries. Do n
 force it into Dolphin Vulkan or run emulation on the UI thread. Pause/quiesce,
 flush, capture/restore and stop/join acknowledge actual completion or failure.
 
-Existing schema-1 entries explicitly migrate to GameCube while retaining IDs and
-progress. Add separate system/backend/capability/version routing now. A future
+Collection::decode explicitly upgrades schema-1 entries to GameCube/Dolphin in
+schema 2 while retaining IDs and progress. The unsafe direct adapter declarations
+now live under backend::dolphin; N64 cartridge/input/save-format policy lives in
+n64. The N64 execution route still refuses unavailable native support. Explicit
+versioned execution capabilities and the libretro host are still required. A future
 FN64 adapter can use the same N64 entries with validated ordinary-save conversion;
 it does not inherit Mupen checkpoint compatibility. Do not alter FN64 itself.
 

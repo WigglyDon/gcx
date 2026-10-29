@@ -39,10 +39,10 @@ fn execute(build: &Path, log: &Path, command: &str) -> Result<()> {
 }
 
 pub fn check(root: &Path, source: &Path) -> Result<()> {
-    let build = root.join("build/host");
-    let probe = root.join("target/debug/gcx-probe");
-    if !probe.is_file() || !build.join("gcx/libgcx_engine.so").is_file() {
-        return Err("build the normal host engine and Rust gcx-probe first".into());
+    let build = root.join("build/ntx-host");
+    let probe = root.join("target/debug/ntx-probe");
+    if !probe.is_file() || !build.join("ntx/libntx_engine.so").is_file() {
+        return Err("build the normal host engine and Rust ntx-probe first".into());
     }
     let stamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)?
@@ -76,8 +76,8 @@ pub fn check(root: &Path, source: &Path) -> Result<()> {
     std::fs::write(scratch.join("compile-command.txt"), &compile)?;
     execute(&build, &scratch.join("compile.log"), &compile)?;
 
-    let link = generated_command(&build, "gcx/libgcx_engine.so")?;
-    const OUTPUT: &str = " -o gcx/libgcx_engine.so ";
+    let link = generated_command(&build, "ntx/libntx_engine.so")?;
+    const OUTPUT: &str = " -o ntx/libntx_engine.so ";
     if link.matches(OUTPUT).count() != 1 {
         return Err("unrecognized host native link command".into());
     }
@@ -89,7 +89,7 @@ pub fn check(root: &Path, source: &Path) -> Result<()> {
         &format!(
             " {} -o {} ",
             quote(&object)?,
-            quote(&scratch.join("libgcx_engine.so"))?
+            quote(&scratch.join("libntx_engine.so"))?
         ),
         1,
     );

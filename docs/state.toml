@@ -1,6 +1,6 @@
 schema_version = 1
 product = "ntx"
-classification = "NTX5_RELOCATION_SUCCESSION_APPLICATION_MIGRATION_PENDING"
+classification = "NTX5_SOURCE_RENAME_OFFLINE_IMPORT_N64_POLICY_LINKED_PACKAGE_PENDING"
 repository = "WigglyDon/ntx"
 repository_id = 1429193278
 branch = "main"
@@ -8,8 +8,8 @@ pre_succession_head = "b3a02e570e9f63e94d897c688a2f5f850b054ae6"
 active_issue = "https://github.com/WigglyDon/ntx/issues/5"
 architecture_amendment = "https://github.com/WigglyDon/ntx/issues/5#issuecomment-6505289270"
 handoff = "docs/NTX_HANDOFF.md"
-source_status = "Existing implementation and history preserved; comprehensive first-party app/source rename is successor work, not yet claimed complete"
-active_systems = ["GameCube: working direct Dolphin baseline", "Nintendo64: active Mupen64Plus-Next integration assignment, not implemented"]
+source_status = "Active first-party source/native/JNI/package/build names renamed; staged offline legacy import and schema-2 routing implemented; linked APK and actual device migration pending"
+active_systems = ["GameCube: working direct Dolphin baseline", "Nintendo64: exact Mupen64Plus-Next pin and cartridge/input/save-format policy implemented; execution adapter not implemented"]
 axes = "Host platform/device, emulated system and execution backend are independent"
 session_model = "Many independent open/resumable games; one foreground runtime initially is scheduling policy, not permanent architecture"
 canonical_android_package = "com.machinerhythm.ntx"
@@ -23,7 +23,7 @@ dolphin_revision = "cf5cb7ef81c3e8e7af5c9d566334219ffda9f68b"
 dolphin_engine_sha256 = "d419cc59abbe5fc41c343946d244e17c8d0c041a8a338b2fe8986e6994602e40"
 legacy_resources_sha256 = "9dd2e4e0e1ad8201bf525e5fc959c93f9794618497d5bc14382197b689bb4327"
 legacy_patch_sha256 = "7ea94c3526b4e3f5ccd623a3edce28e806d310850110e891507f669fe2d5d2c2"
-next_step = "Successor acknowledges actual ownership on NTX-5; begins full active source identity rename with explicit legacy schema/data migration boundaries, preserving current saves/signer; then pinned N64 vertical slice"
+next_step = "Build and link renamed GameCube package under fresh actual capacity/tool readiness; qualify protected device-specific migration/relink without replaying progress; continue pinned Mupen Rust host/GLES/audio/package vertical slice"
 completed_do_not_repeat = "GameCube boot/native slice, current ordinary-save/cold-menu reload, earlier build-bound scene/library returns, matched stationary Home timing, post-cleanup storage/retained-input checks"
 retired_objective = "Speedrunner/quest automation and repetitive qualification loop"
 open_defects = ["Pixel later-play Pause/reentry freeze: undetermined", "Separate Fold Home-return process loss/lag/layout/haptics: unresolved"]
@@ -35,5 +35,24 @@ preparation_commit = "ecb606e07f6aea2e79c0e605bc96078cf9e76c50"
 relocation = "VERIFIED existing checkout in same-workspace ntx directory; root/.git inodes retained; previous directory absent and no alias"
 verification = "66770real-host entry identities/modes/sizes preserved;8critical file hashes/inodes;147read-only translated retained-input pins;26nested Git heads/dirt unchanged. Three empty sandbox-only mountpoints classified separately; first inventory refusal retained privately"
 private_supplement = ".local/succession-20261029/NTX_PRIVATE_HANDOFF.md"
-source_status = "Public handoff/guidance only; original application names/package/data migration and N64 implementation remain for successor"
+source_status = "At outgoing succession: public handoff/guidance only; current successor source progress is recorded in implementation below"
 launch = "Installed Codex CLI0.165.0 help verifies fresh interactive -C directory and positional prompt; no model/profile/sandbox/config override and no successor started"
+
+[implementation]
+source_identity = "Active crates, direct Dolphin hooks/exports, JNI/activity, resources, tooling and new writes use ntx; explicit residual audit and immutable baseline patch retained"
+collection_schema = 2
+migration = "Offline schema-1 protected export importer: bounded stage, hashes, writer locks, durable atomic no-replace publication, exact retry and changed-target refusal; actual device transfer remains pending"
+signer = "Canonical reference copies retained key; original/recovery retained; independent recovery and installed-candidate certificate binding verified"
+n64_revision = "15bada85906593376e8fd697f1b0b3af3a20f512"
+n64_status = "Source pin/interfaces inspected; original Rust byte-order/input/packed-save policy and fixtures; no core binary/host, playable game or scene resume"
+resume_limit = "Pinned Mupen retro_unserialize returns unconditional true after job wait; restore result and cached/pending-save semantics require repair/qualification"
+device_actions = "None during successor source increment; installed legacy application and actual device progress unchanged"
+
+[validation]
+host = "74 portable library tests plus 15 presentation decoder and 3 integration tests passed; subsequently added atomic no-replace fixture passed with all 5 migration tests"
+helpers = "94 offline packet fixtures passed"
+lints = "Warnings-denied host all-targets including native declarations and ARM64 Android Clippy passed; no mock native library or fingerprints"
+android_shell = "Java compiler module, DEX namespace and compiled resources/manifest checked; canonical package/activity/label confirmed"
+native = "Pinned Dolphin source/patch/dependency/resource graph and actual render-surface fixture passed; full renamed library not rebuilt"
+retained = "8 critical inputs retain exact recorded SHA256/inode/size; baseline patch SHA256 retained; same signer independently verified"
+limits = "No newly linked APK, actual device migration, N64 core execution/save qualification, gameplay/lifecycle or release result"

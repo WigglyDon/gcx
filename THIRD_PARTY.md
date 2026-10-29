@@ -1,6 +1,6 @@
 # Source lineage and dependency obligations
 
-Original gcx Rust host, player, input, storage and build logic uses [MIT](LICENSE).
+Original ntx Rust host, player, input, storage and build logic uses [MIT](LICENSE).
 The foundation's supplied xbx bootstrap attribution remains intact. Landscape
 geometry adapts selected public PSX MIT layout concepts at
 `4277d4ca651a4c9c2e8e88113a0ef092e330f01c`; its copyright notice is retained in

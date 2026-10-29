@@ -8,7 +8,7 @@
 #include "Core/HW/SI/SI_DeviceGCController.h"
 #include "Core/PowerPC/PowerPC.h"
 
-extern "C" GCX_EXPORT uint32_t gcx_fixture_card(uint32_t operation, uint32_t value)
+extern "C" NTX_EXPORT uint32_t ntx_fixture_card(uint32_t operation, uint32_t value)
 {
   auto& system = Core::System::GetInstance();
   const Core::CPUThreadGuard guard(system);
@@ -24,14 +24,14 @@ extern "C" GCX_EXPORT uint32_t gcx_fixture_card(uint32_t operation, uint32_t val
   default: return 0xffffffff;
   }
 }
-extern "C" GCX_EXPORT uint32_t gcx_fixture_gpr4()
+extern "C" NTX_EXPORT uint32_t ntx_fixture_gpr4()
 {
   auto& system = Core::System::GetInstance();
   const Core::CPUThreadGuard guard(system);
   return system.GetPPCState().gpr[4];
 }
 
-extern "C" GCX_EXPORT uint64_t gcx_fixture_si_request(uint32_t operation)
+extern "C" NTX_EXPORT uint64_t ntx_fixture_si_request(uint32_t operation)
 {
   auto& system = Core::System::GetInstance();
   const Core::CPUThreadGuard guard(system);

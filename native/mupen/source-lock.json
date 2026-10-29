@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "repository": "https://github.com/libretro/mupen64plus-libretro-nx",
+  "revision": "15bada85906593376e8fd697f1b0b3af3a20f512",
+  "tree": "34209af94c9d9e80ee12336347e9867f1865740b",
+  "status": "source interfaces inspected; build and complete component license/resource audit pending; no playable result",
+  "target": {
+    "abi": "arm64-v8a",
+    "renderer": "GLES3/GLideN64",
+    "frontend": "first-party Rust libretro host; no RetroArch frontend",
+    "snapshot_resume": false
+  },
+  "gitlinks": [
+    {
+      "path": "mupen64plus-rsp-paraLLEl/lightning/gnulib",
+      "mode": "160000",
+      "type": "commit",
+      "sha": "e54b645fc6b8422562327443bda575c65d931fbd"
+    }
+  ],
+  "reviewed_files": [
+    {
+      "path": "libretro/libretro.c",
+      "git_blob": "4a9f1297ff16a2a1d34551c7bfa883d2a8baa6e9"
+    },
+    {
+      "path": "libretro/libretro_memory.h",
+      "git_blob": "a5a51180c8085e2ffd539918adf074ea42644e13"
+    },
+    {
+      "path": "libretro/jni/Android.mk",
+      "git_blob": "55b847a950bc5d06c107e5fd9f2b94f6f826b04f"
+    },
+    {
+      "path": "libretro/jni/Application.mk",
+      "git_blob": "fab8ab1bdc3632fc85262148454d58c3ae8acc62"
+    },
+    {
+      "path": "mupen64plus-core/src/main/savestates.c",
+      "git_blob": "ef3187094c67e4f8abfb3bfa099759cfe097d9e8"
+    },
+    {
+      "path": "custom/mupen64plus-core/plugin/emulate_game_controller_via_libretro.c",
+      "git_blob": "8a132d4a6c49afaf35e01b36f52b1f90d539a0e7"
+    },
+    {
+      "path": "mupen64plus-core/src/device/cart/flashram.h",
+      "git_blob": "aeda031e620ae18ac848d56d14f475d0390ff257"
+    },
+    {
+      "path": "mupen64plus-core/src/device/cart/sram.h",
+      "git_blob": "014e8e9791f6b53985da83e757a7f6bdd1fd6509"
+    },
+    {
+      "path": "mupen64plus-core/src/device/controllers/paks/mempak.h",
+      "git_blob": "1cbad59a8593cccae77be10e77b8f7353418811f"
+    },
+    {
+      "path": "libretro-common/glsm/glsm.c",
+      "git_blob": "b3e8c60e4e3b62b1761afa69e305c8ac9da58cd3"
+    },
+    {
+      "path": "Makefile.common",
+      "git_blob": "72aef3abc409369b5c8837163fea3ad249cb96dc"
+    },
+    {
+      "path": "LICENSE",
+      "git_blob": "d159169d1050894d3ea3b98e1c965c4058208fe1"
+    },
+    {
+      "path": ".gitlab-ci.yml",
+      "git_blob": "c30e55f1f77bc0eaf5891b1b36d98ee4f05d8452"
+    }
+  ]
+}

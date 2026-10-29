@@ -17,8 +17,8 @@ SPEC = importlib.util.spec_from_file_location(
 packet = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(packet)
 OWN = packet.PACKAGE
-RESUMED = f"Display #0 (activities):\nmResumedActivity: ActivityRecord{{1 u0 {OWN}/.GcxActivity t1}}"
-WINDOW = f"Display: mDisplayId=0 rootTasks=1\nmCurrentFocus=Window{{1 u0 {OWN}/{OWN}.GcxActivity}}\nDisplayFrames w=800 h=400 r=0\nmTopFocusedDisplayId=0"
+RESUMED = f"Display #0 (activities):\nmResumedActivity: ActivityRecord{{1 u0 {OWN}/.NtxActivity t1}}"
+WINDOW = f"Display: mDisplayId=0 rootTasks=1\nmCurrentFocus=Window{{1 u0 {OWN}/{OWN}.NtxActivity}}\nDisplayFrames w=800 h=400 r=0\nmTopFocusedDisplayId=0"
 OTHER = "com.example.other/.OtherActivity"
 VIEWPORT = "DisplayViewport{type=INTERNAL, valid=true, isActive=true, displayId=0, uniqueId='local:123', orientation=0}"
 XML = f'''<?xml version="1.0"?><hierarchy><node bounds="[0,0][800,400]">
@@ -93,7 +93,7 @@ class Fixture:
         elif "sha256sum" in args and self.retirement:
             out = "".join(f"{self.retirement['hashes'][p]}  {p}\n" for p in args[4:]).encode()
         elif "/proc/1000/stat" in args and self.retirement:
-            out = ("1000 (gcx) S " + "0 " * 18 + str(self.retirement["ticks"])).encode()
+            out = ("1000 (ntx) S " + "0 " * 18 + str(self.retirement["ticks"])).encode()
         elif "logcat" in joined and self.retirement:
             out = self.retirement["logs"].encode()
         elif "dumpsys display" in joined:
@@ -173,7 +173,7 @@ class InterruptedCleanupTests(unittest.TestCase):
 
 class ShadeCleanupTests(unittest.TestCase):
     def setUp(self):
-        self.focus = (WINDOW.replace(f"{OWN}/{OWN}.GcxActivity", "NotificationShade")
+        self.focus = (WINDOW.replace(f"{OWN}/{OWN}.NtxActivity", "NotificationShade")
                       + "\n" + RESUMED)
         self.display = "Display State=ON"
         self.keyguard = "showing=false secure=false"
@@ -192,7 +192,7 @@ class ShadeCleanupTests(unittest.TestCase):
 
     def test_foreign_secure_locked_off_or_ambiguous_overlay_never_matches(self):
         changes = (
-            {"focus": self.focus.replace(f"{OWN}/.GcxActivity", OTHER)},
+            {"focus": self.focus.replace(f"{OWN}/.NtxActivity", OTHER)},
             {"focus": self.focus.replace("NotificationShade", "PermissionDialog")},
             {"focus": self.focus.replace(" u0 NotificationShade", " u10 NotificationShade")},
             {"focus": self.focus + "\nDisplay #1:\n" + OTHER},
@@ -420,14 +420,14 @@ class PacketTests(unittest.TestCase):
         payload = b"original complete native payload fixture"
         checkpoint = hashlib.sha256(payload).hexdigest()
         game, profile = "a" * 32, "b" * 32
-        base = f"files/gcx/profiles/{profile}/"
+        base = f"files/ntx/profiles/{profile}/"
         collection = json.dumps({"schema_version": 1, "selected": game, "entries": [{
             "game_id": game, "profile_id": profile, "checkpoint": checkpoint,
             "paused": True, "runtime_incomplete": True, "stopped": False,
             "restart_required": False}]}).encode()
-        files = {"files/gcx/collection.json": collection, base + "save-generation.json": b"generation",
+        files = {"files/ntx/collection.json": collection, base + "save-generation.json": b"generation",
                  base + "GC/SRAM.raw": b"console", base + "GC/MemoryCardA.USA.raw": b"ordinary save",
-                 base + f"checkpoints/{checkpoint}.gcx": payload}
+                 base + f"checkpoints/{checkpoint}.ntx": payload}
         archive = root / "complete.tar"
         with tarfile.open(archive, "w") as tar:
             for name, data in files.items():
@@ -442,8 +442,8 @@ class PacketTests(unittest.TestCase):
         self.f.retirement = {"collection": collection,
                              "hashes": {p: hashlib.sha256(data).hexdigest() for p, data in files.items()},
                              "ticks": 777, "logs": "native.pause.end paused\nCheckpoint complete: durable\n"}
-        self.f.resumed = RESUMED.replace(OWN + "/.GcxActivity", "com.example.home/.HomeActivity")
-        self.f.windows = WINDOW.replace(OWN + "/" + OWN + ".GcxActivity", "com.example.home/.HomeActivity")
+        self.f.resumed = RESUMED.replace(OWN + "/.NtxActivity", "com.example.home/.HomeActivity")
+        self.f.windows = WINDOW.replace(OWN + "/" + OWN + ".NtxActivity", "com.example.home/.HomeActivity")
         return {"op": "retire_checkpoint", "archive": "complete.tar", "pid": 1000, "start_ticks": 777}
 
     def test_checkpoint_retirement_requires_verified_backup_background_and_current_process(self):
@@ -570,12 +570,12 @@ class PacketTests(unittest.TestCase):
         with self.assertRaises(packet.Refused):
             self.f.driver.execute({"op": "capture", "name": "late.png"})
         with self.assertRaises(packet.Refused):
-            self.f.driver.execute({"op": "gcx_button", "text": "Resume", "cleanup": True})
+            self.f.driver.execute({"op": "ntx_button", "text": "Resume", "cleanup": True})
         self.assertEqual(self.f.calls, [])
 
     def test_requested_short_timeout_is_also_the_actual_operation_deadline(self):
         self.f.now = self.f.budget.cleanup_at - 2
-        self.f.driver.execute({"op": "hash_files", "paths": ["files/gcx/card.raw"],
+        self.f.driver.execute({"op": "hash_files", "paths": ["files/ntx/card.raw"],
                                "timeout": 1})
         self.assertEqual(self.f.driver.operation_end, self.f.budget.cleanup_at - 1)
         self.assertEqual(self.f.timeouts, [1])
@@ -584,13 +584,13 @@ class PacketTests(unittest.TestCase):
         windows = ("historical ANR mCurrentFocus=Window{old u0 " + OTHER + "}\n" +
                    "Display: mDisplayId=4 rootTasks=1\nmCurrentFocus=Window{other u0 " + OTHER + "}\n" + WINDOW)
         activities = "Display #4 (activities):\ntopResumedActivity=" + OTHER + "\n" + RESUMED
-        self.assertEqual(packet.own_focus(activities, windows)[0], (OWN, OWN + ".GcxActivity"))
+        self.assertEqual(packet.own_focus(activities, windows)[0], (OWN, OWN + ".NtxActivity"))
         with self.assertRaises(packet.Refused):
             packet.own_focus(activities, windows.replace("mTopFocusedDisplayId=0", "mTopFocusedDisplayId=4"))
 
     def test_android13_single_live_display_needs_no_global_top_field(self):
         windows = WINDOW.replace("mTopFocusedDisplayId=0", "")
-        self.assertEqual(packet.own_focus(RESUMED, windows)[0], (OWN, OWN + ".GcxActivity"))
+        self.assertEqual(packet.own_focus(RESUMED, windows)[0], (OWN, OWN + ".NtxActivity"))
         with self.assertRaises(packet.Refused):
             packet.own_focus(RESUMED, windows + "\nDisplay: mDisplayId=4 rootTasks=1\n")
 
@@ -601,13 +601,13 @@ class PacketTests(unittest.TestCase):
                 packet.own_focus(resumed, windows)
         # Android can report the same resumed component twice, in two formats.
         self.assertEqual(packet.own_focus(RESUMED + "\ntopResumedActivity=" +
-                                         OWN + "/" + OWN + ".GcxActivity", WINDOW)[0],
-                         (OWN, OWN + ".GcxActivity"))
+                                         OWN + "/" + OWN + ".NtxActivity", WINDOW)[0],
+                         (OWN, OWN + ".NtxActivity"))
 
     def test_coherent_foreign_refusal_retains_first_predicate_without_extra_query(self):
-        own = f"{OWN}/{OWN}.GcxActivity"
+        own = f"{OWN}/{OWN}.NtxActivity"
         self.f.windows = WINDOW.replace(own, OTHER)
-        self.f.resumed = RESUMED.replace(f'{OWN}/.GcxActivity', OTHER)
+        self.f.resumed = RESUMED.replace(f'{OWN}/.NtxActivity', OTHER)
         with self.assertRaises(packet.Refused):self.f.driver.focus()
         proof = self.f.driver.receipt['foreground_refusal_observation']
         self.assertEqual(proof['component'],list(packet.component(OTHER)))
@@ -616,7 +616,7 @@ class PacketTests(unittest.TestCase):
         self.assertTrue(self.f.driver.budget.forced_cleanup)
         self.assertTrue(self.f.driver.mismatch)
         self.f.windows = WINDOW.replace(own,'second.app/.Second')
-        self.f.resumed = RESUMED.replace(f'{OWN}/.GcxActivity','second.app/.Second')
+        self.f.resumed = RESUMED.replace(f'{OWN}/.NtxActivity','second.app/.Second')
         with self.assertRaises(packet.Refused):self.f.driver.focus()
         self.assertEqual(self.f.driver.receipt['foreground_refusal_observation'],proof)
         self.assertEqual(len(self.f.calls),2)
@@ -625,7 +625,7 @@ class PacketTests(unittest.TestCase):
     def test_mismatch_blocks_capture_and_touch_before_mutation(self):
         self.f.windows = f"mCurrentFocus=Window{{1 u0 {OTHER}}}"
         for command in ({"op": "capture", "name": "wrong.png"},
-                        {"op": "gcx_button", "text": "Resume", "cleanup": True}):
+                        {"op": "ntx_button", "text": "Resume", "cleanup": True}):
             with self.assertRaises(packet.Refused):
                 self.f.driver.execute(command)
         self.assertTrue(self.f.driver.mismatch)
@@ -640,7 +640,7 @@ class PacketTests(unittest.TestCase):
 
     def test_native_tap_is_single_use_and_bound_to_current_inspected_image(self):
         self.f.driver.execute({"op": "capture", "name": "native.png"})
-        tap = {"op": "gcx_tap", "capture": "native.png", "target": "Pause",
+        tap = {"op": "ntx_tap", "capture": "native.png", "target": "Pause",
                "bounds": [30, 300, 90, 390]}
         self.f.driver.execute(tap)
         self.assertEqual(self.f.calls[-1], ["shell", "input", "tap", "60", "345"])
@@ -649,7 +649,7 @@ class PacketTests(unittest.TestCase):
 
     def test_stick_contact_is_named_finite_and_single_use(self):
         self.f.driver.execute(dict(op='capture', name='stick.png'))
-        command = dict(op='gcx_stick', target='C Stick', capture='stick.png',
+        command = dict(op='ntx_stick', target='C Stick', capture='stick.png',
                        bounds=[30, 290, 150, 390], delta=[20, -15], duration_ms=500)
         self.f.driver.execute(command)
         self.assertEqual(self.f.calls[-1],
@@ -659,7 +659,7 @@ class PacketTests(unittest.TestCase):
 
     def test_stick_contact_refuses_unbounded_arbitrary_and_cleanup_routes(self):
         self.f.driver.execute(dict(op='capture', name='stick.png'))
-        command = dict(op='gcx_stick', target='Control Stick', capture='stick.png',
+        command = dict(op='ntx_stick', target='Control Stick', capture='stick.png',
                        bounds=[30, 290, 150, 390], delta=[20, 0], duration_ms=500)
         for change in ({'target': 'A'}, {'cleanup': True}, {'delta': [0, 0]},
                        {'delta': [34, 0]}, {'delta': [25, 25]}, {'delta': [True, 0]},
@@ -671,7 +671,7 @@ class PacketTests(unittest.TestCase):
 
     def test_explicit_stick_hold_is_one_bounded_stationary_contact_and_single_use(self):
         self.f.driver.execute(dict(op='capture', name='held-stick.png'))
-        command = dict(op='gcx_stick', target='Control Stick', capture='held-stick.png',
+        command = dict(op='ntx_stick', target='Control Stick', capture='held-stick.png',
                        bounds=[30, 290, 150, 390], delta=[20, -15], duration_ms=500,
                        motion='hold')
         self.f.driver.execute(command)
@@ -682,7 +682,7 @@ class PacketTests(unittest.TestCase):
 
     def test_analog_travel_is_separate_balanced_finite_and_single_use(self):
         self.f.driver.execute(dict(op='capture', name='analog.png'))
-        command = dict(op='gcx_trigger', target='L analog', capture='analog.png',
+        command = dict(op='ntx_trigger', target='L analog', capture='analog.png',
                        bounds=[30, 80, 130, 140], travel_percent=35, duration_ms=100)
         self.f.driver.execute(command)
         self.assertEqual(self.f.calls[-1],
@@ -692,7 +692,7 @@ class PacketTests(unittest.TestCase):
 
     def test_analog_contact_rejects_ambiguous_button_travel_and_cleanup(self):
         self.f.driver.execute(dict(op='capture', name='analog.png'))
-        command = dict(op='gcx_trigger', target='L analog', capture='analog.png',
+        command = dict(op='ntx_trigger', target='L analog', capture='analog.png',
                        bounds=[30, 80, 130, 140], travel_percent=95, duration_ms=100)
         for change in ({'target':'L click'}, {'target':'L'}, {'cleanup':True},
                        {'travel_percent':True}, {'travel_percent':0}, {'travel_percent':100},
@@ -704,7 +704,7 @@ class PacketTests(unittest.TestCase):
 
     def test_right_analog_near_full_travel_stays_inside_its_bar(self):
         self.f.driver.execute(dict(op='capture', name='right-analog.png'))
-        self.f.driver.execute(dict(op='gcx_trigger', target='R analog',
+        self.f.driver.execute(dict(op='ntx_trigger', target='R analog',
             capture='right-analog.png', bounds=[30, 80, 130, 140],
             travel_percent=99, duration_ms=500))
         self.assertEqual(self.f.calls[-1],
@@ -712,7 +712,7 @@ class PacketTests(unittest.TestCase):
 
     def test_analog_contact_keeps_foreground_freshness_and_frame_guards(self):
         self.f.driver.execute(dict(op='capture', name='analog.png'))
-        command = dict(op='gcx_trigger', target='R analog', capture='analog.png',
+        command = dict(op='ntx_trigger', target='R analog', capture='analog.png',
                        bounds=[30, 80, 130, 140], travel_percent=95, duration_ms=100)
         self.f.now +=31
         with self.assertRaises(packet.Refused):self.f.driver.execute(command)
@@ -723,7 +723,7 @@ class PacketTests(unittest.TestCase):
 
     def test_only_explicit_digital_l_click_is_admitted_as_a_finite_button_contact(self):
         self.f.driver.execute(dict(op='capture', name='l-click.png'))
-        command = dict(op='gcx_tap', target='L click', capture='l-click.png',
+        command = dict(op='ntx_tap', target='L click', capture='l-click.png',
                        bounds=[30, 80, 90, 140], press_ms=100)
         for change in ({'target': 'L analog'}, {'target': 'L'}, {'target': 'R click'},
                        {'cleanup': True}, {'press_ms': 251}):
@@ -737,7 +737,7 @@ class PacketTests(unittest.TestCase):
 
     def test_hold_retains_fresh_frame_geometry_target_duration_and_well_guards(self):
         self.f.driver.execute(dict(op='capture', name='held-stick.png'))
-        command = dict(op='gcx_stick', target='C Stick', capture='held-stick.png',
+        command = dict(op='ntx_stick', target='C Stick', capture='held-stick.png',
                        bounds=[30, 290, 150, 390], delta=[20, -15], duration_ms=500,
                        motion='hold')
         for change in ({'motion': 'other'}, {'motion': True}, {'motion': None},
@@ -754,7 +754,7 @@ class PacketTests(unittest.TestCase):
 
     def test_stick_capture_expiry_and_window_change_refuse(self):
         self.f.driver.execute(dict(op='capture', name='stick.png'))
-        command = dict(op='gcx_stick', target='Control Stick', capture='stick.png',
+        command = dict(op='ntx_stick', target='Control Stick', capture='stick.png',
                        bounds=[30, 290, 150, 390], delta=[20, 0], duration_ms=500)
         self.f.now += 31
         with self.assertRaises(packet.Refused):
@@ -769,7 +769,7 @@ class PacketTests(unittest.TestCase):
         driver = packet.Driver(self.temp.name, self.f.budget, self.f.invoke,
                                lambda: self.f.now, self.f.sleep, stick_ms_limit=4000)
         driver.execute(dict(op='capture', name='long-stick.png'))
-        command = dict(op='gcx_stick', target='Control Stick', capture='long-stick.png',
+        command = dict(op='ntx_stick', target='Control Stick', capture='long-stick.png',
                        bounds=[30, 290, 150, 390], delta=[20, 0], duration_ms=4001)
         with self.assertRaises(packet.Refused):
             driver.execute(command)
@@ -789,38 +789,38 @@ class PacketTests(unittest.TestCase):
     def test_focus_metadata_is_batched_without_dropping_either_observation(self):
         self.f.driver.focus()
         self.assertEqual(self.f.calls, [["shell", packet.FOCUS_QUERY]])
-        self.f.resumed = RESUMED.replace(OWN + "/.GcxActivity", OTHER)
+        self.f.resumed = RESUMED.replace(OWN + "/.NtxActivity", OTHER)
         with self.assertRaises(packet.Refused):
             self.f.driver.focus()
         self.assertTrue(self.f.driver.mismatch)
 
     def test_held_test_stimulus_is_one_bounded_stationary_contact(self):
         self.f.driver.execute({"op": "capture", "name": "native.png"})
-        self.f.driver.execute({"op": "gcx_tap", "capture": "native.png", "target": "Start",
+        self.f.driver.execute({"op": "ntx_tap", "capture": "native.png", "target": "Start",
                                "bounds": [30, 300, 90, 390], "press_ms": 120})
         self.assertEqual(self.f.calls[-1], ["shell", "input", "swipe", "60", "345", "60", "345", "120"])
         with self.assertRaises(packet.Refused):
-            self.f.driver.execute({"op": "gcx_tap", "capture": "native.png", "target": "Start",
+            self.f.driver.execute({"op": "ntx_tap", "capture": "native.png", "target": "Start",
                                    "bounds": [30, 300, 90, 390], "press_ms": 120})
 
     def test_held_test_stimulus_refuses_invalid_duration_before_input(self):
         self.f.driver.execute({"op": "capture", "name": "native.png"})
         for invalid in (-1, 251, True, "120", 0.5):
             with self.assertRaises(packet.Refused):
-                self.f.driver.execute({"op": "gcx_tap", "capture": "native.png", "target": "Start",
+                self.f.driver.execute({"op": "ntx_tap", "capture": "native.png", "target": "Start",
                                        "bounds": [30, 300, 90, 390], "press_ms": invalid})
         self.assertFalse(any("input" in c for c in self.f.calls))
 
     def test_pause_cannot_hold_contact_across_opening_a_dialog_window(self):
         self.f.driver.execute({"op": "capture", "name": "native.png"})
         with self.assertRaises(packet.Refused):
-            self.f.driver.execute({"op": "gcx_tap", "capture": "native.png", "target": "Pause",
+            self.f.driver.execute({"op": "ntx_tap", "capture": "native.png", "target": "Pause",
                                    "bounds": [30, 300, 90, 390], "press_ms": 120})
         self.assertFalse(any("input" in c for c in self.f.calls))
 
     def test_native_tap_refuses_stale_or_rotated_capture(self):
         self.f.driver.execute({"op": "capture", "name": "native.png"})
-        tap = {"op": "gcx_tap", "capture": "native.png", "target": "Pause",
+        tap = {"op": "ntx_tap", "capture": "native.png", "target": "Pause",
                "bounds": [30, 300, 90, 390]}
         self.f.now += 31
         with self.assertRaises(packet.Refused):
@@ -842,13 +842,13 @@ class PacketTests(unittest.TestCase):
             return result
         self.f.driver.invoke = slow_focus
         with self.assertRaises(packet.Refused):
-            self.f.driver.execute({"op": "gcx_tap", "capture": "native.png", "target": "Pause",
+            self.f.driver.execute({"op": "ntx_tap", "capture": "native.png", "target": "Pause",
                                    "bounds": [30, 300, 90, 390]})
         self.assertFalse(any("input" in c for c in self.f.calls))
 
     def test_each_button_uses_fresh_observed_bounds_and_focus(self):
-        self.f.driver.execute({"op": "gcx_button", "text": "Resume"})
-        self.f.driver.execute({"op": "gcx_button", "text": "Stop game", "cleanup": True})
+        self.f.driver.execute({"op": "ntx_button", "text": "Resume"})
+        self.f.driver.execute({"op": "ntx_button", "text": "Stop game", "cleanup": True})
         self.assertEqual([c for c in self.f.calls if "tap" in c],
                          [["shell", "input", "tap", "170", "120"],
                           ["shell", "input", "tap", "550", "240"]])
@@ -872,7 +872,7 @@ class PacketTests(unittest.TestCase):
     def test_focus_change_after_layout_aborts_the_input_batch(self):
         self.f.after_dump = f"mCurrentFocus=Window{{1 u0 {OTHER}}}"
         with self.assertRaises(packet.Refused):
-            self.f.driver.execute({"op": "gcx_button", "text": "Resume"})
+            self.f.driver.execute({"op": "ntx_button", "text": "Resume"})
         self.assertFalse(any("input" in c for c in self.f.calls))
         with self.assertRaises(packet.Refused):
             packet.button_center(XML, "missing stale button")
@@ -880,11 +880,11 @@ class PacketTests(unittest.TestCase):
     def test_same_package_new_window_invalidates_the_observed_button_layout(self):
         self.f.after_dump = WINDOW.replace("Window{1", "Window{2")
         with self.assertRaises(packet.Refused):
-            self.f.driver.execute({"op": "gcx_button", "text": "Resume"})
+            self.f.driver.execute({"op": "ntx_button", "text": "Resume"})
         self.assertFalse(any("input" in c for c in self.f.calls))
 
     def test_focused_app_without_a_current_focused_window_is_not_admission(self):
-        self.f.windows = f"mFocusedApp=ActivityRecord{{1 u0 {OWN}/.GcxActivity t1}}"
+        self.f.windows = f"mFocusedApp=ActivityRecord{{1 u0 {OWN}/.NtxActivity t1}}"
         with self.assertRaises(packet.Refused):
             self.f.driver.execute({"op": "capture", "name": "missing-focus.png"})
         self.assertFalse(any("screencap" in c for c in self.f.calls))
@@ -913,8 +913,8 @@ class PacketTests(unittest.TestCase):
         self.assertFalse(any("am" in c for c in self.f.calls))
 
     def test_authorized_initial_own_entry_cannot_override_later_mismatch(self):
-        self.f.resumed = RESUMED.replace(OWN + "/.GcxActivity", OTHER)
-        self.f.windows = WINDOW.replace(OWN + "/" + OWN + ".GcxActivity", OTHER)
+        self.f.resumed = RESUMED.replace(OWN + "/.NtxActivity", OTHER)
+        self.f.windows = WINDOW.replace(OWN + "/" + OWN + ".NtxActivity", OTHER)
         self.f.driver.execute({"op": "launch", "initial_entry": True})
         self.assertEqual(sum("am" in c for c in self.f.calls), 1)
         self.assertIn("-W", next(c for c in self.f.calls if "am" in c))
@@ -923,12 +923,12 @@ class PacketTests(unittest.TestCase):
         self.assertEqual(sum("am" in c for c in self.f.calls), 1)
 
     def test_hashing_always_has_literal_file_arguments(self):
-        paths = ["files/gcx/profiles/fixture/cards/MemoryCardA.USA.raw"]
+        paths = ["files/ntx/profiles/fixture/cards/MemoryCardA.USA.raw"]
         args = packet.hash_arguments(paths)
         self.assertEqual(args, ["shell", "run-as", OWN, "sha256sum", *paths])
-        for invalid in ([], ["files/gcx/*.raw"], ["files/gcx/a b"],
-                        ["files/gcx/../private"], ["files/gcx/$(echo x)"],
-                        ["/files/gcx/card"]):
+        for invalid in ([], ["files/ntx/*.raw"], ["files/ntx/a b"],
+                        ["files/ntx/../private"], ["files/ntx/$(echo x)"],
+                        ["/files/ntx/card"]):
             with self.assertRaises(packet.Refused):
                 packet.hash_arguments(invalid)
         self.f.driver.execute({"op": "hash_files", "paths": paths})
@@ -944,7 +944,7 @@ class PacketTests(unittest.TestCase):
     def test_timeout_stops_all_further_device_commands(self):
         self.f.fail = True
         with self.assertRaises(subprocess.TimeoutExpired):
-            self.f.driver.execute({"op": "hash_files", "paths": ["files/gcx/card.raw"]})
+            self.f.driver.execute({"op": "hash_files", "paths": ["files/ntx/card.raw"]})
         count = len(self.f.calls)
         self.f.driver.finish()
         self.assertEqual(len(self.f.calls), count)
@@ -985,8 +985,8 @@ class PacketTests(unittest.TestCase):
         self.f.driver.receipt["verified_new_install"] = True
         invoke = self.f.driver.invoke
         def new_install(args, timeout):
-            if "cat" in args and "files/gcx/collection.json" in args:
-                self.assertEqual(args, ["shell", "run-as", OWN, "cat", "files/gcx/collection.json"])
+            if "cat" in args and "files/ntx/collection.json" in args:
+                self.assertEqual(args, ["shell", "run-as", OWN, "cat", "files/ntx/collection.json"])
                 return subprocess.CompletedProcess(args, 1, b"", b"cat: No such file or directory")
             return invoke(args, timeout)
         self.f.driver.invoke = new_install
@@ -999,7 +999,7 @@ class PacketTests(unittest.TestCase):
         self.f.driver.receipt["verified_new_install"] = True
         invoke = self.f.driver.invoke
         def merged_error(args, timeout):
-            if "cat" in args and "files/gcx/collection.json" in args:
+            if "cat" in args and "files/ntx/collection.json" in args:
                 return subprocess.CompletedProcess(args, 0, b"cat: No such file or directory", b"")
             return invoke(args, timeout)
         self.f.driver.invoke = merged_error
@@ -1011,7 +1011,7 @@ class PacketTests(unittest.TestCase):
     def test_missing_collection_without_new_install_proof_cannot_retire_client(self):
         invoke = self.f.driver.invoke
         def missing(args, timeout):
-            if "cat" in args and "files/gcx/collection.json" in args:
+            if "cat" in args and "files/ntx/collection.json" in args:
                 return subprocess.CompletedProcess(args, 1, b"", b"cat: No such file or directory")
             return invoke(args, timeout)
         self.f.driver.invoke = missing
@@ -1025,7 +1025,7 @@ class DiagnosticHistoryTests(unittest.TestCase):
     identity = ('1234', '5678')
 
     def line(self, number, body):
-        return f'10-26 12:00:00.{number:03d} 1234 1235 E gcx : Lifecycle +{number}us {body}'
+        return f'10-26 12:00:00.{number:03d} 1234 1235 E ntx : Lifecycle +{number}us {body}'
 
     def test_evicted_prefix_requires_exact_tail_and_retains_all_records(self):
         old = [self.line(i, str(i)) for i in range(8)]

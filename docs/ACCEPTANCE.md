@@ -5,6 +5,14 @@ Current task: [NTX-5](https://github.com/WigglyDon/ntx/issues/5), including
 The repository/directory succession is not completion of the application rebrand,
 Android data migration or N64 support. No new device campaign follows from it.
 
+The successor source increment now renames active implementation/package/build
+identity, implements offline staged import and schema-2 system/backend routing,
+and pins N64 interfaces with original cartridge/input/save-format policy.
+Portable tests, host/native surface checks, Android Rust/Java/resource checks and
+relevant warnings-denied lints support this increment. No new linked APK, actual
+package-data migration or playable N64 result is claimed. See
+[the exact migration boundary](IDENTITY_MIGRATION.md).
+
 ## Earned GameCube baseline: preserve, do not replay
 
 | Result | Binding and limits |

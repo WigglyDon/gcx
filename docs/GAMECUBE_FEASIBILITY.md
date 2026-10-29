@@ -1,3 +1,5 @@
+> Historical source-selection research, retained at its original scope. Current work follows AGENTS.md, NTX-5 and docs/ARCHITECTURE.md. Legacy product names here describe that research.
+
 # GameCube feasibility and first investigation
 
 Reviewed 2026-10-21. These are source observations and proposed tests, not a build,

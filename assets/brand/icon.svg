@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" fill="none">
-<title>gcx — the green A button</title>
+<title>ntx — the green A button</title>
 <defs><linearGradient id="plastic" x2="0" y2="1"><stop stop-color="#C4C4BE"/><stop offset="1" stop-color="#AEAEA7"/></linearGradient><linearGradient id="cap" x2="0" y2="1"><stop stop-color="#85CA72"/><stop offset="1" stop-color="#4F9B49"/></linearGradient></defs>
 <path fill="url(#plastic)" d="M0 0h108v108H0z"/>
 <circle cx="54" cy="56" r="38" fill="#90918A"/><circle cx="54" cy="54" r="38" fill="#777972"/><circle cx="54" cy="53" r="36" fill="#354C35"/><circle cx="54" cy="54" r="34.5" fill="url(#cap)"/>

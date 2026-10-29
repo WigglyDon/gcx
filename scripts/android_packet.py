@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""The existing gcx-local JSON test helper, with scoped UI/deadline guards.
+"""The existing ntx-local JSON test helper, with scoped UI/deadline guards.
 
 Run only inside an admitted android-device transaction. This does not grant a
-window, select a device, change shared tooling, or implement the gcx application.
+window, select a device, change shared tooling, or implement the ntx application.
 """
 import json
 import os
@@ -18,8 +18,8 @@ import sys
 import time
 import xml.etree.ElementTree as ET
 
-PACKAGE = "com.machinerhythm.gcx"
-ACTIVITY = PACKAGE + "/.GcxActivity"
+PACKAGE = "com.machinerhythm.ntx"
+ACTIVITY = PACKAGE + "/.NtxActivity"
 FOCUS_QUERY = ("dumpsys window displays | grep -E 'Display:|mCurrentFocus=|mTopFocusedDisplayId=|DisplayFrames'; "
                "dumpsys activity activities | grep -E 'Display #[0-9]+|mResumedActivity:|topResumedActivity='")
 
@@ -74,7 +74,7 @@ def interrupted_capture_cleanup(inflight, job, expected_job, cleanup_process,
 
 
 def cleanup_shade_context(focus, display, keyguard):
-    """Only an unlocked SystemUI shade above gcx on the default lab display.
+    """Only an unlocked SystemUI shade above ntx on the default lab display.
 
     Non-content metadata is sufficient. This is not own_focus(), a gameplay
     input exception, or permission to dismiss another app's overlay. Recheck
@@ -98,7 +98,7 @@ def cleanup_shade_context(focus, display, keyguard):
             or not re.fullmatch(r"Window\{[a-fA-F0-9]+ u0 NotificationShade\}", current[0].strip())
             or len(frames) != 1 or any(int(n) <= 0 for n in frames[0][:2])
             or int(frames[0][2]) not in (0, 1, 2, 3)
-            or component(activities[2]) != (PACKAGE, PACKAGE + ".GcxActivity")):
+            or component(activities[2]) != (PACKAGE, PACKAGE + ".NtxActivity")):
         raise Refused("shade is not above the exact owned resumed activity")
     return {"display": 0, "window": current[0].strip(),
             "geometry": [int(n) for n in frames[0]], "activity": ACTIVITY}
@@ -156,7 +156,7 @@ class Budget:
 
 
 def active_bound_entry(collection, binding):
-    """Current gcx intent for one source/frame-guarded test input, not FPS proof."""
+    """Current ntx intent for one source/frame-guarded test input, not FPS proof."""
     if (any(not re.fullmatch(r"[a-f0-9]{32}", binding.get(k, ""))
             for k in ("game_id", "profile_id"))
             or collection.get("selected") != binding["game_id"]):
@@ -198,7 +198,7 @@ def merge_diagnostic_history(previous, current, previous_process, current_proces
             or (previous and tuple(previous_process) != tuple(current_process))):
         raise Refused("diagnostic process identity changed")
     pattern = re.compile(r"^\d\d-\d\d \d\d:\d\d:\d\d\.\d+\s+"
-                         + re.escape(current_process[0]) + r"\s+\d+\s+[VDIWEF]\s+gcx\s*:")
+                         + re.escape(current_process[0]) + r"\s+\d+\s+[VDIWEF]\s+ntx\s*:")
     def records(text):
         if not isinstance(text, str) or len(text.encode()) > 1024 * 1024:
             raise Refused("diagnostic history byte bound exceeded")
@@ -329,8 +329,8 @@ def focused_pair(resumed, windows):
 
 def own_focus(resumed, windows):
     activity, window = focused_pair(resumed, windows)
-    if activity != (PACKAGE, PACKAGE + ".GcxActivity"):
-        raise Refused("expected gcx Activity AND focused window do not match")
+    if activity != (PACKAGE, PACKAGE + ".NtxActivity"):
+        raise Refused("expected ntx Activity AND focused window do not match")
     return activity, window
 
 
@@ -353,7 +353,7 @@ def button_center(xml, text):
                and n.attrib.get("enabled") == "true"
                and n.attrib.get("clickable") == "true"]
     if len(matches) != 1:
-        raise Refused("requested current gcx button missing or ambiguous")
+        raise Refused("requested current ntx button missing or ambiguous")
     a, b, c, d = bounds(matches[0])
     ancestor = parents.get(matches[0])
     while ancestor is not None and ancestor.tag == "node":
@@ -369,9 +369,9 @@ def button_center(xml, text):
 def hash_arguments(paths):
     # ADB joins shell arguments: literal validated paths avoid the former sh -c
     # quoting bug, which accidentally ran sha256sum with no input arguments.
-    if not paths or any(not re.fullmatch(r"files/gcx/[A-Za-z0-9_./-]+", p)
+    if not paths or any(not re.fullmatch(r"files/ntx/[A-Za-z0-9_./-]+", p)
                         or ".." in p.split("/") for p in paths):
-        raise Refused("hash requires explicit literal gcx file paths")
+        raise Refused("hash requires explicit literal ntx file paths")
     return ["shell", "run-as", PACKAGE, "sha256sum", *paths]
 
 
@@ -432,15 +432,15 @@ class Driver:
     def focus(self):
         try:
             observed = self.observe_focus()
-            if observed[0] != (PACKAGE, PACKAGE + ".GcxActivity"):
+            if observed[0] != (PACKAGE, PACKAGE + ".NtxActivity"):
                 # Private predicate metadata only; preserve the first refusal.
                 # This is not readiness, a UI capture or authority to act there.
                 self.receipt.setdefault("foreground_refusal_observation", {
                     "at": self.clock(), "component": list(observed[0]),
                     "display": observed[1][0], "frames": observed[1][2],
-                    "expected": [PACKAGE, PACKAGE + ".GcxActivity"],
+                    "expected": [PACKAGE, PACKAGE + ".NtxActivity"],
                 })
-                raise Refused("expected gcx Activity AND focused window do not match")
+                raise Refused("expected ntx Activity AND focused window do not match")
             self.own_ui_observed = True
             return observed
         except Refused:
@@ -521,9 +521,9 @@ class Driver:
         if not (re.fullmatch(r"[0-9a-f]{32}", profile) and re.fullmatch(r"[0-9a-f]{32}", game)
                 and re.fullmatch(r"[0-9a-f]{64}", checkpoint)):
             raise Refused("invalid checkpoint/profile binding")
-        base = f"files/gcx/profiles/{profile}/"
-        required = {"files/gcx/collection.json", base + "save-generation.json",
-                    base + "GC/SRAM.raw", base + f"checkpoints/{checkpoint}.gcx"}
+        base = f"files/ntx/profiles/{profile}/"
+        required = {"files/ntx/collection.json", base + "save-generation.json",
+                    base + "GC/SRAM.raw", base + f"checkpoints/{checkpoint}.ntx"}
         hashes = {}
         with tarfile.open(archive) as backup:
             members = backup.getmembers()
@@ -537,9 +537,9 @@ class Driver:
             cards = {p for p in hashes if re.fullmatch(re.escape(base) + r"GC/MemoryCardA\.(USA|EUR|JAP)\.raw", p)}
             if len(cards) != 1 or set(hashes) != required | cards:
                 raise Refused("backup must contain the complete selected generation only")
-            if hashes[base + f"checkpoints/{checkpoint}.gcx"] != checkpoint:
+            if hashes[base + f"checkpoints/{checkpoint}.ntx"] != checkpoint:
                 raise Refused("backup checkpoint bytes do not match their identity")
-            collection = json.load(backup.extractfile("files/gcx/collection.json"))
+            collection = json.load(backup.extractfile("files/ntx/collection.json"))
         entry = next(e for e in collection["entries"] if e["game_id"] == collection["selected"])
         intent = str(entry["paused"]).lower()
         if not (entry["game_id"] == game and entry["profile_id"] == profile
@@ -579,7 +579,7 @@ class Driver:
             raise Refused("runtime process start changed")
         pending_restore = command["op"] == "recover_pending_restore"
         lines = 192 if pending_restore else 64
-        logs = self.call(["shell", f"logcat -d --pid={pid} -s gcx:I '*:S' | tail -{lines}"]).stdout.decode()
+        logs = self.call(["shell", f"logcat -d --pid={pid} -s ntx:I '*:S' | tail -{lines}"]).stdout.decode()
         states = re.findall(r"native\.pause\.end (paused|playing)", logs)
         observations = self.receipt.setdefault("retirement_observations", [])
         if len(observations) >= 8:
@@ -649,12 +649,12 @@ class Driver:
             p.chmod(0o600)
             self.last_capture = (name, self.clock(), before, dimensions)
             return {"capture": str(p), "bytes": len(result.stdout)}
-        if op in ("gcx_tap", "gcx_stick", "gcx_trigger"):
+        if op in ("ntx_tap", "ntx_stick", "ntx_trigger"):
             # Automated native-button checks use an agent-inspected, just-taken
             # own image. Bind one tap to its live window AND display geometry;
             # never reuse a guessed historical layout or a batch of points.
-            admitted = (("Control Stick", "C Stick") if op == "gcx_stick"
-                        else (("L analog", "R analog") if op == "gcx_trigger"
+            admitted = (("Control Stick", "C Stick") if op == "ntx_stick"
+                        else (("L analog", "R analog") if op == "ntx_trigger"
                               else ("Pause", "Start", "A", "B", "L click")))
             if command["target"] not in admitted:
                 raise Refused("unadmitted native control")
@@ -682,7 +682,7 @@ class Driver:
             if not (0 <= a < c <= width and 0 <= b < d <= height):
                 raise Refused("native button outside current image")
             x, y = (a+c)//2, (b+d)//2
-            if op == "gcx_trigger":
+            if op == "ntx_trigger":
                 percent = command.get("travel_percent")
                 duration = command.get("duration_ms")
                 if type(percent) is not int or not 1 <= percent <= 99 or c - a < 3:
@@ -694,7 +694,7 @@ class Driver:
                 x = min(c - 1, max(a + 1, round(a + (c - a) * percent / 100)))
                 result = self.action(["shell", "input", "swipe", str(x), str(y),
                                       str(x), str(y), str(duration)])
-            elif op == "gcx_stick":
+            elif op == "ntx_stick":
                 delta = command.get("delta")
                 duration = command.get("duration_ms")
                 if (not isinstance(delta, list) or len(delta) != 2
@@ -724,18 +724,18 @@ class Driver:
                 x, y = str(x), str(y)
                 result = self.action(["shell", "input", "swipe", x, y, x, y, str(press)] if press else
                                      ["shell", "input", "tap", x, y])
-        elif op == "gcx_button":
+        elif op == "ntx_button":
             text = command["text"]
             if cleanup and text not in ("Stop game", "Stop current game"):
                 raise Refused("cleanup cannot resume a test")
             before = self.focus()
-            path = "/data/local/tmp/gcx-packet-ui.xml"
+            path = "/data/local/tmp/ntx-packet-ui.xml"
             result = self.call(["shell", f"uiautomator dump {path} >/dev/null && cat {path}; rm -f {path}"])
             xml = result.stdout.decode()
             try:
                 x, y = button_center(xml[xml.index("<?xml"):], text)
             except (ValueError, ET.ParseError) as error:
-                raise Refused("no usable current gcx UI layout") from error
+                raise Refused("no usable current ntx UI layout") from error
             if self.focus() != before:
                 self.mismatch = True
                 self.budget.forced_cleanup = True
@@ -748,7 +748,7 @@ class Driver:
             home = self.call(["shell", "cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME"])
             initial = (command.get("initial_entry") and not self.launched
                        and not self.own_ui_observed and not self.mismatch)
-            if current not in (component(home.stdout.decode()), (PACKAGE, PACKAGE + ".GcxActivity")) and not (initial or command.get("owner_reconfirmed")):
+            if current not in (component(home.stdout.decode()), (PACKAGE, PACKAGE + ".NtxActivity")) and not (initial or command.get("owner_reconfirmed")):
                 self.mismatch = True
                 self.budget.forced_cleanup = True
                 raise Refused("unexpected app before launch; owner clarification required")
@@ -816,7 +816,7 @@ class Driver:
             # Collection is text: shell-v2 preserves the remote exit status and
             # stderr. exec-out merges a missing-file error into stdout and may
             # return zero, which is not evidence of a readable collection.
-            result = self.call(["shell", "run-as", PACKAGE, "cat", "files/gcx/collection.json"])
+            result = self.call(["shell", "run-as", PACKAGE, "cat", "files/ntx/collection.json"])
             # The admitted installer may prove package absence before a new
             # install. Before any import, that build has no saved collection or
             # runtime: imports persist the collection before native boot.
@@ -848,13 +848,13 @@ class Driver:
                     pass  # Do not act on an unexpected app to finish cleanup.
                 return
             self.receipt["clients_retired"] = True
-            # Screen-off is an explicit return step, only from gcx or the observed
+            # Screen-off is an explicit return step, only from ntx or the observed
             # current Home. No unrelated-app screenshot or touch is used.
             display = self.call(["shell", "dumpsys display | grep -E 'Display State=|mState='"]).stdout.decode()
             if not physical_displays_off(display):
                 home = self.call(["shell", "cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME"]).stdout.decode()
                 current, _ = self.observe_focus()
-                if current not in (component(home), (PACKAGE, PACKAGE + ".GcxActivity")):
+                if current not in (component(home), (PACKAGE, PACKAGE + ".NtxActivity")):
                     raise Refused("unexpected app during return; no screen input")
                 self.action(["shell", "input", "keyevent", "KEYCODE_SLEEP"])
             # Sleep/keyguard transitions are asynchronous. Re-observe finitely,
@@ -882,16 +882,16 @@ def main():
     root = Path(root)
     root.mkdir(mode=0o700, parents=True, exist_ok=False)
     fd = int(os.environ["CODEX_ANDROID_LEASE_FD"])
-    budget = Budget(time.monotonic(), float(os.environ["GCX_OUTER_DEADLINE_MONO"]))
-    automated = os.environ.get("GCX_AUTOMATED_PACKET") == "1"
+    budget = Budget(time.monotonic(), float(os.environ["NTX_OUTER_DEADLINE_MONO"]))
+    automated = os.environ.get("NTX_AUTOMATED_PACKET") == "1"
     def invoke(args, timeout):
         return subprocess.run(["android-device", "adb", alias, "--", *args],
                               stdin=subprocess.DEVNULL, capture_output=True,
                               timeout=timeout, pass_fds=(fd,))
     driver = Driver(root, budget, invoke)
-    driver.receipt["verified_new_install"] = os.environ.get("GCX_VERIFIED_NEW_INSTALL") == "1"
-    task = os.environ["GCX_DEVICE_TASK"]
-    if not re.fullmatch(r"gcx-[a-z0-9-]{1,100}", task):
+    driver.receipt["verified_new_install"] = os.environ.get("NTX_VERIFIED_NEW_INSTALL") == "1"
+    task = os.environ["NTX_DEVICE_TASK"]
+    if not re.fullmatch(r"ntx-[a-z0-9-]{1,100}", task):
         raise Refused("invalid own task record name")
     canonical = Path.home() / ".local/state/codex-android/tasks" / task / "receipt.json"
     def canonical_pending():

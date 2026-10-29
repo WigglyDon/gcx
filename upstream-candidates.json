@@ -1,22 +1,9 @@
 {
-  "schema_version": 1,
-  "observed_on": "2026-10-21",
-  "status": "research observations, not incorporated dependencies or a full lock",
-  "candidates": [
-    {
-      "role": "first GameCube engine candidate",
-      "repository": "dolphin-emu/dolphin",
-      "ref": "cf5cb7ef81c3e8e7af5c9d566334219ffda9f68b",
-      "url": "https://github.com/dolphin-emu/dolphin/tree/cf5cb7ef81c3e8e7af5c9d566334219ffda9f68b",
-      "declared_license": "GPL-2.0-or-later; inspect every incorporated component",
-      "qualification": "source excerpts only; no build/device result"
-    }
-  ],
-  "behavior_reference": {
-    "repository": "WigglyDon/psx",
-    "ref": "1e4ba86fa0a5fc1470837b6bcc06bd20b6642c11",
-    "status": "historical public reference; recheck before selective reuse"
-  },
-  "incorporated_engine": null,
-  "device_results": []
+  "schema_version": 2,
+  "observed_on": "2026-10-29",
+  "dolphin_lock": "native/dolphin-gitlinks.tsv",
+  "dolphin_patch": "native/patches/0001-direct-adapter.patch",
+  "n64_lock": "native/mupen/source-lock.json",
+  "n64_status": "exact source pin and interfaces inspected; no core execution or packaging yet",
+  "historical_research": "docs/history/GCX_UPSTREAM_CANDIDATES.json"
 }
