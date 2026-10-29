@@ -109,6 +109,7 @@ pub fn write(root: &Path, source: &Path) -> Result<()> {
             );
         }
     }
+    let mupen = crate::mupen::source_check(root)?;
     let binding = serde_json::json!({
         "schema":1,"native_abi":8,"checkpoint_abi":1,"first_party_head":output(Command::new("git").args(["rev-parse","HEAD"]).current_dir(root))?.trim(),
         "source_inventory_sha256":digest(&manifest)?,"source_files":paths.len(),
@@ -116,6 +117,15 @@ pub fn write(root: &Path, source: &Path) -> Result<()> {
         "dolphin_sys_tree":output(Command::new("git").arg("-C").arg(source).args(["rev-parse","HEAD:Data/Sys"]))?.trim(),
         "engine_patch_sha256":digest(&root.join("native/patches/0001-direct-adapter.patch"))?,
         "gitlink_graph_sha256":digest(&root.join("native/dolphin-gitlinks.tsv"))?,
+        "mupen_commit":"15bada85906593376e8fd697f1b0b3af3a20f512",
+        "mupen_sources_sha256":digest(&root.join("native/mupen/source-files.sha256"))?,
+        "mupen_patched_sources_sha256":digest(&root.join("native/mupen/patched-files.sha256"))?,
+        "mupen_selected_sources_sha256":digest(&root.join("native/mupen/selected-sources.txt"))?,
+        "mupen_core_sha256":digest(&root.join("build/ntx-mupen/lib/arm64-v8a/libntx_mupen64plus_next.so"))?,
+        "mupen_original_archive_sha256":digest(&root.join(".local/source-archives/mupen64plus-next-15bada85.tar.gz"))?,
+        "mupen_patches":[digest(&root.join("native/mupen/0001-checked-state-result.patch"))?,digest(&root.join("native/mupen/0002-coherent-state-boundary.patch"))?],
+        "mupen_makefile_sha256":digest(&mupen.join("libretro/jni/Android.mk"))?,
+        "mupen_build":"NDK30/API28/arm64-v8a/GLES3/HLE/GLideN64; LLE=0 HAVE_PARALLEL_RSP=0 HAVE_PARALLEL_RDP=0 HAVE_THR_AL=0; -j1; 16KiB ELF",
         "cargo_lock_sha256":digest(&root.join("Cargo.lock"))?,"tools":tools
     });
     fs::write(

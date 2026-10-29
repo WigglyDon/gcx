@@ -3,8 +3,10 @@
 Binding authority: [NTX-5](https://github.com/WigglyDon/ntx/issues/5) and
 [amendment6505289270](https://github.com/WigglyDon/ntx/issues/5#issuecomment-6505289270).
 These are required current contracts. Active identity, schema-2 routing and
-offline staged import are implemented; linked-package/device migration and the
-N64 execution adapter remain unfinished. The preserved GameCube baseline is documented in
+offline staged import are implemented. A renamed GameCube package is built and
+preserved; device migration remains unqualified. The pinned N64 core compiles
+and the Rust execution/Android resource/save/scene implementation is in source;
+N64 package and device acceptance remain unfinished. The preserved GameCube baseline is documented in
 [historical architecture](history/GCX_ARCHITECTURE.md) and native/README.md.
 
 ## Three independent axes
@@ -73,8 +75,15 @@ flush, capture/restore and stop/join acknowledge actual completion or failure.
 Collection::decode explicitly upgrades schema-1 entries to GameCube/Dolphin in
 schema 2 while retaining IDs and progress. The unsafe direct adapter declarations
 now live under backend::dolphin; N64 cartridge/input/save-format policy lives in
-n64. The N64 execution route still refuses unavailable native support. Explicit
-versioned execution capabilities and the libretro host are still required. A future
+n64. The small backend::mupen adapter uses a qualified process slot, callback ABI
+and instance-owned backend directories. Android supplies EGL3/offscreen drawing,
+surface replacement, AudioTrack delivery and measured system-correct touch input.
+N64 ordinary generations and checkpoints have their own Rust owners and do not
+reuse Dolphin cards or machine containers. Exact native/options/architecture/
+media/profile/ordinary bindings are checked; failed restores cannot publish native
+ordinary memory. State jobs yield at completion before further guest execution.
+A failed native join retains code/context/host and profile writer ownership.
+Linked/device results remain separately required. A future
 FN64 adapter can use the same N64 entries with validated ordinary-save conversion;
 it does not inherit Mupen checkpoint compatibility. Do not alter FN64 itself.
 

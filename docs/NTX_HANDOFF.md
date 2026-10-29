@@ -1,3 +1,15 @@
+> Current successor increment (2026-10-29): same sole worker and checkout.
+> The renamed GameCube library/APK was built, signed with the retained key and
+> preserved privately (source22f0f147; APKbb52566a; engine15da3bfa). Pixel4
+> migration has not installed the new package: first admission budget refusal
+> was recovered with verified physical OFF return; subsequent read-only export
+> timed out and its cleanup-only recovery is waiting for qualified wireless
+> connectivity. Actual custody records remain authoritative; no new guest input
+> or source-data mutation occurred. The local-only supplement and ignored NTX
+> migration capsules preserve exact records. Pinned N64 native compilation, Rust
+> Android resources/runtime and distinct save/scene implementation are now in
+> progress; playable, save/reload and cross-system acceptance remain pending.
+
 # NTX successor handoff
 
 Continue the same project and Git history under

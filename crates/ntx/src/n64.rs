@@ -43,7 +43,7 @@ impl Cartridge {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(usize)]
 pub enum Button {
     A,
@@ -62,7 +62,7 @@ pub enum Button {
     CRight,
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct Pad {
     buttons: [bool; 14],
     stick: [i16; 2],

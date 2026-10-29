@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 #![cfg(target_os = "android")]
+mod n64_host;
 mod platform;
 mod player;
 

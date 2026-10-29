@@ -10,8 +10,11 @@ Mupen64Plus-Next is the next active implementation, not yet a playable claim.
 Active crates/native/JNI/build/branding now use ntx and com.machinerhythm.ntx.
 An offline staged migration tool preserves identities, ordinary progress and
 legacy recovery scenes; schema 2 separates system/backend routing. The retained
-installed GameCube candidate is still the legacy package. A newly linked APK,
-actual device migration and playable N64 remain unfinished. See the
+installed GameCube candidate is still the legacy package. A renamed GameCube APK has been built, signed and preserved with its exact
+source. The pinned ARM64 N64 core now compiles, with Rust host, graphics/audio,
+controls and independent profile/save/scene routing implemented. Actual device
+migration, a linked N64 package and playable/save/continuity acceptance remain
+unfinished. See the
 [migration boundary](docs/IDENTITY_MIGRATION.md) and [N64 pin/audit](native/mupen/README.md).
 
 Read [AGENTS.md](AGENTS.md), [successor handoff](docs/NTX_HANDOFF.md),

@@ -1,10 +1,15 @@
-Maintained NTX Mupen host-boundary repair: truthful restore result, buffer guards, optional-log ABI fallback, instance-owned directories and completed coroutine retirement.
-Upstream 15bada85906593376e8fd697f1b0b3af3a20f512; borrowed code retains its original licenses.
+NTX maintained checked state, owned context/logging/directories and completion-bearing shutdown repairs. Modified 2026-10-29.
+Upstream 15bada85906593376e8fd697f1b0b3af3a20f512; original licenses retained.
 
 diff --git a/libretro/libretro.c b/libretro/libretro.c
 --- a/libretro/libretro.c
 +++ b/libretro/libretro.c
-@@ -19,6 +19,10 @@
+@@ -1,3 +1,4 @@
++/* Modified by ntx on 2026-10-29: checked state results/buffers, logger fallback, owned directories and coroutine retirement. */
+ /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+  *   Mupen64plus-Next - libretro.c                                         *
+  *   Copyright (C) 2020 M4xw <m4x@m4xw.net>                                *
+@@ -19,6 +20,10 @@
   * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
  
  #include <stdio.h>
@@ -15,7 +20,7 @@ diff --git a/libretro/libretro.c b/libretro/libretro.c
  #include <stdlib.h>
  #include <string.h>
  #include <compat/strl.h>
-@@ -102,7 +106,24 @@
+@@ -102,7 +107,24 @@
  struct retro_perf_callback perf_cb;
  retro_get_cpu_features_t perf_get_cpu_features_cb = NULL;
  
@@ -41,7 +46,20 @@ diff --git a/libretro/libretro.c b/libretro/libretro.c
  retro_video_refresh_t video_cb = NULL;
  retro_input_poll_t poll_cb = NULL;
  retro_input_state_t input_cb = NULL;
-@@ -711,7 +732,7 @@
+@@ -690,8 +712,12 @@
+     }
+ }
+ 
++static bool ntx_shutdown_complete = true;
++RETRO_API bool retro_ntx_shutdown_complete(void) { return ntx_shutdown_complete; }
++
+ void retro_init(void)
+ {
++    ntx_shutdown_complete = false;
+     char* sys_pathname;
+     wchar_t w_pathname[PATH_SIZE];
+     environ_cb(RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY, &sys_pathname);
+@@ -711,7 +737,7 @@
      if (environ_cb(RETRO_ENVIRONMENT_GET_LOG_INTERFACE, &log))
          log_cb = log.log;
      else
@@ -50,7 +68,7 @@ diff --git a/libretro/libretro.c b/libretro/libretro.c
  
      if (environ_cb(RETRO_ENVIRONMENT_GET_PERF_INTERFACE, &perf_cb))
          perf_get_cpu_features_cb = perf_cb.get_cpu_features;
-@@ -728,7 +749,11 @@
+@@ -728,7 +754,11 @@
          game_thread = co_create(65536 * sizeof(void*) * 16, (void (*)(void))EmuThreadFunction);
      }
  
@@ -63,9 +81,27 @@ diff --git a/libretro/libretro.c b/libretro/libretro.c
      if(ret && log_cb)
          log_cb(RETRO_LOG_ERROR, CORE_NAME ": failed to initialize core (err=%i)\n", ret);
  }
-@@ -748,6 +773,12 @@
+@@ -740,14 +770,28 @@
+     {
+        if(!(current_rdp_type == RDP_PLUGIN_GLIDEN64 && EnableThreadedRenderer))
+        {
+-           CoreDoCommand(M64CMD_STOP, 0, NULL);
+-           co_switch(game_thread); /* Let the core thread finish */
++           /* An unopened coroutine must never be started just to shut down. */
++           if (!initializing)
++           {
++               CoreDoCommand(M64CMD_STOP, 0, NULL);
++               co_switch(game_thread); /* Let the core thread finish */
++               int state = M64EMU_RUNNING;
++               if (CoreDoCommand(M64CMD_CORE_STATE_QUERY, M64CORE_EMU_STATE, &state) != M64ERR_SUCCESS || state != M64EMU_STOPPED)
++                   return; /* Rust retains the library, host and writer on failure. */
++           }
+            CoreDoCommand(M64CMD_ROM_CLOSE, 0, NULL);
+        }
+     }
  
      CoreShutdown();
++    ntx_shutdown_complete = true;
      deinit_audio_libretro();
 +    /* NTX: execution has returned to the host; release its coroutine allocation. */
 +    if (game_thread)
@@ -76,7 +112,7 @@ diff --git a/libretro/libretro.c b/libretro/libretro.c
  
      if (perf_cb.perf_log)
          perf_cb.perf_log();
-@@ -2137,7 +2168,7 @@
+@@ -2137,7 +2181,7 @@
  
  bool retro_serialize(void *data, size_t size)
  {
@@ -85,7 +121,7 @@ diff --git a/libretro/libretro.c b/libretro/libretro.c
        return false;
  
     retro_savestate_complete = false;
-@@ -2170,7 +2201,7 @@
+@@ -2170,7 +2214,7 @@
  
  bool retro_unserialize(const void *data, size_t size)
  {
@@ -94,7 +130,7 @@ diff --git a/libretro/libretro.c b/libretro/libretro.c
        return false;
  
     retro_savestate_complete = false;
-@@ -2198,7 +2229,7 @@
+@@ -2198,7 +2242,7 @@
        glsm_ctl(GLSM_CTL_STATE_UNBIND, NULL);
     }
  

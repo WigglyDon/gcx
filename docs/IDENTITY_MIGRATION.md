@@ -3,8 +3,11 @@
 Active crates, probes, native exports, JNI/activity, Android resources, package,
 private root, links, helper environment and build outputs now use ntx. Dolphin
 remains a direct adapter. New CMake output roots avoid relocated legacy caches.
-This is source implementation; a new linked APK and actual device migration have
-not yet been qualified. The legacy installation and recovery candidates remain.
+The renamed GameCube APK is linked, signed with the retained certificate and
+privately preserved with exact corresponding source. Actual device migration
+and media regrant are not yet qualified. A read-only Pixel4 export timed out
+before target installation; cleanup recovery waits for its qualified link. The
+legacy installation, ordinary data and recovery candidates remain.
 
 Collection schema 2 separates `system` and `backend`. `Collection::decode` maps
 schema 1 explicitly to GameCube/Dolphin while preserving opaque IDs, selected

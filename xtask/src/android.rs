@@ -165,6 +165,75 @@ pub fn prepare(root: &Path, source: &Path) -> Result<()> {
         &source.join("Externals"),
         &notices.join("native-dependencies"),
     )?;
+    let mupen = crate::mupen::source_check(root)?;
+    licenses(&mupen, &mupen, &notices.join("mupen-components"))?;
+    let mut source_notices = String::new();
+    for row in include_str!("../../native/mupen/source-files.sha256").lines() {
+        let (_, name) = row
+            .split_once("  ")
+            .ok_or("invalid Mupen notice source identity")?;
+        let bytes = fs::read(mupen.join(name))?;
+        let Ok(text) = std::str::from_utf8(&bytes) else {
+            continue;
+        };
+        let mut rest = text.trim_start();
+        let mut header = String::new();
+        loop {
+            if rest.starts_with("/*") {
+                let Some(end) = rest.find("*/") else {
+                    break;
+                };
+                header.push_str(&rest[..end + 2]);
+                header.push('\n');
+                rest = rest[end + 2..].trim_start();
+            } else if rest.starts_with("//") {
+                let end = rest.find('\n').unwrap_or(rest.len());
+                header.push_str(&rest[..end]);
+                header.push('\n');
+                rest = rest[end..].trim_start();
+            } else {
+                break;
+            }
+        }
+        if !header.is_empty() {
+            source_notices.push_str(&format!("\n===== {name} =====\n{header}"));
+        }
+    }
+    fs::create_dir_all(notices.join("mupen"))?;
+    fs::write(
+        notices.join("mupen/source-file-notices.txt"),
+        source_notices,
+    )?;
+    for name in [
+        "custom/dependencies/libpng/png.h",
+        "custom/dependencies/libzlib/zlib.h",
+        "xxHash/xxhash.h",
+        "mupen64plus-core/subprojects/md5/md5.c",
+    ] {
+        copy(
+            &mupen.join(name),
+            &notices.join("mupen/component-source-notices").join(name),
+        )?;
+    }
+    for name in [
+        "README.md",
+        "RESOURCE_AUDIT.md",
+        "selected-sources.txt",
+        "source-files.sha256",
+        "patched-files.sha256",
+        "source-lock.json",
+        "0001-checked-state-result.patch",
+        "0002-coherent-state-boundary.patch",
+    ] {
+        copy(
+            &root.join("native/mupen").join(name),
+            &notices.join("mupen").join(name),
+        )?;
+    }
+    copy(
+        &root.join("native/LICENSES/GPL-3.0-only.txt"),
+        &notices.join("mupen/GPL-3.0.txt"),
+    )?;
     let metadata = output(Command::new("cargo").args([
         "metadata",
         "--offline",
@@ -397,6 +466,21 @@ pub fn package(root: &Path, source: &Path, signed: bool) -> Result<()> {
         return Err("expected NDK 30.0.16248370".into());
     }
     let engine = root.join("build/ntx-android/ntx/libntx_engine.so");
+    crate::mupen::source_check(root)?;
+    let mupen = root.join("build/ntx-mupen/lib/arm64-v8a/libntx_mupen64plus_next.so");
+    if !mupen.is_file() {
+        return Err("build the pinned N64 core before packaging".into());
+    }
+    let mupen_hash = crate::receipt::digest(&mupen)?;
+    let core_debug = root
+        .join(".local/symbols")
+        .join(format!("{mupen_hash}.libntx_mupen64plus_next.so"));
+    if !core_debug.exists() {
+        copy(&mupen, &core_debug)?;
+    }
+    if crate::receipt::digest(&core_debug)? != mupen_hash {
+        return Err("retained N64 debug input differs".into());
+    }
     if !engine.is_file() {
         return Err("build the pinned Android native engine first".into());
     }
@@ -443,6 +527,7 @@ pub fn package(root: &Path, source: &Path, signed: bool) -> Result<()> {
             "NTX_ENGINE_LIB_DIR",
             engine.parent().ok_or("missing engine directory")?,
         )
+        .env("NTX_MUPEN_SHA256", &mupen_hash)
         .env("CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER", &linker)
         .env("CC_aarch64_linux_android", &linker)
         .env(
@@ -459,7 +544,7 @@ pub fn package(root: &Path, source: &Path, signed: bool) -> Result<()> {
     let rust = root.join("target/aarch64-linux-android/release/libntx_android.so");
     let cpp=ndk.join("toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so");
     let mut native_hashes = String::from("source_sha256\tpackaged_sha256\tname\n");
-    for p in [&engine, &rust, &cpp] {
+    for p in [&engine, &rust, &cpp, &mupen] {
         audit_elf(p, &ndk)?;
         let name = p.file_name().ok_or("missing native name")?;
         let packaged = native.join(name);
@@ -481,6 +566,31 @@ pub fn package(root: &Path, source: &Path, signed: bool) -> Result<()> {
         ));
     }
     fs::write(out.join("native-libraries.tsv"), native_hashes)?;
+    let core_exports = output(
+        Command::new(ndk.join("toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"))
+            .args(["--dyn-syms", "--wide"])
+            .arg(native.join("libntx_mupen64plus_next.so")),
+    )?;
+    for symbol in [
+        "retro_api_version",
+        "retro_init",
+        "retro_load_game",
+        "retro_run",
+        "retro_serialize",
+        "retro_unserialize",
+        "retro_get_memory_data",
+        "retro_get_memory_size",
+        "retro_unload_game",
+        "retro_deinit",
+        "retro_ntx_shutdown_complete",
+    ] {
+        if !core_exports.lines().any(|line| {
+            line.split_whitespace().last() == Some(symbol)
+                && !line.split_whitespace().any(|s| s == "UND")
+        }) {
+            return Err(format!("missing defined N64 core entrypoint {symbol}").into());
+        }
+    }
     let symbols = output(
         Command::new(ndk.join("toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"))
             .args(["--dyn-syms", "--wide"])
@@ -623,7 +733,12 @@ pub fn package(root: &Path, source: &Path, signed: bool) -> Result<()> {
             return Err("actual APK resource bytes differ from reviewed staging".into());
         }
     }
-    for name in ["libntx_engine.so", "libntx_android.so", "libc++_shared.so"] {
+    for name in [
+        "libntx_engine.so",
+        "libntx_android.so",
+        "libc++_shared.so",
+        "libntx_mupen64plus_next.so",
+    ] {
         let result = Command::new("unzip")
             .args(["-p"])
             .arg(&apk)

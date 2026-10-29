@@ -1,5 +1,29 @@
 # Pinned N64 integration boundary
 
+Current successor implementation (2026-10-29): the full pinned ARM64 GLES3/HLE
+core compiles. Rust owns the small libretro adapter, Android EGL/GLES resources,
+audio delivery, measured N64 touch controls, per-profile ordinary generations and
+bound machine generations in the same collection as direct Dolphin. The code is
+being linked/qualified; no device playable/save/reload/continuity result follows.
+Earlier preparatory findings below remain provenance, with these repairs applied:
+
+- Actual restore result and buffer admission are checked. Completed save/load
+  jobs yield after clearing the job, before further guest execution. Capture then
+  commits the ordinary image from that same boundary before publishing a scene.
+- The selected nonparallel workqueue executes its copy synchronously. Machine
+  state includes FlashRAM mode/page buffer and device protocol state; ordinary
+  EEPROM/Pak/SRAM/FlashRAM bytes remain a distinct bound generation. Current
+  bytes are checked before restore, and failed restore memory cannot publish.
+- Shutdown skips starting an unopened coroutine and acknowledges actual stopped
+  core state before freeing it. Rust retains code/context/host/writer ownership
+  if that acknowledgement or post-join publication fails.
+- `check_boundary.py` compiles the actual pinned header/state/deinit entrypoints
+  with bounded fixtures and reproduces both maintained patches exactly. These
+  are boundary checks, not emulation/GPU or successful game-state evidence.
+- See [selected resources/licenses](RESOURCE_AUDIT.md) and the exact 274-source
+  manifest. N64 packaging retains component/source notices and GPLv3 text;
+  candidate preservation includes original and complete patched source archives.
+
 Selected core: [Mupen64Plus-Next at 15bada85906593376e8fd697f1b0b3af3a20f512](https://github.com/libretro/mupen64plus-libretro-nx/tree/15bada85906593376e8fd697f1b0b3af3a20f512).
 [source-lock.json](source-lock.json) records its complete root tree identity,
 recursive gitlink and the inspected file blobs. The repository has no .gitmodules

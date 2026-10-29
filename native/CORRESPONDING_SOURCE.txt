@@ -51,3 +51,16 @@ certificate receipt and never generates a replacement key. Bit-identical APK rep
 timestamps and environment differ). Compare code/resources and recorded source
 inputs independently. No gameplay, audio, save/reload or hardware result follows
 from archive verification or build success.
+N64 source reconstruction for candidates containing libntx_mupen64plus_next.so:
+The preserved mupen-active-source.tar.gz contains the complete verified source
+tree with the two maintained patches already applied, including dated notices.
+Extract under .local/source. mupen-upstream-15bada85.tar.gz is the retained exact
+original GitHub archive. native/mupen/source-files.sha256 records original Git
+blob content (the archive's one Windows vcxproj CRLF expansion is normalized to
+the pinned blob); patched-files.sha256 records the explicit overrides.
+Run cargo xtask mupen-source-check and python3 native/mupen/check_boundary.py.
+With the bound existing NDK30, run cargo xtask build-mupen, then the normal
+package-android-unsigned route. No private signer is needed for source rebuild.
+The ARM64/API28/GLES3/HLE/GLideN64 recipe and excluded optional plugins are in
+xtask/src/mupen.rs; use the recorded tool hashes, source manifests and options.
+GPLv3 and all selected component notices accompany this core combination.

@@ -41,7 +41,7 @@ impl WindowGeometry {
             (safe.bottom - safe.top) / self.density,
         ))
     }
-    fn control_bounds(self) -> Option<Area> {
+    pub fn control_bounds(self) -> Option<Area> {
         let i = self.clearance;
         if !valid(self.window)
             || !valid(self.surface)

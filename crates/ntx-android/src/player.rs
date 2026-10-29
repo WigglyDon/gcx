@@ -34,6 +34,10 @@ static MISSING_PRESENT_REPORTED: AtomicBool = AtomicBool::new(false);
 pub(crate) fn haptics_enabled() -> bool {
     UI.lock().is_ok_and(|ui| ui.haptics())
 }
+pub(crate) fn controls_opacity() -> f32 {
+    UI.lock()
+        .map_or(0.85, |ui| ui.controls_opacity() as f32 / 100.)
+}
 // The core asks for one complete input packet at its actual pad poll. Rendering
 // and the Android owner loop never consume quick-press pulses.
 unsafe extern "C" fn sample_input(controls: *mut f64) {
@@ -47,6 +51,9 @@ unsafe extern "C" fn sample_input(controls: *mut f64) {
     }
 }
 pub(crate) fn measure_window(geometry: Option<WindowGeometry>) {
+    if let Ok(mut view) = crate::n64_host::view().lock() {
+        view.measure(geometry);
+    }
     let observed = UI.lock().ok().map(|mut ui| {
         ui.measure(geometry);
         ui.has_presented_geometry()
@@ -63,13 +70,227 @@ struct SaveProfile {
     path: PathBuf,
     _writer: ProfileLock,
 }
-struct LiveRuntime {
-    native_alive: bool,
+#[path = "n64_runtime.rs"]
+mod n64_runtime;
+struct RuntimeInfo {
     events: Box<RuntimeEvents>,
+    media_sha256: String,
+}
+enum LiveRuntime {
+    Dolphin(Box<DolphinRuntime>),
+    N64(Box<n64_runtime::Runtime>),
+}
+impl std::ops::Deref for DolphinRuntime {
+    type Target = RuntimeInfo;
+    fn deref(&self) -> &RuntimeInfo {
+        &self.info
+    }
+}
+impl std::ops::DerefMut for DolphinRuntime {
+    fn deref_mut(&mut self) -> &mut RuntimeInfo {
+        &mut self.info
+    }
+}
+impl std::ops::Deref for LiveRuntime {
+    type Target = RuntimeInfo;
+    fn deref(&self) -> &RuntimeInfo {
+        match self {
+            Self::Dolphin(r) => &r.info,
+            Self::N64(r) => &r.info,
+        }
+    }
+}
+impl LiveRuntime {
+    fn pending(&self) -> bool {
+        match self {
+            Self::Dolphin(r) => r.pending_restore.is_some(),
+            Self::N64(r) => r.pending.is_some(),
+        }
+    }
+    fn failed(&self) -> bool {
+        match self {
+            Self::Dolphin(r) => r.failed_restore || unsafe { ntx_engine_recovery_required() != 0 },
+            Self::N64(r) => r.failed,
+        }
+    }
+    fn pause(&mut self, paused: bool) {
+        match self {
+            Self::Dolphin(_) => unsafe {
+                ntx_engine_pause(i32::from(paused));
+                if paused {
+                    ntx_engine_input(Pad::default().values().as_ptr());
+                }
+            },
+            Self::N64(r) => r.pause(paused),
+        }
+    }
+    fn state(&self) -> i32 {
+        match self {
+            Self::Dolphin(_) => unsafe { ntx_engine_state() },
+            Self::N64(r) => {
+                if r.core.is_some() {
+                    1
+                } else {
+                    0
+                }
+            }
+        }
+    }
+    fn dispatch(&mut self) {
+        match self {
+            Self::Dolphin(_) => unsafe { ntx_engine_dispatch() },
+            Self::N64(r) => r.dispatch(),
+        }
+    }
+    fn surface(&mut self, window: &NativeWindow) -> bool {
+        match self {
+            Self::Dolphin(_) => unsafe { ntx_engine_surface(window.ptr().as_ptr().cast()) != 0 },
+            Self::N64(r) => r.surface(Some(window)),
+        }
+    }
+    fn detach_surface(&mut self) {
+        if let Self::N64(r) = self {
+            r.surface(None);
+        }
+    }
+    fn resize(&mut self) {
+        if let Self::Dolphin(_) = self {
+            unsafe {
+                ntx_engine_resize();
+            }
+        }
+    }
+    fn commit_for_departure(&mut self) -> bool {
+        match self {
+            Self::Dolphin(r) => r.commit_for_departure(),
+            Self::N64(r) => r.commit().is_ok(),
+        }
+    }
+    fn verify_departure(&self) -> std::result::Result<(), String> {
+        match self {
+            Self::Dolphin(r) => r.verify_departure(),
+            Self::N64(r) => r.verify_departure(),
+        }
+    }
+    fn verify_pending(&self) -> Result<()> {
+        match self {
+            Self::Dolphin(r) => r
+                .pending_restore
+                .as_ref()
+                .ok_or("No pending scene")?
+                .verify_current_saves(&r._profile.path)
+                .map_err(Into::into),
+            Self::N64(r) => r.verify_pending().map_err(Into::into),
+        }
+    }
+    fn restore(&mut self) -> Result<Option<()>> {
+        match self {
+            Self::Dolphin(r) => r.restore(),
+            Self::N64(r) => r.restore().map_err(Into::into),
+        }
+    }
+    fn accept_checkpoint(&mut self, id: Option<String>) {
+        match self {
+            Self::Dolphin(r) => r.accepted_checkpoint = id,
+            Self::N64(_) => {}
+        }
+    }
+}
+impl StopRuntime for LiveRuntime {
+    fn epoch(&self) -> u64 {
+        self.events.epoch
+    }
+    fn pause_commit(&mut self) -> std::result::Result<(), String> {
+        match self {
+            Self::Dolphin(r) => r.pause_commit(),
+            Self::N64(r) => r.commit(),
+        }
+    }
+    fn discard_checkpoint(&mut self) {
+        if let Self::Dolphin(r) = self {
+            r.discard_checkpoint();
+        }
+    }
+    fn join(&mut self) -> std::result::Result<(), String> {
+        match self {
+            Self::Dolphin(r) => r.join(),
+            Self::N64(r) => r.join(),
+        }
+    }
+}
+fn save_checkpoint(
+    active: &mut LiveRuntime,
+    root: &Path,
+    collection: &mut Collection,
+    index: usize,
+) -> Result<()> {
+    match active {
+        LiveRuntime::Dolphin(r) => save_dolphin_checkpoint(r, root, collection, index),
+        LiveRuntime::N64(r) => {
+            let id = r.capture()?;
+            let earlier = collection.entries[index].checkpoint.replace(id);
+            if let Err(e) = save_collection(root, collection) {
+                collection.entries[index].checkpoint = earlier;
+                return Err(e);
+            }
+            r.accept_departure();
+            Ok(())
+        }
+    }
+}
+fn pause_for_background(
+    root: &Path,
+    runtime: &mut Option<LiveRuntime>,
+    collection: &mut Collection,
+    selected: Option<usize>,
+    native_paused: &mut Option<bool>,
+) {
+    if let Ok(mut ui) = UI.lock() {
+        ui.cancel();
+    }
+    let Some(active) = runtime.as_mut() else {
+        return;
+    };
+    active.pause(true);
+    if !matches!(active.state(), 1 | 2) {
+        *native_paused = None;
+        return;
+    }
+    if *native_paused != Some(true)
+        && !active.pending()
+        && let Some(index) = selected
+        && !collection.entries[index].restart_required
+        && let Err(error) = save_checkpoint(active, root, collection, index)
+    {
+        platform::push(Command::Error(format!(
+            "Could not checkpoint the game: {error}. Current saves and paused runtime retained."
+        )));
+    }
+    *native_paused = Some(true);
+}
+fn boot(
+    root: &Path,
+    sys: &Path,
+    entry: &SavedSession,
+    window: &NativeWindow,
+) -> Result<LiveRuntime> {
+    match (entry.system, entry.backend) {
+        (ntx::backend::System::GameCube, ntx::backend::Backend::Dolphin) => Ok(
+            LiveRuntime::Dolphin(Box::new(boot_dolphin(root, sys, entry, window)?)),
+        ),
+        (ntx::backend::System::Nintendo64, ntx::backend::Backend::Mupen64PlusNext) => Ok(
+            LiveRuntime::N64(Box::new(n64_runtime::Runtime::boot(root, entry, window)?)),
+        ),
+        _ => Err("Unsupported system/backend route".into()),
+    }
+}
+struct DolphinRuntime {
+    native_alive: bool,
+    binding: Binding,
+    info: RuntimeInfo,
     _cards: ntx::storage::CardStore,
     _profile: SaveProfile,
     _boot_window: NativeWindow,
-    binding: Binding,
     pending_restore: Option<Checkpoint>,
     accepted_checkpoint: Option<String>,
     accepted_generation: Option<ntx::storage::SaveGeneration>,
@@ -81,7 +302,7 @@ struct RuntimeEvents {
     stopped: AtomicBool,
     teardown_error: Mutex<Option<String>>,
 }
-impl LiveRuntime {
+impl DolphinRuntime {
     fn commit_for_departure(&self) -> bool {
         if let Ok(mut touch) = UI.lock() {
             touch.cancel();
@@ -100,8 +321,8 @@ impl LiveRuntime {
 }
 /// Publish the immutable complete generation before changing its durable session
 /// reference. The profile lock is still owned, including across metadata sync.
-fn save_checkpoint(
-    active: &mut LiveRuntime,
+fn save_dolphin_checkpoint(
+    active: &mut DolphinRuntime,
     root: &Path,
     collection: &mut Collection,
     index: usize,
@@ -176,7 +397,7 @@ fn save_checkpoint(
     platform::diagnostic("Checkpoint complete: native paused, saves and session reference durable");
     Ok(())
 }
-impl LiveRuntime {
+impl DolphinRuntime {
     fn verify_departure(&self) -> std::result::Result<(), String> {
         self.accepted_generation
             .as_ref()
@@ -209,42 +430,7 @@ impl LiveRuntime {
         Ok(Some(()))
     }
 }
-fn pause_for_background(
-    root: &Path,
-    runtime: &mut Option<LiveRuntime>,
-    collection: &mut Collection,
-    selected: Option<usize>,
-    native_paused: &mut Option<bool>,
-) {
-    if let Ok(mut touch) = UI.lock() {
-        touch.cancel();
-    }
-    let Some(active) = runtime.as_mut() else {
-        return;
-    };
-    unsafe {
-        platform::trace_current("native.pause.begin", "pause");
-        ntx_engine_pause(1);
-        platform::trace_current("native.pause.end", "paused");
-        ntx_engine_input(Pad::default().values().as_ptr());
-        if !matches!(ntx_engine_state(), 1 | 2) {
-            *native_paused = None;
-            return;
-        }
-    }
-    if *native_paused != Some(true)
-        && active.pending_restore.is_none()
-        && let Some(index) = selected
-        && !collection.entries[index].restart_required
-        && let Err(error) = save_checkpoint(active, root, collection, index)
-    {
-        platform::push(Command::Error(format!(
-            "Could not checkpoint the game: {error}. Current saves and paused runtime retained."
-        )));
-    }
-    *native_paused = Some(true);
-}
-impl StopRuntime for LiveRuntime {
+impl StopRuntime for DolphinRuntime {
     fn epoch(&self) -> u64 {
         self.events.epoch
     }
@@ -304,7 +490,7 @@ impl StopRuntime for LiveRuntime {
         Ok(())
     }
 }
-impl Drop for LiveRuntime {
+impl Drop for DolphinRuntime {
     fn drop(&mut self) {
         if let Ok(mut touch) = UI.lock() {
             touch.cancel();
@@ -320,7 +506,7 @@ impl Drop for LiveRuntime {
     }
 }
 unsafe extern "C" fn event(context: *mut std::ffi::c_void, id: u32, message: *const c_char) {
-    // SAFETY: this box is retained in LiveRuntime until every native worker joins.
+    // SAFETY: this box is retained in DolphinRuntime until every native worker joins.
     let context = unsafe { &*context.cast::<RuntimeEvents>() };
     if id == 10 {
         context.stopped.store(true, Ordering::Relaxed);
@@ -634,12 +820,37 @@ fn resources(app: &AndroidApp, root: &Path) -> Result<PathBuf> {
     }
     Ok(sys)
 }
-fn boot(
+fn media_digest(system: ntx::backend::System, file: File) -> Result<String> {
+    match system {
+        ntx::backend::System::GameCube => Ok(checkpoint::media_digest(file)?),
+        ntx::backend::System::Nintendo64 => Ok(ntx::n64::Cartridge::read(file)?.sha256),
+    }
+}
+fn inspect_media(uri: &str) -> Result<(ntx::backend::System, ntx::backend::Backend)> {
+    use ntx::backend::{Backend, System};
+    let mut file = platform::open_document(uri)?;
+    let mut magic = [0; 4];
+    file.read_exact(&mut magic)?;
+    if matches!(
+        magic,
+        [0x80, 0x37, 0x12, 0x40] | [0x37, 0x80, 0x40, 0x12] | [0x40, 0x12, 0x37, 0x80]
+    ) {
+        ntx::n64::Cartridge::read(platform::open_document(uri)?)?;
+        return Ok((System::Nintendo64, Backend::Mupen64PlusNext));
+    }
+    let candidate = CString::new(uri)?;
+    let mut info = MediaInfo::default();
+    if unsafe { ntx_engine_inspect(candidate.as_ptr(), &mut info) } != 0 {
+        return Ok((System::GameCube, Backend::Dolphin));
+    }
+    Err("Choose a readable GameCube disc or N64 cartridge. Existing games and progress are retained.".into())
+}
+fn boot_dolphin(
     root: &Path,
     sys: &Path,
     entry: &SavedSession,
     window: &NativeWindow,
-) -> Result<LiveRuntime> {
+) -> Result<DolphinRuntime> {
     if entry.system != ntx::backend::System::GameCube
         || entry.backend != ntx::backend::Backend::Dolphin
     {
@@ -708,12 +919,15 @@ fn boot(
             return Err("engine initialization rejected".into());
         }
         platform::trace_current("boot.engine_init.end", "ok");
-        let mut runtime = LiveRuntime {
+        let mut runtime = DolphinRuntime {
             native_alive: true,
-            events,
             _cards: cards,
             _profile: profile,
             _boot_window: window.clone(),
+            info: RuntimeInfo {
+                events,
+                media_sha256: media_sha256.clone(),
+            },
             binding: Binding {
                 game_id: entry.game_id.0.clone(),
                 profile_id: entry.profile_id.0.clone(),
@@ -795,11 +1009,17 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
     std::fs::create_dir_all(&root)?;
     match ntx::controls::Settings::load(&root) {
         Ok(settings) => {
+            if let Ok(mut view) = crate::n64_host::view().lock() {
+                view.configure_dead_zone(settings.dead_zone);
+            }
             if let Ok(mut ui) = UI.lock() {
                 ui.configure_controls(settings);
             }
         }
         Err(_) => {
+            if let Ok(mut view) = crate::n64_host::view().lock() {
+                view.configure_dead_zone(ntx::controls::Settings::default().dead_zone);
+            }
             if let Ok(mut ui) = UI.lock() {
                 ui.configure_controls(ntx::controls::Settings::default());
             }
@@ -889,6 +1109,9 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                             selected,
                             &mut native_paused,
                         );
+                        if let Some(active) = runtime.as_mut() {
+                            active.detach_surface();
+                        }
                         window = None;
                         measure_window(None);
                         if let Ok(mut touch) = UI.lock() {
@@ -926,10 +1149,8 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                         if let Ok(mut touch) = UI.lock() {
                             touch.cancel();
                         }
-                        if runtime.is_some() {
-                            unsafe {
-                                ntx_engine_resize();
-                            }
+                        if let Some(active) = runtime.as_mut() {
+                            active.resize();
                         }
                     }
                     MainEvent::InputAvailable => {
@@ -948,6 +1169,63 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                                             runtime.is_some(),
                                             window.is_some()
                                         ));
+                                    }
+                                    if hidden
+                                        && window.is_some()
+                                        && matches!(runtime, Some(LiveRuntime::N64(_)))
+                                    {
+                                        let mut pause = false;
+                                        if let Ok(mut touch) = crate::n64_host::view().lock() {
+                                            match motion.action() {
+                                                MotionAction::Down | MotionAction::PointerDown => {
+                                                    let p = motion
+                                                        .pointer_at_index(motion.pointer_index());
+                                                    let hit =
+                                                        touch.down(p.pointer_id(), p.x(), p.y());
+                                                    pause =
+                                                        hit == Some(ntx::n64_touch::Target::Pause);
+                                                    if hit.is_some() && haptics_enabled() {
+                                                        platform::haptic(app);
+                                                    }
+                                                }
+                                                MotionAction::Move => {
+                                                    for p in motion.pointers() {
+                                                        touch.move_pointer(
+                                                            p.pointer_id(),
+                                                            p.x(),
+                                                            p.y(),
+                                                        );
+                                                    }
+                                                }
+                                                MotionAction::Up | MotionAction::PointerUp => {
+                                                    let p = motion
+                                                        .pointer_at_index(motion.pointer_index());
+                                                    touch.up(p.pointer_id());
+                                                }
+                                                MotionAction::Cancel => touch.cancel(),
+                                                _ => {}
+                                            }
+                                        }
+                                        if pause && let Some(index) = selected {
+                                            collection.entries[index].paused = true;
+                                            hidden = false;
+                                            pause_for_background(
+                                                &root,
+                                                &mut runtime,
+                                                &mut collection,
+                                                selected,
+                                                &mut native_paused,
+                                            );
+                                            if let Some(active) = runtime.as_ref() {
+                                                platform::player_menu(
+                                                    app,
+                                                    active.events.epoch,
+                                                    !collection.entries[index].restart_required,
+                                                    None,
+                                                );
+                                            }
+                                        }
+                                        return InputStatus::Handled;
                                     }
                                     if hidden && runtime.is_some() && window.is_some() {
                                         if let Ok(mut touch) = UI.lock() {
@@ -1092,7 +1370,7 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                         });
                     if let Some(index) = relink {
                         let observed = match platform::open_document(&uri)
-                            .and_then(|file| Ok(checkpoint::media_digest(file)?))
+                            .and_then(|file| media_digest(collection.entries[index].system, file))
                         {
                             Ok(digest) => digest,
                             Err(error) => {
@@ -1176,6 +1454,16 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                         .lock()
                         .map(|ui| ui.controls())
                         .map_err(|_| "controls lock poisoned")?;
+                    if selected.is_some_and(|i| {
+                        collection.entries[i].system == ntx::backend::System::Nintendo64
+                    }) {
+                        platform::n64_controls_menu(
+                            app,
+                            runtime.as_ref().map_or(0, |r| r.events.epoch),
+                            &settings,
+                        );
+                        continue;
+                    }
                     platform::controls_menu(
                         app,
                         runtime.as_ref().map_or(0, |r| r.events.epoch),
@@ -1189,6 +1477,9 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                         continue;
                     }
                     if settings.save(&root).is_ok() {
+                        if let Ok(mut view) = crate::n64_host::view().lock() {
+                            view.configure_dead_zone(settings.dead_zone);
+                        }
                         if let Ok(mut ui) = UI.lock() {
                             ui.configure_controls(settings);
                         }
@@ -1201,6 +1492,44 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                     if platform::menu_current(menu) {
                         platform::push(Command::Library);
                     }
+                }
+                Command::N64Comfort(menu, action) => {
+                    if !platform::menu_current(menu)
+                        || !selected.is_some_and(|i| {
+                            collection.entries[i].system == ntx::backend::System::Nintendo64
+                        })
+                    {
+                        continue;
+                    }
+                    let mut settings = UI.lock().map_err(|_| "controls lock poisoned")?.controls();
+                    match action {
+                        13 => settings.opacity = settings.opacity.saturating_sub(10).max(30),
+                        14 => settings.opacity = (settings.opacity + 10).min(100),
+                        15 => settings.haptics = !settings.haptics,
+                        16 => {
+                            settings.dead_zone = match settings.dead_zone {
+                                0..=4 => 12,
+                                5..=15 => 20,
+                                _ => 0,
+                            }
+                        }
+                        _ => continue,
+                    }
+                    if let Err(e) = settings.save(&root) {
+                        platform::notice(app, format!("Could not preserve controls: {e}"));
+                        continue;
+                    }
+                    if let Ok(mut view) = crate::n64_host::view().lock() {
+                        view.configure_dead_zone(settings.dead_zone);
+                    }
+                    if let Ok(mut ui) = UI.lock() {
+                        ui.configure_controls(settings.clone());
+                    }
+                    platform::n64_controls_menu(
+                        app,
+                        runtime.as_ref().map_or(0, |r| r.events.epoch),
+                        &settings,
+                    );
                 }
                 Command::About(menu) => {
                     if platform::menu_current(menu) {
@@ -1352,15 +1681,16 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                 }
                 Command::Selected(uri) => {
                     picker_pending = false;
+                    let route = match inspect_media(&uri) {
+                        Ok(route) => route,
+                        Err(e) => {
+                            platform::notice(app, e.to_string());
+                            continue;
+                        }
+                    };
                     if runtime.is_some() {
                         if selected.is_some_and(|i| collection.entries[i].restart_required) {
                             platform::notice(app, "The current game needs recovery. Use Stop or Restart with current saves before opening another game.".into());
-                            continue;
-                        }
-                        let mut info = MediaInfo::default();
-                        let valid=CString::new(uri.as_str()).is_ok_and(|candidate| unsafe {ntx_engine_inspect(candidate.as_ptr(),&mut info)}!=0);
-                        if !valid {
-                            platform::notice(app,"Choose a readable GameCube ISO/GCM or RVZ. The current runtime is retained.".into());
                             continue;
                         }
                         if selected.is_some_and(|i| {
@@ -1409,10 +1739,10 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                             index
                         } else {
                             let title = platform::display_name(&uri)
-                                .unwrap_or_else(|_| "GameCube game".into());
+                                .unwrap_or_else(|_| "Nintendo game".into());
                             collection.entries.push(SavedSession {
-                                system: ntx::backend::System::GameCube,
-                                backend: ntx::backend::Backend::Dolphin,
+                                system: route.0,
+                                backend: route.1,
                                 media_relink_required: false,
                                 media_sha256: None,
                                 game_id: GameId(id()?),
@@ -1476,11 +1806,10 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                             touch.cancel();
                         }
                         hidden = false;
-                        unsafe {
+                        {
                             platform::trace_current("native.pause.begin", "pause");
-                            ntx_engine_pause(1);
+                            runtime.as_mut().unwrap().pause(true);
                             platform::trace_current("native.pause.end", "paused");
-                            ntx_engine_input(Pad::default().values().as_ptr());
                         }
                         native_paused = Some(true);
                         let persistence = if save_collection(&root, &collection).is_err() {
@@ -1527,7 +1856,7 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
             restart_requested = false;
             if let Some(index) = selected {
                 if runtime
-                    .as_ref()
+                    .as_mut()
                     .is_some_and(|active| !active.commit_for_departure())
                 {
                     native_paused = Some(true);
@@ -1536,8 +1865,7 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                 }
                 let mut teardown_error = None;
                 if let Some(active) = runtime.as_mut() {
-                    let quarantined =
-                        active.failed_restore || unsafe { ntx_engine_recovery_required() != 0 };
+                    let quarantined = active.failed();
                     let joined = active.join();
                     if !quarantined {
                         teardown_error = joined.err();
@@ -1590,8 +1918,7 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
             }
             match boot(&root, &sys, &collection.entries[index], window) {
                 Ok(active) => {
-                    collection.entries[index].media_sha256 =
-                        Some(active.binding.media_sha256.clone());
+                    collection.entries[index].media_sha256 = Some(active.media_sha256.clone());
                     runtime = Some(active);
                     if let Err(error) = save_collection(&root, &collection) {
                         collection.entries[index]
@@ -1624,13 +1951,13 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
         if runtime.is_some() {
             // SAFETY: all lifecycle work runs on this owner thread; surface strong
             // references are held by Rust and the native queue/backend owners.
-            unsafe {
-                ntx_engine_dispatch();
+            {
+                runtime.as_mut().unwrap().dispatch();
                 if surface_pending && let Some(window) = &window {
                     if !surface_traced {
                         platform::trace_current("surface.apply.begin", "");
                     }
-                    surface_pending = ntx_engine_surface(window.ptr().as_ptr().cast()) == 0;
+                    surface_pending = !runtime.as_mut().unwrap().surface(window);
                     if !surface_traced || !surface_pending {
                         platform::trace_current(
                             "surface.apply.end",
@@ -1647,7 +1974,7 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                     && window.is_some()
                     && !surface_pending
                     && let (Some(active), Some(index)) = (runtime.as_mut(), selected)
-                    && active.pending_restore.is_some()
+                    && active.pending()
                     && !collection.entries[index].restart_required
                 {
                     match active.restore() {
@@ -1655,8 +1982,7 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                             // SavedSession owns the latest durable UI intent;
                             // Resume after the capture may have changed it.
                             let paused = collection.entries[index].paused;
-                            active.accepted_checkpoint =
-                                collection.entries[index].checkpoint.clone();
+                            active.accept_checkpoint(collection.entries[index].checkpoint.clone());
                             native_paused = Some(true);
                             if paused {
                                 hidden = false;
@@ -1671,12 +1997,10 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                         }
                     }
                 }
-                if matches!(ntx_engine_state(), 1 | 2) {
-                    let restoring = runtime
-                        .as_ref()
-                        .is_some_and(|r| r.pending_restore.is_some());
+                if matches!(runtime.as_ref().unwrap().state(), 1 | 2) {
+                    let restoring = runtime.as_ref().is_some_and(|r| r.pending());
                     let paused = restoring
-                        || ntx_engine_recovery_required() != 0
+                        || runtime.as_ref().unwrap().failed()
                         || !hidden
                         || !foreground
                         || window.is_none()
@@ -1686,7 +2010,7 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                             "native.pause.begin",
                             if paused { "pause" } else { "play" },
                         );
-                        ntx_engine_pause(i32::from(paused));
+                        runtime.as_mut().unwrap().pause(paused);
                         platform::trace_current(
                             "native.pause.end",
                             if paused { "paused" } else { "playing" },
@@ -1708,7 +2032,7 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                                 collection.entries[index].paused = true;
                             }
                             platform::trace_current("native.pause.begin", "pause");
-                            ntx_engine_pause(1);
+                            runtime.as_mut().unwrap().pause(true);
                             platform::trace_current("native.pause.end", "paused");
                             native_paused = Some(true);
                             platform::push(Command::Error("Could not preserve session settings. The paused game and previous checkpoint are retained.".into()));
@@ -1770,19 +2094,15 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                 .clone()
                 .unwrap_or_else(|| "The runtime already requires explicit recovery.".into())
                 .into())
-        } else if let Some(state) = &active.pending_restore {
-            state
-                .verify_current_saves(&active._profile.path)
-                .map_err(Into::into)
+        } else if active.pending() {
+            active.verify_pending()
         } else {
             save_checkpoint(active, &root, &mut collection, index)
         };
         let barrier = active.pause_commit();
         let joined = active.join().and_then(|()| {
-            if let Some(state) = &active.pending_restore {
-                state
-                    .verify_current_saves(&active._profile.path)
-                    .map_err(|e| e.to_string())
+            if active.pending() {
+                active.verify_pending().map_err(|e| e.to_string())
             } else {
                 active.verify_departure()
             }

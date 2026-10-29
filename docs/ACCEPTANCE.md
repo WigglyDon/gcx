@@ -7,10 +7,15 @@ Android data migration or N64 support. No new device campaign follows from it.
 
 The successor source increment now renames active implementation/package/build
 identity, implements offline staged import and schema-2 system/backend routing,
-and pins N64 interfaces with original cartridge/input/save-format policy.
+and builds the pinned ARM64 N64 core with Rust host, Android graphics/audio/input
+and distinct ordinary/scene persistence in source.
 Portable tests, host/native surface checks, Android Rust/Java/resource checks and
-relevant warnings-denied lints support this increment. No new linked APK, actual
-package-data migration or playable N64 result is claimed. See
+relevant warnings-denied lints support this increment. The renamed GameCube APK
+was linked, signed with the retained identity and privately preserved with exact
+corresponding source. Actual package-data migration, playable N64/save/reload and
+cross-system continuity are not yet qualified. The read-only migration export
+timed out before installation; cleanup-only recovery waits for qualified wireless
+connectivity. No new guest input or source mutation occurred. See
 [the exact migration boundary](IDENTITY_MIGRATION.md).
 
 ## Earned GameCube baseline: preserve, do not replay

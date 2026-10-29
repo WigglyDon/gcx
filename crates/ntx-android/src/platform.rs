@@ -193,6 +193,7 @@ pub enum Command {
     Library,
     Controls(u64, f32, f32),
     ApplyControls(u64, ntx::controls::Settings),
+    N64Comfort(u64, i32),
     ControlsBack(u64),
     About(u64),
     Game(String),
@@ -291,7 +292,7 @@ pub fn init(app: &AndroidApp) -> Result<()> {
     }));
     Ok(())
 }
-fn with_env<T>(f: impl FnOnce(&mut JNIEnv<'_>, &JObject<'_>) -> Result<T>) -> Result<T> {
+pub(crate) fn with_env<T>(f: impl FnOnce(&mut JNIEnv<'_>, &JObject<'_>) -> Result<T>) -> Result<T> {
     let activity = ACTIVITY
         .lock()
         .map_err(|_| "activity lock poisoned")?
@@ -812,7 +813,7 @@ pub fn menu(app: &AndroidApp, show: bool, message: Option<String>) {
         app,
         show,
         message.unwrap_or_else(|| {
-            "Your games\nAdd a GameCube game. Your progress stays with it.".into()
+            "Your games\nAdd a GameCube or N64 game. Your progress stays with it.".into()
         }),
         actions,
         0,
@@ -1069,7 +1070,7 @@ pub fn library_menu(
     } else {
         actions.push((1, "Add game".into()));
         let text = if games.is_empty() {
-            "Your games\nAdd a GameCube game. Your progress stays with it."
+            "Your games\nAdd a GameCube or N64 game. Your progress stays with it."
         } else {
             "Your games\nPick up where you left off."
         };
@@ -1090,7 +1091,32 @@ pub fn controls_menu(
     );
 }
 pub fn about_menu(app: &AndroidApp) {
-    render_menu(app,true,"ntx\nAlpha 1 · GameCube\n\nYour games. Open, play, leave, return.\nMade by Machine Rhythm.\n\nBuilt with Dolphin. Original ntx work is MIT; Dolphin and the combined distribution retain GPL-2.0-or-later terms.\nSource and notices: github.com/WigglyDon/ntx".into(),vec![(6,"Back to your games".into())],0);
+    render_menu(app,true,"ntx\nAlpha 1 · GameCube + N64\n\nYour games. Open, play, leave, return.\nMade by Machine Rhythm.\n\nBuilt with Dolphin and Mupen64Plus-Next. Original ntx work is MIT. The combined package follows applicable GPLv3 and component terms; no warranty.\nSource and notices: github.com/WigglyDon/ntx".into(),vec![(6,"Back to your games".into())],0);
+}
+pub fn n64_controls_menu(app: &AndroidApp, runtime: u64, settings: &ntx::controls::Settings) {
+    render_menu(
+        app,
+        true,
+        format!(
+            "N64 touch controls\n\nOne analog stick, four C buttons, digital L/R and Z.\nVisibility: {}% · Stick dead zone: {}%",
+            settings.opacity, settings.dead_zone
+        ),
+        vec![
+            (13, "Less visible controls".into()),
+            (14, "More visible controls".into()),
+            (
+                15,
+                if settings.haptics {
+                    "Turn touch feedback off".into()
+                } else {
+                    "Turn touch feedback on".into()
+                },
+            ),
+            (16, "Change stick dead zone".into()),
+            (11, "Back to your games".into()),
+        ],
+        runtime,
+    );
 }
 fn render_menu_with_games(
     app: &AndroidApp,
@@ -1194,7 +1220,7 @@ fn render_menu_with_games(
                     env,
                     activity,
                     &view,
-                    "Machine Rhythm · GameCube",
+                    "Machine Rhythm · Nintendo",
                     13.0,
                     ntx::presentation::MUTED,
                 )?;
@@ -1678,12 +1704,13 @@ extern "system" fn Java_com_machinerhythm_ntx_NtxActivity_uiAction(
             }
         }
         11 => push(Command::ControlsBack(menu as u64)),
+        13..=16 => push(Command::N64Comfort(menu as u64, action)),
         20..=25 if controls_ui::action(&mut env, action, menu as u64).is_err() => {
             let _ = env.exception_clear();
         }
         _ => {}
     }
-    if matches!(action, 1..=12 | 20..=25) {
+    if matches!(action, 1..=16 | 20..=25) {
         feedback(&mut env, &activity);
     }
 }

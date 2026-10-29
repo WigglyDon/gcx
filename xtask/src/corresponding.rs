@@ -125,6 +125,17 @@ pub fn preserve(root: &Path, source: &Path) -> Result<()> {
     fs::write(out.join("source-files.sha256"), inventory)?;
     bundle(root, &out, "ntx")?;
     bundle(source, &out, "dolphin")?;
+    let mupen = crate::mupen::source_check(root)?;
+    run(Command::new("tar")
+        .args(["-czf"])
+        .arg(out.join("mupen-active-source.tar.gz"))
+        .arg("-C")
+        .arg(mupen.parent().ok_or("missing Mupen parent")?)
+        .arg("mupen64plus-next"))?;
+    fs::copy(
+        root.join(".local/source-archives/mupen64plus-next-15bada85.tar.gz"),
+        out.join("mupen-upstream-15bada85.tar.gz"),
+    )?;
     let mut graph = String::from("dolphin\t.local/source/dolphin\n");
     for (index, path) in include_str!("../../native/dependencies.txt")
         .lines()

@@ -93,6 +93,7 @@ pub fn source_check(root: &Path) -> Result<PathBuf> {
 }
 pub fn build(root: &Path) -> Result<()> {
     let source = source_check(root)?;
+    crate::run(Command::new("python3").arg(root.join("native/mupen/check_boundary.py")))?;
     let ndk = PathBuf::from(
         std::env::var_os("ANDROID_NDK_HOME").ok_or("set the existing reviewed ANDROID_NDK_HOME")?,
     );

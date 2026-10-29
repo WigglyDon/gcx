@@ -360,6 +360,7 @@ struct Api {
     api_version: unsafe extern "C" fn() -> u32,
     init: Void,
     deinit: Void,
+    shutdown_complete: unsafe extern "C" fn() -> bool,
     unload: Void,
     run: Void,
     info: unsafe extern "C" fn(*mut SystemInfo),
@@ -391,6 +392,7 @@ impl Api {
             api_version: sym!("retro_api_version"),
             init: sym!("retro_init"),
             deinit: sym!("retro_deinit"),
+            shutdown_complete: sym!("retro_ntx_shutdown_complete"),
             unload: sym!("retro_unload_game"),
             run: sym!("retro_run"),
             info: sym!("retro_get_system_info"),
@@ -405,15 +407,19 @@ impl Api {
         })
     }
 }
-struct Slot;
+struct Slot {
+    release: bool,
+}
 impl Drop for Slot {
     fn drop(&mut self) {
-        LIVE.store(false, Ordering::Release);
+        if self.release {
+            LIVE.store(false, Ordering::Release);
+        }
     }
 }
 pub struct Core {
     api: Api,
-    context: Box<Context>,
+    context: std::mem::ManuallyDrop<Box<Context>>,
     initialized: bool,
     loaded: bool,
     quarantined: bool,
@@ -437,7 +443,7 @@ impl Core {
         {
             return Err("A native N64 instance already owns this process".into());
         }
-        let slot = Slot;
+        let slot = Slot { release: true };
         for path in [system, cache] {
             std::fs::create_dir_all(path).map_err(|e| e.to_string())?;
         }
@@ -486,7 +492,7 @@ impl Core {
         CONTEXT.with(|p| p.set(&mut *context));
         let mut core = Self {
             api,
-            context,
+            context: std::mem::ManuallyDrop::new(context),
             initialized: false,
             loaded: false,
             quarantined: false,
@@ -607,6 +613,16 @@ impl Core {
         unsafe { ptr::copy_nonoverlapping(bytes.as_ptr(), p.cast::<u8>(), n) };
         Ok(())
     }
+    /// # Safety
+    /// Only at a quiescent cold initialization boundary immediately before a
+    /// validated machine restore. The caller owns the exact current generation;
+    /// this is never permission to attach arbitrary newer data to an old scene.
+    pub unsafe fn reseed_for_restore(&mut self, bytes: &[u8]) -> Result<()> {
+        if !self.loaded || self.quarantined {
+            return Err("N64 ordinary reseed unavailable".into());
+        }
+        self.restore_ordinary(bytes)
+    }
     pub fn capture(&mut self) -> Result<Vec<u8>> {
         if self.quarantined || !self.loaded {
             return Err("N64 state capture is unavailable".into());
@@ -653,6 +669,9 @@ impl Core {
             }
             if self.initialized {
                 (self.api.deinit)();
+                if !(self.api.shutdown_complete)() {
+                    return Err("N64 native shutdown did not acknowledge completion; host, writer and native memory must remain retained".into());
+                }
                 self.initialized = false;
             }
             if let Some(destroy) = self.context.hardware.take().and_then(|h| h.destroy) {
@@ -665,10 +684,24 @@ impl Core {
 impl Drop for Core {
     fn drop(&mut self) {
         let _ = self.stop();
+        if self.initialized || self.loaded {
+            // A failed join may not free the callback owner or executable code.
+            // Preserve the actual process slot and host resources for recovery.
+            self._slot.release = false;
+            if let Some(library) = self._library.take() {
+                std::mem::forget(library);
+            }
+            return;
+        }
         // Shared-library destructors finish while host graphics/audio and the
         // callback context are still alive. No native owner outlives the slot.
         drop(self._library.take());
         CONTEXT.with(|c| c.set(ptr::null_mut()));
+        // SAFETY: completed stop, DLL destructors and callback retirement precede
+        // release of graphics/audio and their strong surface references.
+        unsafe {
+            std::mem::ManuallyDrop::drop(&mut self.context);
+        }
     }
 }
 
