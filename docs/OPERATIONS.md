@@ -1,3 +1,5 @@
+> Current authority: NTX-5 and amendment6505289270; read docs/NTX_HANDOFF.md first. Existing safety/ownership rules below remain. Old seed/probe recipes are historical references, not current dispatch. Comprehensive app/package/data rename is successor work. No old-path alias or retired-storage recreation.
+
 # Working environment and delivery safety
 
 ## Independent project

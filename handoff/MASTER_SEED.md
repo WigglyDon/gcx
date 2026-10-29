@@ -1,3 +1,5 @@
+> Historical bootstrap/seed material. Superseded by AGENTS.md, docs/NTX_HANDOFF.md and NTX-5 including amendment6505289270. Do not recreate a checkout, repository or old qualification campaign from this file.
+
 # gcx — complete independent product Master seed
 
 ## Initialize here

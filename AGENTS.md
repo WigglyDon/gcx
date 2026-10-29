@@ -1,99 +1,100 @@
-# gcx development
+# ntx development
 
-Read README.md, docs/state.toml, docs/github-state.toml, docs/PRODUCT.md,
-docs/ARCHITECTURE.md and the active issue with its latest comments. Read
-GAMECUBE_FEASIBILITY, DISTRIBUTION and OPERATIONS before choosing build/device
-paths. Prepared issue files are scope, not proof of remote creation or execution.
+Continue this existing project under [NTX-5](https://github.com/WigglyDon/ntx/issues/5)
+and its binding [architecture amendment6505289270](https://github.com/WigglyDon/ntx/issues/5#issuecomment-6505289270).
+Read their latest comments, README.md, docs/NTX_HANDOFF.md, docs/state.toml,
+docs/github-state.toml, docs/PRODUCT.md and docs/ARCHITECTURE.md before choosing work.
+Read docs/DISTRIBUTION.md and docs/OPERATIONS.md before build/device paths.
+The handoff's local-only supplement locates retained inputs and recovery material.
+Old GCX issue/seed/probe instructions are historical evidence, not current priority.
 
-## Continuing an existing assignment
+## Continuation and ownership
 
-Reconcile the latest live review with the current acceptance row before choosing
-work. Initialization instructions are not a request to repeat completed boot,
-ordinary-save, checkpoint or timing campaigns. Keep a qualified installed binary
-stable while diagnosing an open incident; use retained evidence and the smallest
-relevant check before requesting another build or device transaction.
+This is succession of the same public repository (stable ID1429193278), history,
+working direct Dolphin GameCube implementation and protected progress. A fresh
+session acknowledges ownership on NTX-5 with actual checkout/branch/HEAD/dirt and
+continues the first unfinished slice. Do not start another implementation worker,
+clone a duplicate, reset donor edits, replay the seed or restart completed campaigns.
+Resolve inputs/output locations after relocation; old absolute paths and cached
+executables are not proof of readiness. Do not create a permanent old-path alias,
+recreate retired storage or silently switch host/filesystem.
 
-Resolve source, tool and cache inputs against their actual current locations and
-ownership. A historical workspace receipt, mount, symlink or cache label does not
-prove those bytes still exist or grant capacity. If an input disappeared, report
-that exact gap; do not revive a retired storage route, silently fall back to a
-different filesystem, or copy a sibling checkout. Host placement and any second
-platform work still require their own bounded assignment.
+## Product and engineering
 
-## Product and authority
+ntx is the Nintendo member of the five emulator products, with PSX as the
+established game-first experience and architecture reference. Public original
+first-party work is MIT; borrowed code retains its licenses/provenance. All new
+substantive first-party player/host/persistence/input logic is Rust. Retain useful
+C/C++ and use mechanical platform/JNI/ABI glue where necessary. No managed
+application layer, speculative framework or whole-emulator rewrite.
 
-Build an independent native GameCube player with the same game-first continuity
-as PSX. Android ARM64 on the owner's stock Fold is the first desired playable
-target. GameCube only initially; no Wii, Triforce, GBA-link, online service or
-second platform is automatically admitted. Eventual mobile stores are goals.
+Complete the comprehensive rename: active source/crates, native exports/JNI,
+build/tooling/artifacts/docs/branding and canonical Android package
+com.machinerhythm.ntx, data root ntx, links machinerhythm-ntx://play/<GameId>.
+Legacy names belong only to immutable history/provenance or isolated compatibility
+readers/fixtures. Preserve the signer and opaque game/profile identities. A new
+Android package does not inherit private data or document grants: implement staged,
+validated, idempotent migration without overwriting newer target progress. Keep
+source installation and rollback material until migration is verified. Never
+rewrite snapshot fingerprints to force compatibility or discard unsaved progress.
 
-All new substantive first-party logic is Rust. Use the mature Dolphin engine as
-the first candidate. Inspect its native Android/core interfaces rather than
-requiring libretro or inheriting the full Android/desktop frontend. Retain useful
-C/C++ code, its authorship and licenses. Targeted donor fixes, optimizations,
-proper APIs, bounded boot/HLE work and justified Rust replacements are authorized.
-Mechanical platform shims and small donor-language edits are allowed. No Kotlin,
-Java, C++ or Python application layer; no whole-core rewrite merely for language
-purity. Upstream acceptance is not required to maintain our tested fork.
+Keep Dolphin's working direct GameCube adapter. N64 through a pinned
+Mupen64Plus-Next core and small Rust libretro host adapter is ACTIVE now; this does
+not convert Dolphin to libretro or import RetroArch's frontend. FN64 is a possible
+later N64 backend, independent of game identity and ordinary progress. Do not
+modify FN64, PSX or other siblings. Wii/other systems, all-platform ports, online
+services, public binary releases and paid infrastructure remain separately scoped.
 
-Prefer a coherent fix at the actual owner over layers, duplicated state or a tour
-of alternative cores. Escalate material scope change, unknown technical model,
-rights/security issues or data-loss risk, not the mere need to edit borrowed code.
+## Shared product contracts
 
-## Core contracts
+Keep host platform/device, emulated system and execution backend independent.
+Portable Rust owns collection/session/save/resume/input policy and scheduling;
+host adapters own platform resources; backend adapters own console execution and
+console-specific persistence. Android/PID/window/GPU/JIT handles are ephemeral.
+Platform agnosticism is required now, not a claim all ports are implemented.
 
-Distinguish GameId, SavedSession, SaveProfile and LiveRuntime. One foreground
-runtime initially serves multiple durable games; it is not a permanent session
-limit. Exactly one writer owns each card/profile/checkpoint through native teardown.
-Keep process/task IDs and native handles out of permanent shortcuts/save identities.
+Keep GameId, SaveProfile, SavedSession and LiveRuntime distinct. Multiple games
+independently open/resumable on the same or different systems are the product
+model. Executing, resident-paused, checkpointed/unloaded and recovery-pending are
+placements/states, not new identities. One foreground live slot is the first
+scheduling policy, not a permanent singleton architecture. Future runtime slots
+must not require game/save reidentification; qualify native isolation before
+simultaneous instantiation. Background pause/silence is the default.
 
-GameCube needs a Control Stick, C Stick, D-pad, A/B/X/Y, Z, Start/Pause, and separate
-L/R analog travel and digital clicks. Do not invent L3/R3 or reuse a PS1 button
-mask. Preserve partial-trigger play, simultaneous touches, calibration and
-release on interruptions. Rust owns the player UI and input policy.
+Separate immutable media, ordinary committed progress, machine resume generations
+and host/control preferences. Inspect each core's capture/restore/pending-write
+semantics. Publish coherent generations, validate current ordinary data before
+restore, and prevent stale/partial restore from flushing over newer saves. Retain
+incompatibility/errors and offer explicit cold start with current saves. Exactly
+one writer owns each profile through native join and durable metadata publication.
+No assumption of cross-backend/architecture snapshot compatibility.
 
-Ordinary saves and machine snapshots are different evidence. Inspect raw-card
-versus GCI-directory persistence and state restoration before deciding storage.
-Do not import PS1's fixed card size, copy its restore order blindly, or use Xbox
-hard-disk snapshot semantics. Do not restore stale card data over current progress.
-Retain incompatible checkpoints and offer explicit restart with current saves.
+Use actual system controls and save formats: GameCube Control/C sticks and separate
+L/R analog travel/clicks; N64 one analog stick, four C buttons, digital L/R and its
+cartridge/Controller Pak storage. Preserve cancellation and simultaneous input.
+Do not transplant PS1 masks, GameCube cards or Xbox storage semantics into N64.
 
-Use Dolphin's existing emulated boot path as the initial BIOS-free candidate.
-Do not impose original IPL import or develop a replacement BIOS without an actual
-missing behavior. Audit all packaged resources and their rights. No copyrighted
-firmware downloading, decompilation-derived laundering or proprietary assets in Git.
+## Finite implementation and verification
 
-## Work and acceptance
+Order: full ntx identity/migration with retained GameCube progress; first playable
+N64 in the same collection; supported continuity/cross-system switch and alpha
+comfort. Use representative affected-boundary tests, focused Rust/native/package
+checks and warnings-denied relevant lints. Preserve earned boot/save/scene/library
+and matched-timing evidence. Quest-playing/speedrunner automation is retired.
+Keep unresolved Pixel Pause/reentry and separate Fold incidents honest; neither
+an unrepeatable incident nor a blocked optional shortcut halts all product work.
 
-GCX-1 is the first assignment. Inspect current local/remote work and acknowledge
-with actual source binding before starting; do not duplicate an existing worker.
-Move from pinned source to one executable Rust-hosted GameCube slice, not a
-framework or another plan. Continue appropriate GCX-2 work once viable without
-waiting for ceremonial closure; honor fresh Master decisions. The initial
-multi-resident feature and full iOS port remain deferred.
+Build off-device under current shared-host capacity/concurrency rules. Preserve
+signer, current cards/states, recovery candidates and unique retained inputs. No
+global cleanup, sibling cache deletion, retired mount resurrection or automatic
+heavy build. Installed android-device procedure owns admission/return. Pixel4
+standing lab work uses normal exclusive admission; Fold needs its fresh personal
+window. No root, wipe, security/launcher changes or peer preemption. Backups and
+actual cleanup/return must be ready under the held lease. Phone tasks require
+ready artifacts; this succession itself starts no device tests.
 
-Protect sibling projects, app IDs/signers, user games/cards/states and shared
-resources. Build off-device. Read current host capacity/custodian policy before
-heavy clones/builds. Never use global cleanup, unrelated caches, filesystem repair
-or repeated expanded source archives to solve this project's space needs.
-Personal Fold access is on request through the current exclusive stock-device
-procedure. No root, unlock, wipe, system-package disabling or security changes.
-
-Run focused tests, formatting, warnings-denied relevant lints, and actual native
-packaging/ABI/signature/notices checks. Add tests for changed behavior; do not
-restart an emulator-wide conformance campaign. Keep visible gameplay, audible
-sound, card save/reload, automatic resume, shortcuts and measured speed separate.
-Use isolated fixtures for faults; do not fill the owner's disk to test ENOSPC.
-
-## Public handling
-
-Public gcx source and ordinary reviewed commits/pushes are authorized. Original
-work is MIT; borrowed/modified/translated GPL work retains applicable terms.
-FFI, dynamic linking or another process is not automatic license separation.
-Record exact source, patches, dependencies and corresponding-source inputs.
-Only reuse selected public PSX files with provenance and license inspection.
-No private sibling files, game/firmware data, raw logs, identifiers or keys in Git.
-Store submission, public binary release, paid services, account/security changes
-and legal commitments require their separate gates. Seed creation is not corporate
-formation or a rights transfer. Keep real work and evidence in the issue and
-lasting behavior in its small source documents. Never infer success from intent.
+Public source commits/pushes are authorized. No secrets, private device details,
+games, firmware, saves, raw logs or signing bytes in Git. Audit licenses/resources
+and corresponding-source reproduction. Store submissions, legal commitments and
+public binary release retain their separate gates. Report actual outcomes and
+limits on NTX-5; keep acceptance issues open.

@@ -1,31 +1,39 @@
 schema_version = 1
-repository = "WigglyDon/gcx"
-repository_url = "https://github.com/WigglyDon/gcx"
+repository = "WigglyDon/ntx"
+repository_id = 1429193278
+repository_url = "https://github.com/WigglyDon/ntx"
 publication_status = "published_and_verified_by_local_bootstrap"
 seed_id = "gcx-foundation-2026-10-21-v1"
 seed_root_commit = "398e522a0c59a3d53ec1e26bcae960d94b76fc35"
 # Records source publication and issue identities, not worker execution or gameplay.
 
 [[issues]]
-key = "GCX-1"
+key = "NTX-1"
 number = 1
-title = "GCX-1: Qualify Dolphin and run a Rust-hosted GameCube slice"
-url = "https://github.com/WigglyDon/gcx/issues/1"
+title = "NTX-1: GameCube backend — Dolphin integration and playable baseline"
+url = "https://github.com/WigglyDon/ntx/issues/1"
 
 [[issues]]
-key = "GCX-2"
+key = "NTX-2"
 number = 2
-title = "GCX-2: Game-first library, safe resume and Home Screen games"
-url = "https://github.com/WigglyDon/gcx/issues/2"
+title = "NTX-2: Nintendo-family collection, dependable play and continuity"
+url = "https://github.com/WigglyDon/ntx/issues/2"
 
 [[issues]]
-key = "GCX-3"
+key = "NTX-3"
 number = 3
-title = "GCX-3: Complete installation, source delivery and mobile release gates"
-url = "https://github.com/WigglyDon/gcx/issues/3"
+title = "NTX-3: installation completeness, source delivery and release readiness"
+url = "https://github.com/WigglyDon/ntx/issues/3"
 
 [[issues]]
-key = "GCX-4"
+key = "NTX-4"
 number = 4
-title = "GCX-4: Optional paused-resident games after measured single-runtime success"
-url = "https://github.com/WigglyDon/gcx/issues/4"
+title = "NTX-4: independent open games and platform-aware runtime placement"
+url = "https://github.com/WigglyDon/ntx/issues/4"
+
+[[issues]]
+key = "NTX-5"
+number = 5
+title = "NTX-5: full gcx → ntx migration and modular Nintendo 64 alpha"
+url = "https://github.com/WigglyDon/ntx/issues/5"
+architecture_amendment = "https://github.com/WigglyDon/ntx/issues/5#issuecomment-6505289270"

@@ -1,3 +1,5 @@
+> Historical bootstrap/seed material. Superseded by AGENTS.md, docs/NTX_HANDOFF.md and NTX-5 including amendment6505289270. Do not recreate a checkout, repository or old qualification campaign from this file.
+
 # Local setup
 
 The intended remote is public `WigglyDon/gcx`. It was **not created by this chat**:

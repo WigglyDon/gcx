@@ -1,95 +1,55 @@
-# Product: GameCube games as durable applications
+# Product: Nintendo games as durable applications
 
-## The intended experience
+ntx is the Nintendo member of the five emulator products, sharing PSX's established
+game-first experience and architecture. This is continuation of the existing
+player, not a restart, sibling merger or shared studio framework.
 
-The owner's working PSX PS1 player is the behavioral reference: select a game,
-play comfortably, leave it, try another game, fold the phone, and return to the
-correct scene after process restart. gcx carries that experience to GameCube as
-its own application and identity. These are product siblings: consistent navigation,
-visual restraint and useful player tools, with each console’s own controls and
-durable game data. It is not PSX renamed or a multi-console merger.
+Choose a local game, play, leave and return to that game's own progress and scene.
+One collection spans the supported systems. Execution backends are implementation
+choices, not a mandatory core-configuration UI. Keep original sibling branding,
+a comfortable layout/editor, system-correct controls and understandable recovery.
 
-The normal path is **choose a local game -> play -> leave -> return**. The engine
-is implementation machinery, not a choice ordinary users need to configure.
-Open gcx for a small collection and Add games. A game-specific Home Screen icon
-enters that game's durable session directly. Settings stay compact and actionable.
+## Active delivery
 
-Initial scope is GameCube, one local player and one live runtime. Wii is a plausible
-later extension because the candidate engine supports it, but it introduces other
-controllers, storage and services and is not active scope. Do not show fake Wii
-support. GBA link, microphone, broadband adapter, Triforce and netplay are separate
-compatibility/features, not silent requirements for ordinary GameCube play.
+[NTX-5](https://github.com/WigglyDon/ntx/issues/5) and
+[amendment6505289270](https://github.com/WigglyDon/ntx/issues/5#issuecomment-6505289270)
+govern. Complete the full ntx identity and safe migration; preserve working direct
+Dolphin GameCube support; add N64 now through Mupen64Plus-Next. FN64 may later
+replace the N64 adapter without redefining games or ordinary saves. Other Nintendo
+systems remain explicit later additions. No all-platform port is being claimed.
 
-## Native feel, not an emulator control panel
+Canonical identity: ntx, Android com.machinerhythm.ntx, data root ntx and
+machinerhythm-ntx://play/<GameId>. A cosmetic label over permanently active gcx
+names is insufficient. Old names remain only in history and isolated migration
+compatibility. Package migration must preserve current progress and reacquire
+media permission; never silently lose unsaved scenes or uninstall the only source.
 
-The first desired device is the stock Android ARM64 Fold. Fit the complete
-aspect-correct game picture using the complete drawable and comfortable controls.
-Owner clarified the target as edge-to-edge like PSX: do not shrink the picture to
-the control-safe inset rectangle. Controls avoid camera/system-gesture space;
-the picture can use those pixels and stays stable while transient bars overlay it.
-Keep controls off the picture by default. Do not stretch or crop game-written
-borders without explicit player choice. Use the actual reported game geometry,
-not a permanent 4:3 or 60-game-FPS assumption.
+## Continuity belongs to each game
 
-Preserve touch capture, multi-finger combinations, neutralization on interruption,
-short press haptics and per-display editable layout profiles. The GameCube layout
-must be deliberately designed: prominent A, B/X/Y, Control Stick, C Stick, D-pad,
-Z, Start/Pause and L/R. Trigger travel and full-press click are independent signals.
-Users must be able to hold a partial press and move/aim without an accidental click.
-Document and test the touch gesture, then evaluate it by actual gameplay.
-Physical controllers feed the same logical input and must neutralize on disconnect.
-Keep a usable touch route; an external controller is not a required workaround.
+Multiple games independently open/resumable on the same and different systems are
+the baseline model. One foreground runtime is an initial scheduling policy, not a
+permanent singleton. Open, resident-paused, executing, checkpointed/unloaded and
+awaiting recovery are different states of the same durable session. Supported
+hosts/backends may later provide multiple resident or executing instances.
 
-Pause feedback is immediate while state storage completes safely. Explicit user
-pause survives fold/rotation/focus changes. Background means paused and silent by
-default, with durable recovery; no fake audio service or CPU keepalive. Bound
-queues and discard stale audio/input rather than replaying them on return.
+Ordinary saves record game-committed progress; automatic machine checkpoints
+record exact continuation and pause intent. Neither replaces the other. Separate
+both from immutable media and layout preferences. Keep errors/incompatible states
+recoverable, reject stale generations against newer ordinary progress and offer
+explicit cold start. Save identity follows the game, not the backend or host.
 
-## Library, formats and identity
+## Alpha comfort
 
-Use scoped document/folder access as a complete path. Explicit rescans may inspect
-selected roots; no mandatory all-files permission or startup-wide storage crawl.
-Inspect container and platform metadata rather than trusting ISO/RVZ filename
-extensions. Start with ordinary GameCube ISO/GCM and RVZ where the chosen decoder
-supports them; document what actually works before advertising more formats.
-Keep compressed content streaming; do not inflate every game into another full
-copy. Missing access or media must lead to recovery of the same entry and saves.
+Maximize the game picture using actual drawable/aspect; keep controls comfortably
+clear and correctly mapped, with simultaneous input, interruption release, editable
+profiles and consistent preferred haptics. Pause/Resume/Stop remain reachable.
+GameCube has two sticks and distinct analog/click L/R. N64 has one analog stick,
+four C buttons and digital shoulders; its persistence is cartridge/Controller Pak,
+not a GameCube card. Physical controllers are useful, never a required workaround.
 
-A multi-disc game has one durable game identity and save profile, with distinct
-media identity, region/revision and remembered disc. Do not merge unrelated games
-by similar filename, discard a second disc, or reset a session when it asks for a
-swap. A local title/cover can be edited without changing saves. Use local artwork
-when valid or an original placeholder; no mandatory cover service or scraping.
-
-## Continuity and completeness
-
-Ordinary memory-card saves are durable game progress; complete machine checkpoints
-are convenient continuation. Cards, state, selected media and controller topology
-must agree before automatic resume. Do not silently restart an incompatible state
-or overwrite newer card progress to make an old snapshot load.
-
-Local export/import is the desired migration route, not a cloud-account product.
-Preserve card format, region and identifiers; validate imports rather than treating
-arbitrary bytes as a card. No sharing of a writable card across independently
-paused game machines by accident. Cross-title save interactions require an explicit
-shared-profile design and regression checks, not global writable default storage.
-
-Aim for install -> choose game -> play without external firmware. The initial
-Dolphin boot/HLE path is already a source-identified route, not a new BIOS project.
-Audit its resources, verify actual gameplay and retain a legitimate optional IPL
-route only when a real feature requires it. Do not bundle proprietary startup art,
-console menus or game assets to imitate branding.
-
-## Scope control
-
-All new substantive first-party logic is Rust. Borrow, modify and maintain the
-mature engine where it helps. No arbitrary donor-hopping, whole-core rewrite,
-shared-studio framework, online account system or enormous settings catalog.
-Keep future multi-resident sessions possible through identity/ownership, but
-implement one runtime first. Android and iOS may provide the same durable game
-experience with different process and execution policies. Do not promise equal
-engine availability or speed on all platforms without evidence.
-
-Live-game menus keep Resume (or explicit Restart after an error) and Stop in a
-fixed footer. Library rows and auxiliary actions scroll independently, so ordinary
-departure never requires finding Stop below the screen in landscape.
+Prioritize real user outcomes over qualification bookkeeping. Reuse earned boot,
+ordinary-save, scene-return and timing evidence at its actual build bounds.
+Speedrunner/quest-progression automation is retired. Preserve historical defects
+without requiring that every unrepeatable report be disproved before product work.
+Use short representative changed-behavior checks, protected saves and honest limits.
+Optional shortcut limitations do not block the whole alpha.

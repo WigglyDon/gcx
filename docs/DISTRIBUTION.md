@@ -1,3 +1,5 @@
+> NTX-5 now includes pinned Mupen64Plus-Next N64 integration. Audit its selected component licenses/resources and corresponding-source graph before packaging; no Mupen playable/license-audit result is claimed by this handoff.
+
 # Distribution and provenance
 
 Goal: a public free-source player, eventually through Google Play and the ordinary
@@ -6,7 +8,7 @@ release. Recheck actual terms and requirements when preparing submission.
 
 ## Engineering ownership is not relicensing
 
-Original gcx seed/first-party work uses MIT. Dolphin declares GPL-2.0-or-later [S1].
+Original ntx first-party (including historical gcx) work uses MIT. Dolphin declares GPL-2.0-or-later [S1].
 Keep per-file and dependency terms, attribution, change notices and exact source
 inputs. A distributed combined application must meet all applicable obligations,
 including corresponding-source/build material where required. Rust, FFI, dynamic
@@ -20,7 +22,7 @@ by its license, but do not imply a trademark grant or blanket store permission.
 Record why the maintained patch exists and reproduce the exact binary/source pair.
 Keep an unmodified source reference for comparison; do not disguise changed builds.
 
-No Dolphin or Nintendo logo/artwork as our identity. gcx is original project branding;
+No Dolphin or Nintendo logo/artwork as our identity. ntx is original project branding;
 name selection is not a search or certification of trademark availability. Source
 reuse from public PSX requires a per-file license/provenance check, not copying the
 whole repository and claiming it is all MIT. No shared private files or app signer.
@@ -64,7 +66,7 @@ PSX's optional media behavior and is outside the initial scope.
 Retain shared Rust semantics and a native platform boundary. Apple's emulator
 category rules do not grant rights to games/firmware/dependencies [S8]. Current
 DolphiniOS maintainers say JIT prevents their App Store release [S5]. That is a
-current constraint to investigate, not an approval for gcx or a permanent impossibility.
+current constraint to investigate, not an approval for ntx or a permanent impossibility.
 A signed stock-iOS build must demonstrate usable execution without a debugger or
 special setup assumed unavailable to ordinary users. Full iOS work is not initially
 dispatched; do not block the Android slice on it or silently redefine the goal as
