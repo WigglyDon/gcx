@@ -638,3 +638,14 @@ no-overwrite guard. Surface the contact result to the operator: a capture and a
 null fatal error do not prove input was dispatched. The actual refusal/reobserve/
 contact sequence has an isolated regression; existing action/image/deadline bounds
 and the eight-refusal limit remain unchanged. No automatic retry is admitted.
+
+After an explicitly authorized retention pass, reconcile the live input graph and
+remaining current recovery set before resuming. Keep retired versions recorded as
+historical evidence, not available files. Verify the exact retained ordinary cards,
+SRAM, complete-generation hashes and signer/recovery binding; a filename suffix
+alone does not distinguish a memory card from console SRAM. Qualify the existing
+local output paths with a small original synchronized-write/rename/readback and
+lock fixture, removing only that fixture. Historical temporary handoffs are not
+runtime dependencies. Scope storage qualification to the declared next phase and
+recheck capacity/concurrency before larger writes. Never repair a missing input by
+restoring an obsolete checkpoint reference or reviving withdrawn storage.

@@ -89,7 +89,7 @@ The unchanged f9de0b0 / b4c92127 candidate now passes an automated ordinary-save
 check on Pixel4: actual movement/action/C Stick, newly acquired Hero’s Clothes,
 in-game Save, normal joined Stop and a fresh-process game-menu reload retaining
 the green outfit and 23 rupees. Final protected joined Stop and device return passed.
-Both ordinary profiles and prior backups remain protected. The owner was away;
+Both ordinary profiles and retained backups remain protected. The owner was away;
 this adds no human audio/control-feel, latency or endurance result. The original
 later-play freeze remains open. See [acceptance](docs/ACCEPTANCE.md).
 
