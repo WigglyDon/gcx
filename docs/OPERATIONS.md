@@ -41,6 +41,32 @@ Reuse upstream CMake/Gradle/NDK and dependency build tools where required; this 
 not introduce a non-Rust product layer. The initial Bash bootstrap only publishes
 this small project foundation and launches the existing Codex installation.
 
+## Select the next bounded phase
+
+Start from the latest source-bound acceptance result and open symptom. Keep an
+unchanged qualified APK/native engine when no demonstrated cause requires a code
+change. Read retained evidence first; select a focused host check or synthetic
+fixture for the affected owner. A missing capture, diagnostic gap or unavailable
+cache is not a game freeze. Do not rebuild unchanged binaries, re-fetch a donor,
+replay an accepted campaign or broaden the game/control matrix just to show work.
+
+Before a growing phase, resolve the exact source, dirty donor patch, dependency
+and resource graph, SDK/NDK, signer and output paths. Shared tools can outlive the
+project name in their cache path; verify the current owner and exact contents
+rather than copying or deleting them. Record private local resolution separately
+from public reproduction instructions. Do not trust retired external storage,
+historical backup receipts or stale symlinks as surviving inputs or present
+admission. Refuse the affected phase instead of recreating a mount or silently
+switching its outputs to another filesystem.
+
+Use existing source/tool caches in place and task-sized output estimates. Retain
+one selected working candidate and its protected recovery/source/symbol bindings,
+plus any earlier evidence still needed for an open incident. Propose exact inactive
+reconstructible outputs to their owner; a directory called cache, target or local
+is not blanket deletion authority. Verify actual free space and memory immediately
+before the admitted growing phase. A second host is a separate useful test scope,
+not an implicit migration or permission to start another mutable product worker.
+
 ## Device custody
 
 Personal Fold access remains on request under the current stock-device and
@@ -66,11 +92,14 @@ to another unit; its timestamp neither replaces nor blocks the target's handoff.
 JSON packet helper, not a device service or application layer. Its private launch
 wrapper must pass the admitted alias, a new private evidence directory,
 `GCX_DEVICE_TASK`, and an absolute monotonic `GCX_OUTER_DEADLINE_MONO` established
-before the outer timeout starts. Run it only inside the existing exclusive
-`android-device transaction`; every nested command inherits that transaction FD.
-It does not grant custody. The earlier of the outer deadline and the helper's
-17-minute limit controls a five-minute cleanup reserve, including one minute
-reserved for final return. New tests and owner waiting end at the cleanup cutoff.
+before the outer timeout starts. A legacy foreground invocation runs inside the
+existing exclusive `android-device transaction`; every nested command inherits
+that transaction FD. Its default17-minute helper limit, five-minute cleanup and
+one-minute return reserve apply to that foreground route. They are not universal
+limits for independently prepared finite lab jobs. Those jobs use the installed
+custodian with their declared work/cleanup/return budgets, unchanged absolute
+deadlines and aggregate counters. Neither route grants its own custody. New tests
+and owner waiting end at the actual task's cleanup cutoff.
 For unattended packets set `GCX_AUTOMATED_PACKET=1`: the input loop immediately
 enters its finalizer at that cutoff (or forced cleanup), without waiting for an
 agent response. The prepared task-local wrapper may then run the existing bounded
@@ -360,10 +389,12 @@ for `status`, `wait`, `resume` or `cancel`. Client wait duration is not job dura
 The installed custodian owns physical admission, safe handoff and actual release;
 product hooks verify their own data/clients and return under that same lease.
 Do not create a second controller or detach a legacy foreground transaction.
-Respect this task's no-immediate-reacquisition instruction; preparation alone
-submits no request or reservation. A nonprogressing pending startup is reported
-through fleet issue21 with its job ID, never cleared by editing custody records.
-Fold requires its own fresh personal window and is excluded from this packet.
+Reconcile current owner/task authority before submission; an older temporary
+no-reacquisition instruction is not a permanent gate after an explicit amendment.
+Preparation alone owns no device or storage. Follow the installed procedure and
+current custodian for a nonprogressing startup, with its actual job ID in private
+coordination; never clear launch/custody records yourself. A personal device still
+needs its own fresh window and is not covered by a lab-device grant.
 
 Keep live job admission separate from prepared audit copies: a template must never
 overwrite the actual job ID or original deadline. Preserve failed originals and

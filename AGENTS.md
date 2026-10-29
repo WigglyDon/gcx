@@ -5,6 +5,21 @@ docs/ARCHITECTURE.md and the active issue with its latest comments. Read
 GAMECUBE_FEASIBILITY, DISTRIBUTION and OPERATIONS before choosing build/device
 paths. Prepared issue files are scope, not proof of remote creation or execution.
 
+## Continuing an existing assignment
+
+Reconcile the latest live review with the current acceptance row before choosing
+work. Initialization instructions are not a request to repeat completed boot,
+ordinary-save, checkpoint or timing campaigns. Keep a qualified installed binary
+stable while diagnosing an open incident; use retained evidence and the smallest
+relevant check before requesting another build or device transaction.
+
+Resolve source, tool and cache inputs against their actual current locations and
+ownership. A historical workspace receipt, mount, symlink or cache label does not
+prove those bytes still exist or grant capacity. If an input disappeared, report
+that exact gap; do not revive a retired storage route, silently fall back to a
+different filesystem, or copy a sibling checkout. Host placement and any second
+platform work still require their own bounded assignment.
+
 ## Product and authority
 
 Build an independent native GameCube player with the same game-first continuity
