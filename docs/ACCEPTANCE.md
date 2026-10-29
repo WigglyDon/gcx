@@ -381,6 +381,24 @@ Stop includes independent host backup verification and is not app Stop latency.
 These single-process trace spans guide further diagnosis; no optimization,
 physical latency, original-freeze closure or general timing guarantee is earned.
 
+## Prepared actual-play/reentry probe: controller refusal
+
+Under review6500561089, the unchanged f9de0b0/APK b4c92127 entered the
+current green-outfit23rupee world through the capture-first controller. Movement
+and a C Stick camera/HUD response were observed. Four play contacts completed;
+the A and L-click contacts alone do not establish a visible action pose.
+A subsequent C Stick request exceeded the inspected well's97pixel displacement
+limit and was refused before dispatch. This is a controller error, not an
+observed game freeze. New work ended at that first refusal.
+
+Cleanup's post-play Pause accepted input and displayed the menu, with native
+pause/checkpoint completion traced. Independent current-generation and both
+ordinary-profile protection, normal joined/durable/profile-released Stop,
+clean metadata, own-process absence, physical display OFF and actual return
+passed. The requested Pause/Resume and Home/reentry sequence remains incomplete;
+no hot/replacement-process comparison, original-incident cause or closure is
+earned. No automatic repeat, rebuild, ordinary-save/timing replay or Fold action.
+
 ## Release gates distinct from playable acceptance
 
 App Bundle delivery, current target requirements, 4/16 KiB native runtime support,
