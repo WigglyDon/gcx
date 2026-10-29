@@ -231,6 +231,7 @@ mod tests {
                 system: crate::backend::System::GameCube,
                 backend: crate::backend::Backend::Dolphin,
                 media_relink_required: false,
+                media_sha256: None,
                 game_id: GameId("a".repeat(32)),
                 profile_id: SaveProfileId("b".repeat(32)),
                 uri: "content://fixture/game".into(),

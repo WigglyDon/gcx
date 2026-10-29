@@ -24,6 +24,10 @@ its artifact cannot update an existing installation.
 `cargo run --offline --locked -p ntx --bin ntx-migrate -- PROTECTED_EXPORT PRIVATE_TARGET_PARENT`
 imports only into PRIVATE_TARGET_PARENT/ntx. This command performs no device
 operation and is not an exporter, archive extractor or phone-installation recipe.
+A prepared development transfer can place that protected export in files/ntx-import.
+At startup, the new app uses the same Rust validator and atomic publisher before
+creating files/ntx. An existing target is never replaced; the incoming export stays
+retained. The app holds its store lock for its entire subsequent runtime.
 Use an already protected, quiescent export obtained under separately admitted
 custody; independently retain source installation, ordinary profiles and complete
 generations. Never extract an untrusted archive directly into the app's live root.
@@ -49,8 +53,10 @@ New package grants are not inferred from old URI strings. Migrated entries remai
 blocked for media access. Selecting the same original document through the new
 picker can durably reacquire access without creating a new game/profile; where a
 checkpoint exists, its media digest must match. Internal game links do not count
-as grant acquisition. A changed locator still needs a verified relocation flow;
-it is refused while relinking the selected imported game. Package-targeted old
+as grant acquisition. A changed locator is accepted only against the preserved media fingerprint;
+otherwise only the exact original locator can be reacquired. Optional protected
+media-identities.json exports or retained checkpoint bindings supply that original
+fingerprint. New successful boots preserve it independently of checkpoints. Package-targeted old
 shortcuts may require re-pinning. No automatic legacy-app forwarding is installed.
 
 Pixel and Fold transfer/rollback, linked package/ABI checks, actual progress and

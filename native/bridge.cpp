@@ -120,6 +120,10 @@ int ntx_engine_init(const char* user, const char* sys, ntx_event_fn event, void*
   UICommon::SetUserDirectory(user);
   UICommon::CreateDirectories();
   UICommon::Init();
+  // Mechanical binding to the Rust-owned profile: imported absolute host paths
+  // are not portable save identities. Dolphin resolves defaults in this user root.
+  Config::SetBaseOrCurrent(Config::MAIN_MEMCARD_A_PATH, std::string{});
+  Config::SetBaseOrCurrent(Config::MAIN_MEMCARD_B_PATH, std::string{});
   Config::SetBaseOrCurrent(Config::MAIN_SLOT_A, ExpansionInterface::EXIDeviceType::MemoryCard);
   Config::SetBaseOrCurrent(Config::MAIN_SLOT_B, ExpansionInterface::EXIDeviceType::None);
   MemoryCard::SetWriteHandler([](const std::string& path, std::span<const u8> data) {

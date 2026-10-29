@@ -12,6 +12,7 @@ mod legacy;
 pub mod lifecycle;
 pub mod migration;
 pub mod n64;
+pub mod n64_save;
 pub mod presentation;
 pub mod touch;
 pub mod viewport;

@@ -1,0 +1,105 @@
+Maintained NTX Mupen host-boundary repair: truthful restore result, buffer guards, optional-log ABI fallback, instance-owned directories and completed coroutine retirement.
+Upstream 15bada85906593376e8fd697f1b0b3af3a20f512; borrowed code retains its original licenses.
+
+diff --git a/libretro/libretro.c b/libretro/libretro.c
+--- a/libretro/libretro.c
++++ b/libretro/libretro.c
+@@ -19,6 +19,10 @@
+  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+ 
+ #include <stdio.h>
++#include <stdarg.h>
++#ifdef ANDROID
++#include <android/log.h>
++#endif
+ #include <stdlib.h>
+ #include <string.h>
+ #include <compat/strl.h>
+@@ -102,7 +106,24 @@
+ struct retro_perf_callback perf_cb;
+ retro_get_cpu_features_t perf_get_cpu_features_cb = NULL;
+ 
+-retro_log_printf_t log_cb = NULL;
++/* NTX mechanical fallback for the optional frontend varargs logging ABI. */
++static void ntx_fallback_log(enum retro_log_level level, const char *format, ...)
++{
++    va_list args;
++    va_start(args, format);
++#ifdef ANDROID
++    const int priority = level >= RETRO_LOG_ERROR ? ANDROID_LOG_ERROR :
++                         level >= RETRO_LOG_WARN ? ANDROID_LOG_WARN :
++                         level >= RETRO_LOG_INFO ? ANDROID_LOG_INFO : ANDROID_LOG_DEBUG;
++    __android_log_vprint(priority, "ntx", format, args);
++#else
++    (void)level;
++    vfprintf(stderr, format, args);
++#endif
++    va_end(args);
++}
++
++retro_log_printf_t log_cb = ntx_fallback_log;
+ retro_video_refresh_t video_cb = NULL;
+ retro_input_poll_t poll_cb = NULL;
+ retro_input_state_t input_cb = NULL;
+@@ -711,7 +732,7 @@
+     if (environ_cb(RETRO_ENVIRONMENT_GET_LOG_INTERFACE, &log))
+         log_cb = log.log;
+     else
+-        log_cb = NULL;
++        log_cb = ntx_fallback_log;
+ 
+     if (environ_cb(RETRO_ENVIRONMENT_GET_PERF_INTERFACE, &perf_cb))
+         perf_get_cpu_features_cb = perf_cb.get_cpu_features;
+@@ -728,7 +749,11 @@
+         game_thread = co_create(65536 * sizeof(void*) * 16, (void (*)(void))EmuThreadFunction);
+     }
+ 
+-    m64p_error ret = CoreStartup(FRONTEND_API_VERSION, ".", ".", NULL, n64DebugCallback, 0, n64StateCallback);
++    /* NTX: the Rust host supplies instance-owned backend directories. */
++    const char *save_pathname = NULL;
++    if (!environ_cb(RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY, &save_pathname) || !save_pathname)
++        save_pathname = sys_pathname;
++    m64p_error ret = CoreStartup(FRONTEND_API_VERSION, save_pathname, sys_pathname, NULL, n64DebugCallback, 0, n64StateCallback);
+     if(ret && log_cb)
+         log_cb(RETRO_LOG_ERROR, CORE_NAME ": failed to initialize core (err=%i)\n", ret);
+ }
+@@ -748,6 +773,12 @@
+ 
+     CoreShutdown();
+     deinit_audio_libretro();
++    /* NTX: execution has returned to the host; release its coroutine allocation. */
++    if (game_thread)
++    {
++        co_delete(game_thread);
++        game_thread = NULL;
++    }
+ 
+     if (perf_cb.perf_log)
+         perf_cb.perf_log();
+@@ -2137,7 +2168,7 @@
+ 
+ bool retro_serialize(void *data, size_t size)
+ {
+-   if (initializing)
++   if (initializing || !data || size < retro_serialize_size())
+       return false;
+ 
+    retro_savestate_complete = false;
+@@ -2170,7 +2201,7 @@
+ 
+ bool retro_unserialize(const void *data, size_t size)
+ {
+-   if (initializing)
++   if (initializing || !data || size < retro_serialize_size())
+       return false;
+ 
+    retro_savestate_complete = false;
+@@ -2198,7 +2229,7 @@
+       glsm_ctl(GLSM_CTL_STATE_UNBIND, NULL);
+    }
+ 
+-   return true;
++   return !!retro_savestate_result;
+ }
+ 
+ //Needed to be able to detach controllers for Lylat Wars multiplayer

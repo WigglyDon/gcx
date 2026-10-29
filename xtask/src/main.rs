@@ -4,6 +4,7 @@ mod android;
 mod corresponding;
 mod identity;
 mod legacy;
+mod mupen;
 mod receipt;
 use std::{path::PathBuf, process::Command};
 const PIN: &str = "cf5cb7ef81c3e8e7af5c9d566334219ffda9f68b";
@@ -123,6 +124,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let source = root.join(".local/source/dolphin");
     let action = std::env::args().nth(1).unwrap_or_default();
     match action.as_str() {
+        "mupen-source-check" => {
+            mupen::source_check(&root)?;
+        }
+        "build-mupen" => mupen::build(&root)?,
         "check-identity" => identity::check(&root)?,
         "check-signer" => {
             let (key, password) = legacy::preserved_signer(&root)?;

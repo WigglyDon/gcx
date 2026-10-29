@@ -44,3 +44,26 @@ The root license is GPL version 2 text; inspected Mupen device files declare
 GPL-2.0-or-later and GLSM declares MIT terms. These observations are not a complete
 combined-distribution license conclusion. Retain all selected component notices
 and corresponding source before packaging or public binary consideration.
+
+## Source build preparation
+
+The selected archive was verified against all 2275 upstream Git blob identities.
+Its one Windows project CRLF export expansion was reversed to the exact pinned
+Git blob; the source manifest records SHA256 for every original file. The
+maintained patch and patched-file manifest separately identify the host-boundary
+changes: checked state buffers/result, mechanical optional logger fallback,
+instance-owned config/data directories and completed coroutine allocation release.
+`cargo xtask mupen-source-check` validates that full active graph.
+
+`cargo xtask build-mupen` uses the existing reviewed NDK, one job and isolated
+build/ntx-mupen outputs. Command-line GLES3/ARM64/HLE options override upstream
+make defaults. The expanded graph has 274 compiled sources and no parallel RSP,
+parallel RDP, Angrylion or gnulib dependency; build execution/qualification is still
+pending. Original optional dependencies remain pinned as excluded source.
+
+The selected graph includes GLideNHQ xBRZ, whose source/header explicitly carry
+GPLv3 and a MAME exception that does not apply to ntx. GPLv3 text is retained in
+native/LICENSES/GPL-3.0-only.txt. Treat this selected core combination under its
+actual applicable GPLv3 obligations, retain component notices and deliver exact
+corresponding source/build inputs; root-license summaries are insufficient.
+No public binary release or store/legal commitment is authorized.

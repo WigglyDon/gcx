@@ -654,6 +654,16 @@ fn boot(
     if !valid_id(&entry.profile_id.0) {
         return Err("invalid profile identity".into());
     }
+    platform::trace_current("boot.media_hash.begin", "");
+    let media_sha256 = checkpoint::media_digest(platform::open_document(&entry.uri)?)?;
+    if entry
+        .media_sha256
+        .as_ref()
+        .is_some_and(|expected| *expected != media_sha256)
+    {
+        return Err("The document bytes changed. Relink verified original media; existing game identity and saves are retained.".into());
+    }
+    platform::trace_current("boot.media_hash.end", "ok");
     let path = root.join("profiles").join(&entry.profile_id.0);
     std::fs::create_dir_all(&path)?;
     let profile = SaveProfile {
@@ -723,10 +733,7 @@ fn boot(
             return Err("Choose a supported GameCube disc image (ISO/GCM or RVZ).".into());
         }
         runtime.binding.disc = info.disc;
-        platform::trace_current("boot.media_hash.begin", "");
-        runtime.binding.media_sha256 =
-            checkpoint::media_digest(platform::open_document(&entry.uri)?)?;
-        platform::trace_current("boot.media_hash.end", "ok");
+        runtime.binding.media_sha256 = media_sha256;
         if let Some(id) = &entry.checkpoint {
             // No guest has started. Reject mismatches before paused native boot.
             platform::trace_current("boot.checkpoint_validate.begin", "");
@@ -770,6 +777,15 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
         .internal_data_path()
         .ok_or("private storage unavailable")?
         .join("ntx");
+    // A development migration transfers only a protected export into this
+    // installation's private incoming directory. Rust validates and atomically
+    // publishes it before any resource/runtime initialization. Existing target
+    // data always wins; leaving the incoming export in place is intentional.
+    let private_parent = root.parent().ok_or("missing private parent")?;
+    let incoming = private_parent.join("ntx-import");
+    if !root.try_exists()? && incoming.try_exists()? {
+        ntx::migration::import_export(&incoming, private_parent)?;
+    }
     let _store_writer = ProfileLock::acquire_file(
         &root
             .parent()
@@ -1067,62 +1083,74 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                 }
                 Command::DocumentSelected(uri) => {
                     picker_pending = false;
-                    if let Some(index) = collection
+                    let relink = collection
                         .entries
                         .iter()
                         .position(|e| e.uri == uri && e.media_relink_required)
-                    {
-                        let checked: Result<()> = (|| {
-                            let file = platform::open_document(&uri)?;
-                            if let Some(checkpoint) = &collection.entries[index].checkpoint {
-                                let profile = root
-                                    .join("profiles")
-                                    .join(&collection.entries[index].profile_id.0);
-                                let retained = checkpoint::inspect_retained(&profile, checkpoint)?;
-                                if checkpoint::media_digest(file)? != retained.media_sha256 {
-                                    return Err("Selected media differs from the retained scene. Original game and scene retained.".into());
-                                }
+                        .or_else(|| {
+                            selected.filter(|i| collection.entries[*i].media_relink_required)
+                        });
+                    if let Some(index) = relink {
+                        let observed = match platform::open_document(&uri)
+                            .and_then(|file| Ok(checkpoint::media_digest(file)?))
+                        {
+                            Ok(digest) => digest,
+                            Err(error) => {
+                                platform::notice(
+                                    app,
+                                    format!("Could not read selected media: {error}"),
+                                );
+                                continue;
                             }
-                            Ok(())
-                        })();
-                        if let Err(error) = checked {
-                            platform::notice(app, format!("Could not relink media: {error}"));
+                        };
+                        let earlier = collection.entries[index].clone();
+                        if let Err(error) =
+                            collection.relink_game(&earlier.game_id.0, &uri, &observed)
+                        {
+                            platform::notice(app, error.into());
                             continue;
                         }
-                        collection.entries[index].media_relink_required = false;
                         if let Err(error) = save_collection(&root, &collection) {
-                            collection.entries[index].media_relink_required = true;
+                            collection.entries[index] = earlier;
                             platform::notice(
                                 app,
                                 format!("Could not preserve media access: {error}"),
                             );
                             continue;
                         }
-                    } else if selected.is_some_and(|i| collection.entries[i].media_relink_required)
-                    {
-                        platform::notice(app, "That is a different document locator. Verified relocation is still required; the original game and progress are retained. Select the original document to reacquire access.".into());
-                        continue;
                     }
                     Command::Selected(uri)
                 }
-                Command::Game(id) => match collection
-                    .open_game(&id, runtime.as_ref().map(|r| r.events.game_id.as_str()))
-                {
-                    Ok(GameOpen::ResumeCurrent) => {
-                        if let Some(index) = selected {
-                            collection.entries[index].paused = false;
+                Command::Game(id) => {
+                    if runtime.is_none()
+                        && let Ok(index) = collection.resolve_game(&id)
+                        && collection.entries[index].media_relink_required
+                    {
+                        selected = Some(index);
+                        collection.selected = Some(id);
+                        save_collection(&root, &collection)?;
+                        platform::relink_menu(app, &collection.entries[index].title);
+                        continue;
+                    }
+                    match collection
+                        .open_game(&id, runtime.as_ref().map(|r| r.events.game_id.as_str()))
+                    {
+                        Ok(GameOpen::ResumeCurrent) => {
+                            if let Some(index) = selected {
+                                collection.entries[index].paused = false;
+                            }
+                            platform::menu(app, false, None);
+                            continue;
                         }
-                        platform::menu(app, false, None);
-                        continue;
+                        Ok(GameOpen::Select(index)) => {
+                            Command::Selected(collection.entries[index].uri.clone())
+                        }
+                        Err(error) => {
+                            platform::notice(app, error.into());
+                            continue;
+                        }
                     }
-                    Ok(GameOpen::Select(index)) => {
-                        Command::Selected(collection.entries[index].uri.clone())
-                    }
-                    Err(error) => {
-                        platform::notice(app, error.into());
-                        continue;
-                    }
-                },
+                }
                 other => other,
             };
             match command {
@@ -1236,7 +1264,7 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                 }
                 Command::Choose => {
                     if !picker_pending {
-                        platform::picker(app);
+                        platform::picker(app, selected.map(|i| collection.entries[i].uri.as_str()));
                         picker_pending = true;
                     }
                 }
@@ -1386,6 +1414,7 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                                 system: ntx::backend::System::GameCube,
                                 backend: ntx::backend::Backend::Dolphin,
                                 media_relink_required: false,
+                                media_sha256: None,
                                 game_id: GameId(id()?),
                                 profile_id: SaveProfileId(id()?),
                                 uri,
@@ -1561,7 +1590,15 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
             }
             match boot(&root, &sys, &collection.entries[index], window) {
                 Ok(active) => {
+                    collection.entries[index].media_sha256 =
+                        Some(active.binding.media_sha256.clone());
                     runtime = Some(active);
+                    if let Err(error) = save_collection(&root, &collection) {
+                        collection.entries[index]
+                            .fail(format!("Could not preserve media identity: {error}"));
+                        hidden = false;
+                        platform::menu(app, true, collection.entries[index].last_error.clone());
+                    }
                     surface_pending = false;
                     native_paused = None;
                 }

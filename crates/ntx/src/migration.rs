@@ -66,7 +66,12 @@ fn inventory(root: &Path) -> io::Result<Inventory> {
             {
                 continue;
             }
-            if depth == 0 && !matches!(name, "collection.json" | "controls.json" | "profiles") {
+            if depth == 0
+                && !matches!(
+                    name,
+                    "collection.json" | "controls.json" | "profiles" | "media-identities.json"
+                )
+            {
                 return Err(invalid(
                     "unrecognized export root entry; preserve and reconcile",
                 ));
@@ -213,7 +218,7 @@ pub fn import_export(source: &Path, target_parent: &Path) -> io::Result<Outcome>
     let source = source.canonicalize()?;
     let parent = target_parent.canonicalize()?;
     let target = parent.join("ntx");
-    if source.starts_with(&parent) || parent.starts_with(&source) {
+    if source.starts_with(&target) || target.starts_with(&source) {
         return Err(invalid("source and target must be disjoint"));
     }
     let _target_writer = ProfileLock::acquire_file(&parent.join("ntx-store.lock"))?;
@@ -221,6 +226,19 @@ pub fn import_export(source: &Path, target_parent: &Path) -> io::Result<Outcome>
     let mut model = collection(&source, &before)?;
     if before.contains_key("controls.json") {
         crate::controls::Settings::load(&source)?;
+    }
+    let media: BTreeMap<String, String> = if let Some(info) = before.get("media-identities.json") {
+        if info.length > 1024 * 1024 {
+            return Err(invalid("media identity export exceeds bound"));
+        }
+        serde_json::from_slice(&fs::read(source.join("media-identities.json"))?)?
+    } else {
+        BTreeMap::new()
+    };
+    if media.iter().any(|(id, digest)| {
+        !storage::valid_digest(digest) || !model.entries.iter().any(|e| e.game_id.0 == *id)
+    }) {
+        return Err(invalid("invalid exported media identity"));
     }
     let mut writers = Vec::new();
     let profiles = source.join("profiles");
@@ -245,12 +263,21 @@ pub fn import_export(source: &Path, target_parent: &Path) -> io::Result<Outcome>
         }
     }
     for game in &mut model.entries {
+        game.media_sha256 = media.get(&game.game_id.0).cloned();
         if let Some(id) = &game.checkpoint {
             let binding =
                 crate::checkpoint::inspect_retained(&profiles.join(&game.profile_id.0), id)?;
             if binding.game_id != game.game_id.0 || binding.profile_id != game.profile_id.0 {
                 return Err(invalid("checkpoint belongs to a different game/profile"));
             }
+            if game
+                .media_sha256
+                .as_ref()
+                .is_some_and(|s| *s != binding.media_sha256)
+            {
+                return Err(invalid("exported media differs from retained checkpoint"));
+            }
+            game.media_sha256 = Some(binding.media_sha256);
             // Retain the reference and exact bytes. A new engine is NOT entitled
             // to rewrite this fingerprint or silently cold boot unsaved play.
             let mut message = "Retained legacy scene requires its original compatible runtime. Keep the recovery candidate, or explicitly restart with current saves after relinking media.".to_owned();
@@ -548,5 +575,18 @@ mod tests {
             fs::read(stage.join("protected")).unwrap(),
             b"retained stage"
         );
+    }
+    #[test]
+    fn private_incoming_sibling_imports_without_recursive_source_target_overlap() {
+        let f = Fixture::new();
+        let incoming = f.parent.join("ntx-import");
+        fs::rename(&f.source, &incoming).unwrap();
+        assert_eq!(
+            import_export(&incoming, &f.parent).unwrap(),
+            Outcome::Imported
+        );
+        assert!(incoming.join("collection.json").is_file());
+        assert!(f.parent.join("ntx/migration.json").is_file());
+        assert!(import_export(&f.parent.join("ntx"), &f.parent).is_err());
     }
 }

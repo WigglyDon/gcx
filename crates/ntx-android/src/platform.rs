@@ -739,7 +739,8 @@ pub fn display_name(text: &str) -> Result<String> {
         result
     })
 }
-pub fn picker(app: &AndroidApp) {
+pub fn picker(app: &AndroidApp, initial_uri: Option<&str>) {
+    let initial_uri = initial_uri.map(str::to_owned);
     let epoch = EPOCH.load(Ordering::Acquire);
     app.run_on_java_main_thread(Box::new(move || {
         if EPOCH.load(Ordering::Acquire) != epoch {
@@ -774,6 +775,16 @@ pub fn picker(app: &AndroidApp) {
                 "(I)Landroid/content/Intent;",
                 &[JValue::Int(1 | 64)],
             )?;
+            if let Some(initial) = &initial_uri {
+                let key = env.new_string("android.provider.extra.INITIAL_URI")?;
+                let initial = uri(env, initial)?;
+                env.call_method(
+                    &intent,
+                    "putExtra",
+                    "(Ljava/lang/String;Landroid/os/Parcelable;)Landroid/content/Intent;",
+                    &[JValue::Object(&key), JValue::Object(&initial)],
+                )?;
+            }
             env.call_method(
                 activity,
                 "startActivityForResult",
@@ -804,6 +815,18 @@ pub fn menu(app: &AndroidApp, show: bool, message: Option<String>) {
             "Your games\nAdd a GameCube game. Your progress stays with it.".into()
         }),
         actions,
+        0,
+    );
+}
+pub fn relink_menu(app: &AndroidApp, title: &str) {
+    render_menu(
+        app,
+        true,
+        format!(
+            "{}\nChoose this game's file to restore access. Your progress and retained scene stay with it.",
+            ntx::presentation::game_title(title)
+        ),
+        vec![(12, "Choose game file".into()), (6, "Library".into())],
         0,
     );
 }
@@ -1613,7 +1636,7 @@ extern "system" fn Java_com_machinerhythm_ntx_NtxActivity_uiAction(
         &format!("action={action}"),
     );
     match action {
-        1 => push(Command::Choose),
+        1 | 12 => push(Command::Choose),
         2 => push(Command::Restart),
         3 => push(Command::Resume(runtime as u64)),
         4 => push(Command::Stop(runtime as u64)),
@@ -1660,7 +1683,7 @@ extern "system" fn Java_com_machinerhythm_ntx_NtxActivity_uiAction(
         }
         _ => {}
     }
-    if matches!(action, 1..=11 | 20..=25) {
+    if matches!(action, 1..=12 | 20..=25) {
         feedback(&mut env, &activity);
     }
 }

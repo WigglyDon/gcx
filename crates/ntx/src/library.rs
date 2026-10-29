@@ -14,6 +14,8 @@ pub struct SavedSession {
     /// A locator is not a grant in a new Android package.
     #[serde(default)]
     pub media_relink_required: bool,
+    #[serde(default)]
+    pub media_sha256: Option<String>,
     pub game_id: GameId,
     pub profile_id: SaveProfileId,
     pub uri: String,
@@ -144,6 +146,41 @@ impl Collection {
             .position(|entry| entry.game_id.0 == id)
             .ok_or("This game is no longer in the library. Open the library to choose a game.")
     }
+    /// The host has freshly acquired read access and fingerprinted these bytes.
+    /// A changed platform locator never allocates another game or save profile.
+    pub fn relink_game(&mut self, id: &str, uri: &str, observed: &str) -> Result<(), &'static str> {
+        let index = self.resolve_game(id)?;
+        if !uri.starts_with("content://")
+            || uri.len() > 65536
+            || !crate::storage::valid_digest(observed)
+            || self
+                .entries
+                .iter()
+                .enumerate()
+                .any(|(i, e)| i != index && e.uri == uri)
+        {
+            return Err("Invalid or already assigned media locator.");
+        }
+        let game = &mut self.entries[index];
+        if !game.media_relink_required {
+            return Err("This game does not need relinking.");
+        }
+        match &game.media_sha256 {
+            Some(expected) if expected != observed => {
+                return Err("Selected media differs; original identity and progress retained.");
+            }
+            None if game.uri != uri => {
+                return Err(
+                    "A verified original media fingerprint is required to change this locator.",
+                );
+            }
+            _ => {}
+        }
+        game.uri = uri.into();
+        game.media_sha256 = Some(observed.into());
+        game.media_relink_required = false;
+        Ok(())
+    }
     pub fn open_game(&self, id: &str, live_game: Option<&str>) -> Result<GameOpen, &'static str> {
         let target = self.resolve_game(id)?;
         if self.entries[target].media_relink_required {
@@ -187,6 +224,9 @@ impl Collection {
         let mut profiles = BTreeSet::new();
         for e in &self.entries {
             if e.backend.system() != e.system
+                || e.media_sha256
+                    .as_ref()
+                    .is_some_and(|s| !crate::storage::valid_digest(s))
                 || !valid_id(&e.game_id.0)
                 || !valid_id(&e.profile_id.0)
                 || !e.uri.starts_with("content://")
@@ -224,6 +264,7 @@ mod tests {
             system: crate::backend::System::GameCube,
             backend: crate::backend::Backend::Dolphin,
             media_relink_required: false,
+            media_sha256: None,
             game_id: GameId("a".repeat(32)),
             profile_id: SaveProfileId("b".repeat(32)),
             uri: "content://fixture/game".into(),
@@ -284,6 +325,33 @@ mod tests {
             Collection::decode(&serde_json::to_vec(&old).unwrap()).is_err(),
             "new schema cannot omit routing"
         );
+    }
+    #[test]
+    fn relinking_a_new_host_locator_checks_media_without_reidentifying_progress() {
+        let mut c = Collection {
+            entries: vec![entry()],
+            ..Default::default()
+        };
+        c.entries[0].media_relink_required = true;
+        let id = c.entries[0].game_id.0.clone();
+        assert!(
+            c.relink_game(&id, "content://other-host/game", &"c".repeat(64))
+                .is_err()
+        );
+        c.entries[0].media_sha256 = Some("c".repeat(64));
+        c.entries[0].checkpoint = Some("e".repeat(64));
+        c.entries[0].restart_required = true;
+        assert!(
+            c.relink_game(&id, "content://other-host/game", &"d".repeat(64))
+                .is_err()
+        );
+        assert_eq!(c.entries[0].uri, "content://fixture/game");
+        c.relink_game(&id, "content://other-host/game", &"c".repeat(64))
+            .unwrap();
+        assert_eq!(c.entries[0].profile_id.0, "b".repeat(32));
+        assert_eq!(c.entries[0].game_id.0, id);
+        assert_eq!(c.entries[0].checkpoint, Some("e".repeat(64)));
+        assert!(c.entries[0].restart_required && !c.entries[0].media_relink_required);
     }
     #[test]
     fn failure_survives_relaunch_and_explicit_restart_keeps_identity_and_error() {
