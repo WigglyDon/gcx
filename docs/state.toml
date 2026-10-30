@@ -50,7 +50,7 @@ resume_limit = "Checked native restore results and state-job yields implemented;
 device_actions = "Combined APK577616e6/source5d2246c installed; library-only atomic import completed and identities/ordinary bytes/source unchanged verified. Custodian confirmed physical OFF and actual return. No guest input or media regrant yet; Fold untouched"
 
 [validation]
-host = "82 portable library tests, 15 decoder and 3 integration tests passed; subsequent disjoint-target and retained-import/route-protection fixtures passed; current host/ARM64 lints deny warnings"
+host = "87 portable library tests passed, including foreground game identity/background policy and fractional frame deadlines; retained 15 decoder and 3 integration checks; host all-targets and ARM64 Android lints deny warnings"
 helpers = "94 offline packet fixtures passed"
 lints = "Warnings-denied host all-targets including native declarations and ARM64 Android Clippy passed; no mock native library or fingerprints"
 android_shell = "Java compiler module, DEX namespace and compiled resources/manifest checked; canonical package/activity/label confirmed"
@@ -65,10 +65,10 @@ engine_sha256 = "15da3bfabf03c27171c37f48773a7c7ee24d5470970746718098ccf566ccab7
 status = "GameCube identity/import candidate signed with retained certificate and privately preserved with exact corresponding source; not installed"
 
 [n64_candidate]
-source = "016767298be311018c798b91c286fbf46b49dfc7"
-apk_sha256 = "45a664c994c9888e0277a92acaac84c3276ec278f9aceea7586f07a9b8a22489"
+source = "ee271cdf653ec36c79a6bd8e3021d87ae734d444"
+apk_sha256 = "8dcfad2a8732cf71996a9e1ed78dcaf60496635868c1059e2c9d012aa0890b46"
 core_sha256 = "af7bab08859b6f8a3d224328d603c60e0d0cd40cfe8a36fa77e668e0b826446f"
-status = "Combined package built and signed with retained identity; native/JNI/source/resource/notices/alignment checks passed; preserved with complete Dolphin/Mupen/Rust source; not installed or playable-qualified. Includes separated touch targets, analog/press feedback and verified legacy failed-cartridge relink; actual device acceptance remains pending"
+status = "Combined package built/signed/audited and preserved with complete corresponding source; not installed or playable-qualified. Includes portable foreground/frame scheduling, dynamic timing validation, truthful callback-only diagnostics, separated touch targets and verified legacy failed-cartridge relink. Normal lab regrant/boundary task waits for its qualified connection; no custody or guest result follows from queueing"
 
 [pixel_migration]
 installed_source = "5d2246c0b82690a004e970eaf0dea75041e1ae8b"
