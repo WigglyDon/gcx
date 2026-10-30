@@ -4,7 +4,9 @@ Binding authority: [NTX-5](https://github.com/WigglyDon/ntx/issues/5) and
 [amendment6505289270](https://github.com/WigglyDon/ntx/issues/5#issuecomment-6505289270).
 These are required current contracts. Active identity, schema-2 routing and
 offline staged import are implemented. A renamed GameCube package is built and
-preserved; device migration remains unqualified. The pinned N64 core compiles
+preserved; Pixel4 app-side data migration is verified with the original IDs and
+ordinary bytes retained. Its document regrant and current-package gameplay remain
+unqualified. The pinned N64 core compiles
 and the Rust execution/Android resource/save/scene implementation is in source;
 A combined package is linked/audited; device acceptance remains unfinished. The preserved GameCube baseline is documented in
 [historical architecture](history/GCX_ARCHITECTURE.md) and native/README.md.

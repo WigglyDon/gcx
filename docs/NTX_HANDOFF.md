@@ -30,13 +30,18 @@ system/backend routing are implemented; see [migration](IDENTITY_MIGRATION.md).
 The original patch is preserved in native/patches/history. Signer matches its
 independent recovery and installed-candidate certificate; original inputs remain.
 
-Pinned N64 source/interfaces and original cartridge/input/save-format policy now
-exist; [integration notes](../native/mupen/README.md) record the real restore-result
-hazard and remaining work. No libretro execution adapter or playable claim yet.
-No phone commands, native heavy build, source-data migration or new linked APK
-have been performed. Do not transfer old gameplay acceptance to this increment.
-The immediate next step is the linked ntx package and protected device-specific
-migration/relink qualification, followed by the pinned N64 execution vertical slice.
+Pinned N64 source, the small Rust libretro execution adapter, Android GLES/audio
+resources, system-correct input and separate ordinary/scene persistence are built
+and linked; [integration notes](../native/mupen/README.md) record the maintained
+native boundary repairs and remaining device qualification. Pixel4 app-side data
+migration is verified with original identities, exact ordinary profile bytes and
+unchanged source installation. The custodian verified return. Its document grants
+still require regrant; N64 play/save/reload and cross-system continuity remain
+unqualified. Source58772ad has a preserved combined private candidate and portable
+opaque media bindings with Android-scoped access enforced in its host adapter.
+Next are protected current-package update/regrant and one affected GameCube
+boundary, followed by actual N64 play/save/continuity. Do not transfer old gameplay
+acceptance to the new package or repeat earned campaigns.
 
 ## Source and relocation boundary (succession baseline)
 
