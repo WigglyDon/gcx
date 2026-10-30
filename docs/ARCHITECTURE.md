@@ -49,6 +49,13 @@ isolation must not redefine IDs or place progress in console-global writable
 storage. Native globals may require process isolation; no unqualified double
 instantiation. Background pause/silence is the default, with no fake keepalive.
 
+The portable scheduling module decides pause/play for the first foreground slot
+from its bound GameId, selected session, resume/recovery state and reported host
+availability. Android supplies foreground/window/player visibility and applies
+the decision to either backend. A different selected game cannot execute the old
+runtime. Portable frame deadlines own N64 pacing; Android supplies event waits.
+Neither decision embeds Android handles or changes durable identities.
+
 ## Ordinary progress and machine state
 
 Keep immutable media, ordinary game-owned saves, machine checkpoints/consistency

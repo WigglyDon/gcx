@@ -8,6 +8,7 @@ use ntx::{
     n64::Cartridge,
     n64_checkpoint::{self, Binding, Checkpoint},
     n64_save::SaveStore,
+    scheduling::FramePacer,
 };
 use std::{
     cell::RefCell,
@@ -30,7 +31,7 @@ pub(super) struct Runtime {
     path: PathBuf,
     binding: Binding,
     paused: bool,
-    next: Instant,
+    pacer: FramePacer,
     accepted: Option<ntx::n64_save::Generation>,
 }
 impl Runtime {
@@ -98,7 +99,7 @@ impl Runtime {
             path,
             binding,
             paused: true,
-            next: Instant::now(),
+            pacer: FramePacer::new(Instant::now()),
             accepted: None,
         })
     }
@@ -115,7 +116,7 @@ impl Runtime {
                 core.silence();
             }
         } else {
-            self.next = Instant::now();
+            self.pacer.reset(Instant::now());
         }
     }
     pub fn surface(&mut self, window: Option<&NativeWindow>) -> bool {
@@ -136,11 +137,15 @@ impl Runtime {
         });
     }
     pub fn dispatch(&mut self) {
-        if self.paused || self.failed || self.pending.is_some() || Instant::now() < self.next {
+        if self.paused || self.failed || self.pending.is_some() || !self.pacer.ready(Instant::now())
+        {
             return;
         }
         let fps = self.core.as_ref().map_or(60., |c| c.av_info().timing.fps);
-        self.next = Instant::now() + Duration::from_secs_f64(1. / fps);
+        if let Err(error) = self.pacer.schedule(Instant::now(), fps) {
+            self.report(error.into());
+            return;
+        }
         if let Err(e) = self.core().and_then(Core::run_frame) {
             self.report(e);
         }
@@ -149,9 +154,7 @@ impl Runtime {
         if self.paused || self.failed || self.pending.is_some() {
             return Duration::from_millis(8);
         }
-        self.next
-            .saturating_duration_since(Instant::now())
-            .min(Duration::from_millis(8))
+        self.pacer.wait(Instant::now(), Duration::from_millis(8))
     }
     pub fn commit(&mut self) -> Result<()> {
         self.pause(true);
@@ -239,9 +242,9 @@ impl Runtime {
         self.pause(true);
         if let Some(core) = self.core.as_mut() {
             core.stop()?;
-            let (frames, audio) = core.observations();
+            let (video_callbacks, audio_acknowledged) = core.observations();
             platform::diagnostic(&format!(
-                "N64 joined: {frames} presented frames, {audio} delivered stereo frames; profile writer retained"
+                "N64 joined: {video_callbacks} accepted video callbacks, {audio_acknowledged} acknowledged stereo frames; includes muted/background acknowledgments, not physical presentation or audible proof; profile writer retained"
             ));
             if !self.failed && self.pending.is_none() {
                 let bytes = core.ordinary_image()?;

@@ -2043,12 +2043,18 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                 }
                 if matches!(runtime.as_ref().unwrap().state(), 1 | 2) {
                     let restoring = runtime.as_ref().is_some_and(|r| r.pending());
-                    let paused = restoring
-                        || runtime.as_ref().unwrap().failed()
-                        || !hidden
-                        || !foreground
-                        || window.is_none()
-                        || selected.is_some_and(|i| collection.entries[i].paused);
+                    let active = runtime.as_ref().unwrap();
+                    let paused = ntx::scheduling::should_pause(
+                        &active.events.game_id,
+                        selected.map(|i| &collection.entries[i]),
+                        ntx::scheduling::HostAvailability {
+                            foreground,
+                            surface_ready: window.is_some(),
+                            player_visible: hidden,
+                        },
+                        restoring,
+                        active.failed(),
+                    );
                     if native_paused != Some(paused) {
                         platform::trace_current(
                             "native.pause.begin",

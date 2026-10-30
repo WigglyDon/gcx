@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-//! Rust-owned GameCube input and exclusive save-profile ownership.
+//! Portable Nintendo collection, session, input and save policy.
 use std::fs::{File, OpenOptions};
 use std::io;
 use std::os::fd::AsRawFd;
@@ -16,6 +16,7 @@ pub mod n64_checkpoint;
 pub mod n64_save;
 pub mod n64_touch;
 pub mod presentation;
+pub mod scheduling;
 pub mod touch;
 pub mod viewport;
 

@@ -52,6 +52,9 @@ pub struct AvInfo {
     pub geometry: Geometry,
     pub timing: Timing,
 }
+fn supported_timing(timing: Timing) -> bool {
+    timing.fps.is_finite() && (40.0..=65.0).contains(&timing.fps) && timing.sample_rate == 44100.0
+}
 #[repr(C)]
 #[derive(Clone, Copy)]
 struct Hardware {
@@ -256,7 +259,12 @@ unsafe extern "C" fn environment(command: u32, data: *mut c_void) -> bool {
                     true
                 }
                 32 => {
-                    c.av = *data.cast::<AvInfo>();
+                    let av = *data.cast::<AvInfo>();
+                    if !supported_timing(av.timing) {
+                        c.fail("Unsupported N64 timing/audio update".into());
+                        return false;
+                    }
+                    c.av = av;
                     true
                 }
                 37 => {
@@ -553,10 +561,7 @@ impl Core {
         }
         core.check()?;
         let timing = core.context.av.timing;
-        if !timing.fps.is_finite()
-            || !(40.0..=65.0).contains(&timing.fps)
-            || timing.sample_rate != 44100.0
-        {
+        if !supported_timing(timing) {
             return Err("Unsupported N64 timing/audio contract".into());
         }
         Ok(core)
@@ -567,6 +572,8 @@ impl Core {
     pub fn av_info(&self) -> AvInfo {
         self.context.av
     }
+    /// Successful callback acknowledgments. A host may discard muted audio or
+    /// accept video without a visible surface; these are not output evidence.
     pub fn observations(&self) -> (u64, u64) {
         (self.context.frames, self.context.audio_frames)
     }
