@@ -68,7 +68,7 @@ status = "GameCube identity/import candidate signed with retained certificate an
 source = "ee271cdf653ec36c79a6bd8e3021d87ae734d444"
 apk_sha256 = "8dcfad2a8732cf71996a9e1ed78dcaf60496635868c1059e2c9d012aa0890b46"
 core_sha256 = "af7bab08859b6f8a3d224328d603c60e0d0cd40cfe8a36fa77e668e0b826446f"
-status = "Combined package built/signed/audited and preserved with complete corresponding source; not installed or playable-qualified. Includes portable foreground/frame scheduling, dynamic timing validation, truthful callback-only diagnostics, separated touch targets and verified legacy failed-cartridge relink. Normal lab regrant/boundary task waits for its qualified connection; no custody or guest result follows from queueing"
+status = "Combined package built/signed/audited and preserved with complete corresponding source; not installed or playable-qualified. Includes portable foreground/frame scheduling, dynamic timing validation, truthful callback-only diagnostics, separated touch targets and verified legacy failed-cartridge relink. Lab regrant/boundary needs restored qualified connectivity. The interactive request was canceled without acquisition while the link was absent, preserving its ready recipe/artifacts; no guest result or held custody"
 
 [pixel_migration]
 installed_source = "5d2246c0b82690a004e970eaf0dea75041e1ae8b"
