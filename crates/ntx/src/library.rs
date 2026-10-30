@@ -111,7 +111,9 @@ pub fn parse_play_uri(uri: &str) -> Result<String, &'static str> {
     Ok(id.to_owned())
 }
 impl Collection {
-    /// Schema 1 was exclusively direct Dolphin GameCube. Upgrade routing only;
+    /// Schema 1 executed exclusively through direct Dolphin GameCube, but may
+    /// retain failed imports of other media. Start with that legacy route;
+    /// a freshly verified relink can classify a never-bound failed import.
     /// IDs, selected game, ordinary data and checkpoint fingerprints stay intact.
     pub fn decode(bytes: &[u8]) -> Result<Self, String> {
         let mut value: serde_json::Value =
@@ -179,6 +181,56 @@ impl Collection {
         game.uri = uri.into();
         game.media_sha256 = Some(observed.into());
         game.media_relink_required = false;
+        Ok(())
+    }
+    /// The host classified the actual freshly granted bytes, not a filename.
+    /// Legacy failed imports with no bound scene/media may acquire their real
+    /// route without allocating identities. Existing bound progress refuses a
+    /// system change; profile files are never converted or deleted here.
+    pub fn relink_game_routed(
+        &mut self,
+        id: &str,
+        uri: &str,
+        observed: &str,
+        system: crate::backend::System,
+        backend: crate::backend::Backend,
+    ) -> Result<(), &'static str> {
+        let index = self.resolve_game(id)?;
+        if backend.system() != system {
+            return Err("Invalid verified media route.");
+        }
+        let game = &self.entries[index];
+        let changed = (game.system, game.backend) != (system, backend);
+        if changed
+            && !(game.media_relink_required
+                && game.media_sha256.is_none()
+                && game.checkpoint.is_none()
+                && game.restart_required
+                && game
+                    .last_error
+                    .as_ref()
+                    .is_some_and(|e| e.contains(crate::legacy::UNSUPPORTED_DISC_IMPORT))
+                && game.system == crate::backend::System::GameCube
+                && game.backend == crate::backend::Backend::Dolphin
+                && system == crate::backend::System::Nintendo64
+                && backend == crate::backend::Backend::Mupen64PlusNext)
+        {
+            return Err(
+                "Verified media system differs from bound progress; original identity and recovery retained.",
+            );
+        }
+        self.relink_game(id, uri, observed)?;
+        if changed {
+            let game = &mut self.entries[index];
+            game.system = system;
+            game.backend = backend;
+            let mut message="N64 cartridge verified for this retained import. Earlier profile files are kept. Restart explicitly with current N64 saves.".to_owned();
+            if let Some(earlier) = &game.last_error {
+                message.push_str("\nEarlier retained error: ");
+                message.push_str(earlier);
+            }
+            game.fail(message);
+        }
         Ok(())
     }
     pub fn open_game(&self, id: &str, live_game: Option<&str>) -> Result<GameOpen, &'static str> {
@@ -259,6 +311,81 @@ impl Collection {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn verified_legacy_failed_cartridge_relinks_without_new_ids_but_bound_scene_refuses_system_change()
+     {
+        use crate::backend::{Backend, System};
+        let mut game = entry();
+        game.media_relink_required = true;
+        game.fail(crate::legacy::UNSUPPORTED_DISC_IMPORT.into());
+        let mut collection = Collection {
+            schema_version: 2,
+            selected: Some(game.game_id.0.clone()),
+            entries: vec![game],
+        };
+        let original = collection.entries[0].clone();
+        collection
+            .relink_game_routed(
+                &original.game_id.0,
+                &original.uri,
+                &"e".repeat(64),
+                System::Nintendo64,
+                Backend::Mupen64PlusNext,
+            )
+            .unwrap();
+        let game = &collection.entries[0];
+        assert_eq!(game.game_id, original.game_id);
+        assert_eq!(game.profile_id.0, original.profile_id.0);
+        assert_eq!(game.system, System::Nintendo64);
+        assert!(!game.boot_allowed());
+        assert!(
+            game.last_error
+                .as_ref()
+                .unwrap()
+                .contains(crate::legacy::UNSUPPORTED_DISC_IMPORT)
+        );
+        collection.entries[0] = original.clone();
+        collection.entries[0].checkpoint = Some("f".repeat(64));
+        assert!(
+            collection
+                .relink_game_routed(
+                    &original.game_id.0,
+                    &original.uri,
+                    &"e".repeat(64),
+                    System::Nintendo64,
+                    Backend::Mupen64PlusNext
+                )
+                .is_err()
+        );
+        assert_eq!(collection.entries[0].system, System::GameCube);
+        assert!(collection.entries[0].media_relink_required);
+        collection.entries[0] = original.clone();
+        collection.entries[0].media_sha256 = Some("e".repeat(64));
+        assert!(
+            collection
+                .relink_game_routed(
+                    &original.game_id.0,
+                    &original.uri,
+                    &"e".repeat(64),
+                    System::Nintendo64,
+                    Backend::Mupen64PlusNext
+                )
+                .is_err()
+        );
+        collection.entries[0] = original.clone();
+        collection.entries[0].last_error = Some("Earlier save barrier failure".into());
+        assert!(
+            collection
+                .relink_game_routed(
+                    &original.game_id.0,
+                    &original.uri,
+                    &"e".repeat(64),
+                    System::Nintendo64,
+                    Backend::Mupen64PlusNext
+                )
+                .is_err()
+        );
+    }
     fn entry() -> SavedSession {
         SavedSession {
             system: crate::backend::System::GameCube,

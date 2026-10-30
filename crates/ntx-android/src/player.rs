@@ -826,7 +826,10 @@ fn media_digest(system: ntx::backend::System, file: File) -> Result<String> {
         ntx::backend::System::Nintendo64 => Ok(ntx::n64::Cartridge::read(file)?.sha256),
     }
 }
-fn inspect_media(uri: &str) -> Result<(ntx::backend::System, ntx::backend::Backend)> {
+fn inspect_media(
+    uri: &str,
+    live: Option<&LiveRuntime>,
+) -> Result<(ntx::backend::System, ntx::backend::Backend)> {
     use ntx::backend::{Backend, System};
     let mut file = platform::open_document(uri)?;
     let mut magic = [0; 4];
@@ -840,6 +843,13 @@ fn inspect_media(uri: &str) -> Result<(ntx::backend::System, ntx::backend::Backe
     }
     let candidate = CString::new(uri)?;
     let mut info = MediaInfo::default();
+    // Inspection also runs before the first Dolphin boot or after its shutdown.
+    // Bind scoped host reads without creating an execution/profile owner.
+    if !matches!(live,Some(LiveRuntime::Dolphin(d)) if d.native_alive) {
+        unsafe {
+            ntx_engine_platform(platform::dispatch);
+        }
+    }
     if unsafe { ntx_engine_inspect(candidate.as_ptr(), &mut info) } != 0 {
         return Ok((System::GameCube, Backend::Dolphin));
     }
@@ -1369,8 +1379,15 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                             selected.filter(|i| collection.entries[*i].media_relink_required)
                         });
                     if let Some(index) = relink {
+                        let route = match inspect_media(&uri, runtime.as_ref()) {
+                            Ok(route) => route,
+                            Err(e) => {
+                                platform::notice(app, e.to_string());
+                                continue;
+                            }
+                        };
                         let observed = match platform::open_document(&uri)
-                            .and_then(|file| media_digest(collection.entries[index].system, file))
+                            .and_then(|file| media_digest(route.0, file))
                         {
                             Ok(digest) => digest,
                             Err(error) => {
@@ -1382,9 +1399,13 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                             }
                         };
                         let earlier = collection.entries[index].clone();
-                        if let Err(error) =
-                            collection.relink_game(&earlier.game_id.0, &uri, &observed)
-                        {
+                        if let Err(error) = collection.relink_game_routed(
+                            &earlier.game_id.0,
+                            &uri,
+                            &observed,
+                            route.0,
+                            route.1,
+                        ) {
                             platform::notice(app, error.into());
                             continue;
                         }
@@ -1681,7 +1702,7 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                 }
                 Command::Selected(uri) => {
                     picker_pending = false;
-                    let route = match inspect_media(&uri) {
+                    let route = match inspect_media(&uri, runtime.as_ref()) {
                         Ok(route) => route,
                         Err(e) => {
                             platform::notice(app, e.to_string());

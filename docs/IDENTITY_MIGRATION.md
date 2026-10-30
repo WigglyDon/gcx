@@ -14,6 +14,16 @@ schema 1 explicitly to GameCube/Dolphin while preserving opaque IDs, selected
 game, profile, pause/error and checkpoint fields. Unknown/ambiguous schemas and
 invalid routes refuse. Android/native resources never become durable game IDs.
 
+Schema 1 could also retain a cartridge that failed its GameCube-only disc
+inspection. During a fresh document regrant, actual cartridge bytes may correct
+that unbound failed import to N64/Mupen with the same GameId and profile. This
+requires the isolated legacy unsupported-disc diagnostic, no bound media hash
+or checkpoint, and the original locator. Existing bound media/scene routes
+refuse a system change. All profile/recovery files and the earlier error remain;
+an explicit cold start is required. No filename-based reidentification or save
+format conversion occurs. Cold GameCube media inspection binds scoped host
+access before execution initialization, without replacing a live Dolphin hook.
+
 The existing signer is retained. `cargo xtask check-signer` compares original key
 and password with independent initial recovery, copies the same key to its ntx
 filename without replacing the original, exports its certificate and compares
