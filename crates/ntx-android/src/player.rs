@@ -1077,6 +1077,8 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
     let mut refresh_pins = true;
     if explicit_launch {
         platform::menu(app, true, None);
+    } else if let Some(index) = selected.filter(|i| collection.entries[*i].media_relink_required) {
+        platform::relink_menu(app, &collection.entries[index].title);
     } else if let Some(index) = selected.filter(|i| collection.entries[*i].restart_required) {
         platform::menu(
             app,
@@ -1683,6 +1685,13 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
                 }
                 Command::Open => {
                     if runtime.is_none()
+                        && let Some(index) =
+                            selected.filter(|i| collection.entries[*i].media_relink_required)
+                    {
+                        platform::relink_menu(app, &collection.entries[index].title);
+                        continue;
+                    }
+                    if runtime.is_none()
                         && let Some(index) = selected
                         && collection.entries[index].stopped
                         && !collection.entries[index].restart_required
@@ -1876,6 +1885,11 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
         if restart_requested {
             restart_requested = false;
             if let Some(index) = selected {
+                if collection.entries[index].media_relink_required {
+                    hidden = false;
+                    platform::relink_menu(app, &collection.entries[index].title);
+                    continue;
+                }
                 if runtime
                     .as_mut()
                     .is_some_and(|active| !active.commit_for_departure())
