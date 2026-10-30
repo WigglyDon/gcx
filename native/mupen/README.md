@@ -1,93 +1,61 @@
-# Pinned N64 integration boundary
-
-Current successor implementation (2026-10-29): the full pinned ARM64 GLES3/HLE
-core compiles. Rust owns the small libretro adapter, Android EGL/GLES resources,
-audio delivery, measured N64 touch controls, per-profile ordinary generations and
-bound machine generations in the same collection as direct Dolphin. The code is
-being linked/qualified; no device playable/save/reload/continuity result follows.
-Earlier preparatory findings below remain provenance, with these repairs applied:
-
-- Actual restore result and buffer admission are checked. Completed save/load
-  jobs yield after clearing the job, before further guest execution. Capture then
-  commits the ordinary image from that same boundary before publishing a scene.
-- The selected nonparallel workqueue executes its copy synchronously. Machine
-  state includes FlashRAM mode/page buffer and device protocol state; ordinary
-  EEPROM/Pak/SRAM/FlashRAM bytes remain a distinct bound generation. Current
-  bytes are checked before restore, and failed restore memory cannot publish.
-- Shutdown skips starting an unopened coroutine and acknowledges actual stopped
-  core state before freeing it. Rust retains code/context/host/writer ownership
-  if that acknowledgement or post-join publication fails.
-- `check_boundary.py` compiles the actual pinned header/state/deinit entrypoints
-  with bounded fixtures and reproduces both maintained patches exactly. These
-  are boundary checks, not emulation/GPU or successful game-state evidence.
-- See [selected resources/licenses](RESOURCE_AUDIT.md) and the exact 274-source
-  manifest. N64 packaging retains component/source notices and GPLv3 text;
-  candidate preservation includes original and complete patched source archives.
+# Pinned N64 integration
 
 Selected core: [Mupen64Plus-Next at 15bada85906593376e8fd697f1b0b3af3a20f512](https://github.com/libretro/mupen64plus-libretro-nx/tree/15bada85906593376e8fd697f1b0b3af3a20f512).
-[source-lock.json](source-lock.json) records its complete root tree identity,
-recursive gitlink and the inspected file blobs. The repository has no .gitmodules
-at this pin; do not invent a dependency URL for the gnulib gitlink. Full component
-and selected-resource license audit/build reproduction remain pending.
+[source-lock.json](source-lock.json) records the root tree, inspected blobs and
+optional gitlink. The pin has no .gitmodules; no dependency URL is invented for
+its excluded gnulib gitlink. No RetroArch frontend is imported.
 
-The [Android makefile](https://github.com/libretro/mupen64plus-libretro-nx/blob/15bada85906593376e8fd697f1b0b3af3a20f512/libretro/jni/Android.mk)
-selects the AArch64 dynarec, enables LLE/parallel components on ARM64 and chooses
-GLESv3 with GLES3=1. Merely setting optional flags to zero on its command line
-does not establish their exclusion: inspect the selected expanded graph. Its
-Application.mk defaults to four ABIs/android-21; ntx must explicitly select
-arm64-v8a and its supported API, output paths and 16 KiB ELF alignment. No upstream
-CI template is a complete ntx reproduction recipe or actual device qualification.
+The ARM64 GLES3/HLE core compiles and a combined Android package was linked,
+signed with the retained identity, checked and privately preserved from source
+36e9b732 (APK f946d3c9). Rust owns the libretro adapter, Android EGL/GLES/audio,
+N64 controls and independent profile/save/scene routing. Subsequent source edits
+need their own bound candidate. No device playable/save/reload/scene or
+cross-system acceptance is claimed by these build results.
 
-The Rust n64 module now validates .z64/.v64/.n64 byte orders by cartridge magic,
-normalizes a bounded private in-memory copy and fingerprints canonical bytes.
-It does not derive/reallocate GameIds or scan/download games. Its own digital C
-buttons and shoulders map to the pinned core's default, non-alternate libretro
-mapping, independent from the GameCube pad. Cancellation and simultaneous input
-have host fixtures. This module is preparatory policy, not a running host adapter.
+## Source and reproduction
 
-Inspected actual boundaries:
+All 2275 original files were checked against upstream Git blobs. The original
+archive's single Windows project CRLF expansion was normalized to the exact Git
+blob; source-files.sha256 records that original content. Maintained patches and
+patched-files.sha256 separately record checked buffers/results, optional logger
+fallback, owned directories, completion-bearing shutdown and coherent state-job
+yields. Modified files retain dated change notices and upstream terms.
 
-| Boundary | Finding and implementation consequence |
+`cargo xtask mupen-source-check` verifies the complete active graph.
+`python3 native/mupen/check_boundary.py` compiles the actual selected header,
+state entrypoints and deinit against bounded fixtures, and reproduces both patches
+from the retained original archive. It checks ABI layouts, failed results, buffer
+admission, completed-job yields, unopened-core shutdown and failed-join retention.
+These checks do not execute a console or GPU.
+
+`cargo xtask build-mupen` uses reviewed NDK30, API28, arm64-v8a, GLES3 and one job,
+with isolated build/ntx-mupen outputs and 16 KiB ELF alignment. The expanded graph
+has [274 compilation inputs](selected-sources.txt), no parallel RSP/RDP, Angrylion
+or gnulib, and no M64P_PARALLEL asynchronous save worker. Upstream Android defaults
+are overridden explicitly; the selected copy workqueue executes synchronously.
+Candidate preservation retains original and complete patched Mupen source,
+first-party/Dolphin/dependency bundles, Rust vendor inputs and exact tool/build
+bindings. The unsigned source-rebuild route needs no private signer.
+
+## Actual backend boundaries
+
+| Boundary | Implemented ownership and limit |
 | --- | --- |
-| libretro.c: retro_load_game | need_fullpath=false; copies content; formats save memory before initialization. Load ordinary data after formatting and before first execution. Passing a real filesystem path also probes .ndd/.gb/.sav sidecars; use scoped cartridge bytes and no path to avoid unintended subsystem discovery. |
-| libretro_memory.h / device headers | RETRO_MEMORY_SAVE_RAM exposes one 296960-byte image: EEPROM 2048, four Controller Paks of 32768, SRAM 32768, FlashRAM 131072. Rust parses these distinct regions. This is not a universal native-save converter; byte order/format validation of external saves remains due. |
-| Controller mapping | Default core maps joypad B/Y to N64 A/B, Select to L, R2 to R, L2 to Z, X/A/L/R to C-up/down/left/right. Fix core options accordingly; do not use alternate mapping or emulate C buttons as a GameCube stick. |
-| retro_serialize | Schedules a core job and switches coroutines until completion; returns retro_savestate_result. Caller owns buffer length and quiescence. |
-| retro_unserialize | Waits for completion but returns true unconditionally after the wait. It cannot acknowledge successful restore as-is; repair/fixture this selected core boundary before offering resume. |
-| savestates.c | Includes device protocol and FlashRAM page buffer/mode/status. Excluding ordinary filenames does not prove pending-save safety. Audit all cached/pending writes and failed-restore cleanup before enabling checkpoints. |
-| GLES/threading | GLSM owns hardware-context callbacks; threaded unload switches coroutines and joins emuThread. Actual EGL context/thread, framebuffer, audio, option callbacks and completion-bearing shutdown are still required in the Rust host. No UI-thread frame loop. |
+| Media | need_fullpath=false. Scoped cartridge bytes use path=NULL, preventing optional .ndd/.gb/.sav sibling probes. Rust validates bounded z64/v64/n64 magic and fingerprints canonical big-endian bytes without changing GameId or originals. |
+| Ordinary storage | RETRO_MEMORY_SAVE_RAM is 296960 bytes: EEPROM2048, four32768-byte Controller Paks, SRAM32768 and FlashRAM131072. Rust owns immutable image generations and an atomic ordinary reference under the profile writer. This is not a universal external native-save converter. |
+| Initialization | The core formats saved_memory at load. Rust injects the current image after formatting and before execution; a pending restore reseeds that exact bound generation after cold initialization and validates again. |
+| Capture/restore | Selected state includes device protocol and FlashRAM page-buffer/mode/status. Completed jobs yield after clearing the job and before further guest execution. Capture commits ordinary bytes from that boundary before publishing a scene. Restore requires exact core/options/architecture/media/game/profile and actual current ordinary generation; failed mutation is quarantined from publication. |
+| Graphics/audio | Android owns a retained EGL3 context, offscreen framebuffer, aspect composition, replacement window surfaces and PCM stereo AudioTrack. The core's threaded renderer is explicitly disabled; callbacks and core calls stay on the native owner thread. Android handles never enter durable game identity. |
+| Input | One analog stick, digital C-up/down/left/right, independent digital L/R and Z, D-pad, A/B/Start. Default core mapping is fixed explicitly; pointer capture, quick presses, simultaneous input and cancellation are Rust policy. No GameCube C-stick/analog-shoulder or PS1 mask transplant. |
+| Shutdown | An unopened coroutine is never started just to stop it. Native stopped state is acknowledged before library/context release. Failed join/publication retains native memory, host resources and writer ownership; successful teardown keeps the writer through durable session publication. |
+| Scheduling | Multiple independent SavedSessions/profiles share one foreground runtime policy. Native globals permit one Mupen instance per process until isolation is qualified; that is a runtime capability, not a one-game identity model. Background pause/silence is the default. |
 
-No core binary is downloaded or packaged, no RetroArch frontend is imported and
-no real cartridge is read in this increment. The app explicitly refuses the N64
-route until an execution adapter exists. Next work remains the linked ntx package
-and protected migration qualification, then the Rust host/GLES/audio/core package
-vertical slice. Ordinary N64 save durability, controllable play and cross-system
-continuity remain open acceptance outcomes.
+## Terms and resources
 
-The root license is GPL version 2 text; inspected Mupen device files declare
-GPL-2.0-or-later and GLSM declares MIT terms. These observations are not a complete
-combined-distribution license conclusion. Retain all selected component notices
-and corresponding source before packaging or public binary consideration.
-
-## Source build preparation
-
-The selected archive was verified against all 2275 upstream Git blob identities.
-Its one Windows project CRLF export expansion was reversed to the exact pinned
-Git blob; the source manifest records SHA256 for every original file. The
-maintained patch and patched-file manifest separately identify the host-boundary
-changes: checked state buffers/result, mechanical optional logger fallback,
-instance-owned config/data directories and completed coroutine allocation release.
-`cargo xtask mupen-source-check` validates that full active graph.
-
-`cargo xtask build-mupen` uses the existing reviewed NDK, one job and isolated
-build/ntx-mupen outputs. Command-line GLES3/ARM64/HLE options override upstream
-make defaults. The expanded graph has 274 compiled sources and no parallel RSP,
-parallel RDP, Angrylion or gnulib dependency; build execution/qualification is still
-pending. Original optional dependencies remain pinned as excluded source.
-
-The selected graph includes GLideNHQ xBRZ, whose source/header explicitly carry
-GPLv3 and a MAME exception that does not apply to ntx. GPLv3 text is retained in
-native/LICENSES/GPL-3.0-only.txt. Treat this selected core combination under its
-actual applicable GPLv3 obligations, retain component notices and deliver exact
-corresponding source/build inputs; root-license summaries are insufficient.
-No public binary release or store/legal commitment is authorized.
+[RESOURCE_AUDIT.md](RESOURCE_AUDIT.md) records selected components and actual
+resource provenance. In particular, GLideNHQ xBRZ requires GPLv3; its MAME exception
+does not apply to ntx. GPLv3 text, component licenses, source-header notices,
+change notices and exact corresponding source accompany the combined candidate.
+Original first-party Rust remains MIT and borrowed files retain their terms.
+No cartridge, firmware, save, texture pack, copied branding or private device
+content is bundled. Public binary/store/legal commitments remain separately gated.

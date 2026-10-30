@@ -68,6 +68,9 @@ pub struct Pad {
     stick: [i16; 2],
 }
 impl Pad {
+    pub fn pressed(&self, button: Button) -> bool {
+        self.buttons[button as usize]
+    }
     pub fn button(&mut self, button: Button, pressed: bool) {
         self.buttons[button as usize] = pressed;
     }

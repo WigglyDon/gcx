@@ -352,7 +352,7 @@ impl Graphics {
                 else {
                     continue;
                 };
-                let color = match zone.target {
+                let mut color = match zone.target {
                     Target::Stick => [0.65, 0.67, 0.70, 0.42],
                     Target::Button(ntx::n64::Button::A) => [0.1, 0.45, 1., 0.60],
                     Target::Button(ntx::n64::Button::B) => [0.1, 0.8, 0.35, 0.60],
@@ -364,7 +364,26 @@ impl Graphics {
                     ) => [1., 0.8, 0.12, 0.6],
                     _ => [0.45, 0.47, 0.5, 0.65],
                 };
+                if let Target::Button(button) = zone.target
+                    && view.sampled.pressed(button)
+                {
+                    color[3] = 0.95;
+                }
                 self.draw([l, t, r, b], color, true, w as f32, h as f32);
+                if zone.target == Target::Stick {
+                    let x = view.sampled.input_state(0, 5, 0, 0) as f32 / 32767.;
+                    let y = view.sampled.input_state(0, 5, 0, 1) as f32 / 32767.;
+                    let radius = (r - l).min(b - t) * 0.18;
+                    let cx = (l + r) * 0.5 + x * (r - l) * 0.32;
+                    let cy = (t + b) * 0.5 + y * (b - t) * 0.32;
+                    self.draw(
+                        [cx - radius, cy - radius, cx + radius, cy + radius],
+                        [0.85, 0.87, 0.9, 0.85],
+                        true,
+                        w as f32,
+                        h as f32,
+                    );
+                }
                 let glyph = match zone.label {
                     "A" => [14, 17, 17, 31, 17, 17, 17],
                     "B" => [30, 17, 17, 30, 17, 17, 30],

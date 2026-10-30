@@ -12,8 +12,8 @@ An offline staged migration tool preserves identities, ordinary progress and
 legacy recovery scenes; schema 2 separates system/backend routing. The retained
 installed GameCube candidate is still the legacy package. A renamed GameCube APK has been built, signed and preserved with its exact
 source. The pinned ARM64 N64 core now compiles, with Rust host, graphics/audio,
-controls and independent profile/save/scene routing implemented. Actual device
-migration, a linked N64 package and playable/save/continuity acceptance remain
+controls and independent profile/save/scene routing implemented. A combined GameCube/N64 package is also built and privately preserved with its
+source. Actual device migration and playable/save/continuity acceptance remain
 unfinished. See the
 [migration boundary](docs/IDENTITY_MIGRATION.md) and [N64 pin/audit](native/mupen/README.md).
 

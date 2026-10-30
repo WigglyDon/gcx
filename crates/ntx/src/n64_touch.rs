@@ -69,10 +69,10 @@ impl View {
         let y = a.bottom;
         add(x + 3.1 * r, y - 3.0 * r, 2.0 * r, Target::Stick, "");
         for (dx, dy, b, label) in [
-            (1., 1.1, Button::Left, "<"),
-            (2., 2.1, Button::Up, "^"),
-            (2., 0.1, Button::Down, "v"),
-            (3., 1.1, Button::Right, ">"),
+            (6., 1.1, Button::Left, "<"),
+            (7., 2.1, Button::Up, "^"),
+            (7., 0.1, Button::Down, "v"),
+            (8., 1.1, Button::Right, ">"),
         ] {
             add(
                 x + dx * r,
@@ -84,12 +84,12 @@ impl View {
         }
         let right = a.right;
         for (dx, dy, b, label) in [
-            (1.3, 2.0, Button::A, "A"),
-            (3.4, 3.3, Button::B, "B"),
-            (4.7, 5.4, Button::CLeft, "<"),
-            (3.3, 6.8, Button::CUp, "^"),
-            (3.3, 4., Button::CDown, "v"),
-            (1.9, 5.4, Button::CRight, ">"),
+            (1.3, 1.8, Button::A, "A"),
+            (3.4, 2.5, Button::B, "B"),
+            (4.7, 5.6, Button::CLeft, "<"),
+            (3.3, 7., Button::CUp, "^"),
+            (3.3, 4.2, Button::CDown, "v"),
+            (1.9, 5.6, Button::CRight, ">"),
         ] {
             add(
                 right - dx * r,
@@ -118,19 +118,13 @@ impl View {
             "Z",
         );
         add(
-            right - 4.0 * r,
+            right - 1.4 * r,
             a.top + 1.2 * r,
             0.9 * r,
             Target::Button(Button::R),
             "R",
         );
-        add(
-            right - 1.3 * r,
-            a.top + 1.2 * r,
-            0.8 * r,
-            Target::Pause,
-            "II",
-        );
+        add(x + w * 0.5, a.top + 1.2 * r, 0.8 * r, Target::Pause, "II");
         add(
             x + w * 0.5,
             y - r,
@@ -223,6 +217,47 @@ impl View {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn distinct_targets_remain_disjoint_on_short_narrow_and_tall_safe_rectangles() {
+        for (w, h) in [(484., 198.), (1000., 500.), (400., 900.)] {
+            let a = Area {
+                left: 21.,
+                top: 13.,
+                right: 21. + w,
+                bottom: 13. + h,
+            };
+            let mut view = View::default();
+            view.measure(Some(WindowGeometry {
+                window: a,
+                surface: a,
+                content: a,
+                input_origin: (21., 13.),
+                clearance: Default::default(),
+                density: 1.,
+            }));
+            for (i, z) in view.zones.iter().enumerate() {
+                assert!(
+                    z.area.left >= a.left
+                        && z.area.top >= a.top
+                        && z.area.right <= a.right
+                        && z.area.bottom <= a.bottom
+                );
+                for other in &view.zones[..i] {
+                    let p = z.area;
+                    let q = other.area;
+                    assert!(
+                        !(p.left < q.right
+                            && p.right > q.left
+                            && p.top < q.bottom
+                            && p.bottom > q.top),
+                        "Overlapping {:?} and {:?}",
+                        z.target,
+                        other.target
+                    );
+                }
+            }
+        }
+    }
     #[test]
     fn quick_simultaneous_c_press_survives_until_poll_and_cancel_clears_every_pointer() {
         let a = Area {

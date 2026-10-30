@@ -6,7 +6,7 @@ These are required current contracts. Active identity, schema-2 routing and
 offline staged import are implemented. A renamed GameCube package is built and
 preserved; device migration remains unqualified. The pinned N64 core compiles
 and the Rust execution/Android resource/save/scene implementation is in source;
-N64 package and device acceptance remain unfinished. The preserved GameCube baseline is documented in
+A combined package is linked/audited; device acceptance remains unfinished. The preserved GameCube baseline is documented in
 [historical architecture](history/GCX_ARCHITECTURE.md) and native/README.md.
 
 ## Three independent axes

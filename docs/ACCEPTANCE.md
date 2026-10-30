@@ -11,8 +11,8 @@ and builds the pinned ARM64 N64 core with Rust host, Android graphics/audio/inpu
 and distinct ordinary/scene persistence in source.
 Portable tests, host/native surface checks, Android Rust/Java/resource checks and
 relevant warnings-denied lints support this increment. The renamed GameCube APK
-was linked, signed with the retained identity and privately preserved with exact
-corresponding source. Actual package-data migration, playable N64/save/reload and
+and subsequent combined N64 package were linked, signed with the retained
+identity and privately preserved with exact corresponding source. Actual package-data migration, playable N64/save/reload and
 cross-system continuity are not yet qualified. The read-only migration export
 timed out before installation; cleanup-only recovery waits for qualified wireless
 connectivity. No new guest input or source mutation occurred. See

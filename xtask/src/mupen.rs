@@ -86,7 +86,7 @@ pub fn source_check(root: &Path) -> Result<PathBuf> {
         return Err("patch names an unpinned file".into());
     }
     println!(
-        "Verified {} exact Mupen source files at {PIN} plus the declared state-result repair; optional gnulib gitlink is outside the selected HLE build",
+        "Verified {} exact Mupen source files at {PIN} plus the declared host-boundary patches; optional gnulib gitlink is outside the selected HLE build",
         expected.len()
     );
     Ok(source)
