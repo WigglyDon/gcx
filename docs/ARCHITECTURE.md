@@ -24,6 +24,12 @@ and process slots out of portable identity. Reacquire host media access without
 creating a different game. Do not bind the universal model to Android or one GPU
 API; platform agnosticism does not claim that all ports already work.
 
+The portable collection validates opaque media locators without requiring an
+Android URI scheme. A verified relocation can replace a host binding while
+retaining IDs, profiles and scene references. Android's adapter accepts only its
+scoped content documents and requires its own grant; accepting a locator in the
+model supplies no access capability or implemented desktop/other-host port.
+
 ## Independent per-game continuity
 
 - GameId: durable game/media identity, independent of host and backend.

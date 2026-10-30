@@ -90,6 +90,23 @@ pub fn valid_id(value: &str) -> bool {
             .bytes()
             .all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(&c))
 }
+/// A persisted host locator is an opaque binding, never game identity or access
+/// authority. Each host adapter enforces its own supported scoped access.
+fn valid_media_locator(value: &str) -> bool {
+    if value.len() > 65536 || value.chars().any(char::is_control) {
+        return false;
+    }
+    let Some((scheme, location)) = value.split_once("://") else {
+        return false;
+    };
+    !location.is_empty()
+        && !scheme.is_empty()
+        && scheme.len() <= 32
+        && scheme.as_bytes()[0].is_ascii_lowercase()
+        && scheme
+            .bytes()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || b"+.-".contains(&c))
+}
 #[derive(Debug, PartialEq, Eq)]
 pub enum GameOpen {
     ResumeCurrent,
@@ -152,8 +169,7 @@ impl Collection {
     /// A changed platform locator never allocates another game or save profile.
     pub fn relink_game(&mut self, id: &str, uri: &str, observed: &str) -> Result<(), &'static str> {
         let index = self.resolve_game(id)?;
-        if !uri.starts_with("content://")
-            || uri.len() > 65536
+        if !valid_media_locator(uri)
             || !crate::storage::valid_digest(observed)
             || self
                 .entries
@@ -281,8 +297,7 @@ impl Collection {
                     .is_some_and(|s| !crate::storage::valid_digest(s))
                 || !valid_id(&e.game_id.0)
                 || !valid_id(&e.profile_id.0)
-                || !e.uri.starts_with("content://")
-                || e.uri.len() > 65536
+                || !valid_media_locator(&e.uri)
                 || e.title.len() > 16384
                 || e.last_error.as_ref().is_some_and(|s| s.len() > 32768)
                 || e.checkpoint
@@ -311,6 +326,41 @@ impl Collection {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn host_locator_changes_do_not_reidentify_a_game_profile_or_scene() {
+        let mut game = entry();
+        game.uri = "file:///owned-games/cartridge.z64".into();
+        game.media_sha256 = Some("e".repeat(64));
+        game.checkpoint = Some("f".repeat(64));
+        game.media_relink_required = true;
+        let mut collection = Collection {
+            schema_version: 2,
+            selected: Some(game.game_id.0.clone()),
+            entries: vec![game.clone()],
+        };
+        collection.validate().unwrap();
+        collection
+            .relink_game(
+                &game.game_id.0,
+                "content://scoped-provider/verified-cartridge",
+                &"e".repeat(64),
+            )
+            .unwrap();
+        assert_eq!(collection.entries[0].game_id, game.game_id);
+        assert_eq!(collection.entries[0].profile_id.0, game.profile_id.0);
+        assert_eq!(collection.entries[0].checkpoint, game.checkpoint);
+        assert_eq!(collection.entries[0].system, game.system);
+        assert_eq!(collection.entries[0].backend, game.backend);
+        for bad in [
+            "/unscoped/path",
+            "content://",
+            "1invalid://location",
+            "content://bad\0location",
+        ] {
+            collection.entries[0].uri = bad.into();
+            assert!(collection.validate().is_err());
+        }
+    }
     #[test]
     fn verified_legacy_failed_cartridge_relinks_without_new_ids_but_bound_scene_refuses_system_change()
      {

@@ -675,6 +675,12 @@ fn resolver<'a>(env: &mut JNIEnv<'a>, activity: &JObject<'_>) -> Result<JObject<
         .l()?)
 }
 pub fn open_document(text: &str) -> Result<File> {
+    if !text.starts_with("content://") {
+        return Err(
+            "Choose the original game through this installation's document picker to grant access."
+                .into(),
+        );
+    }
     with_env(|env, activity| {
         let uri = uri(env, text)?;
         let resolver = resolver(env, activity)?;

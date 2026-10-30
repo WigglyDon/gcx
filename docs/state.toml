@@ -1,6 +1,6 @@
 schema_version = 1
 product = "ntx"
-classification = "NTX5_SIGNED_COMBINED_PACKAGE_DEVICE_ACCEPTANCE_PENDING"
+classification = "NTX5_PIXEL_DATA_MIGRATED_MEDIA_REGRANT_AND_N64_PLAY_PENDING"
 repository = "WigglyDon/ntx"
 repository_id = 1429193278
 branch = "main"
@@ -23,7 +23,7 @@ dolphin_revision = "cf5cb7ef81c3e8e7af5c9d566334219ffda9f68b"
 dolphin_engine_sha256 = "d419cc59abbe5fc41c343946d244e17c8d0c041a8a338b2fe8986e6994602e40"
 legacy_resources_sha256 = "9dd2e4e0e1ad8201bf525e5fc959c93f9794618497d5bc14382197b689bb4327"
 legacy_patch_sha256 = "7ea94c3526b4e3f5ccd623a3edce28e806d310850110e891507f669fe2d5d2c2"
-next_step = "Complete pending Pixel4 cleanup via existing custodian after qualified link returns; protected migration and media regrant; prepare and qualify N64 package/play/save/reload/continuity without restarting earned campaigns"
+next_step = "Protect and update current package if needed, reacquire Pixel4 media grants and perform one affected GameCube boundary check; qualify actual N64 play/audio/save/reload/scene/cross-system continuity. Fold needs a fresh personal window; no retired campaigns"
 completed_do_not_repeat = "GameCube boot/native slice, current ordinary-save/cold-menu reload, earlier build-bound scene/library returns, matched stationary Home timing, post-cleanup storage/retained-input checks"
 retired_objective = "Speedrunner/quest automation and repetitive qualification loop"
 open_defects = ["Pixel later-play Pause/reentry freeze: undetermined", "Separate Fold Home-return process loss/lag/layout/haptics: unresolved"]
@@ -42,12 +42,12 @@ launch = "Installed Codex CLI0.165.0 help verifies fresh interactive -C director
 [implementation]
 source_identity = "Active crates, direct Dolphin hooks/exports, JNI/activity, resources, tooling and new writes use ntx; explicit residual audit and immutable baseline patch retained"
 collection_schema = 2
-migration = "Staged validator and Android import/relink implemented; protected Pixel4 export timed out read-only before installation; original installation retained, cleanup recovery awaiting qualified wireless link"
+migration = "Pixel4 Rust app-side migration verified: schema2, both GameId/profile pairs retained, exact ordinary profile files, unchanged legacy source. Ready incoming and partial stages plus source installation/rollback retained; document grants still require reacquisition"
 signer = "Canonical reference copies retained key; original/recovery retained; independent recovery and installed-candidate certificate binding verified"
 n64_revision = "15bada85906593376e8fd697f1b0b3af3a20f512"
 n64_status = "Pinned ARM64 GLES3/HLE core compiled; small Rust libretro adapter, EGL surface/context retention, audio, N64 controls, packed-save generations and exact-bound scene implementation; linked N64 APK built/signed/preserved from source01676729; actual play/save/resume validation pending"
 resume_limit = "Checked native restore results and state-job yields implemented; exact core/options/architecture/media/profile/current ordinary generation required; failed native restore quarantined, failed shutdown retains ownership"
-device_actions = "First migration attempt refused before work; cleanup recovery verified. Next bounded read-only export timed out before target install/migration; same-task cleanup is pending qualified wireless connectivity. No new guest input or source mutation"
+device_actions = "Combined APK577616e6/source5d2246c installed; library-only atomic import completed and identities/ordinary bytes/source unchanged verified. Custodian confirmed physical OFF and actual return. No guest input or media regrant yet; Fold untouched"
 
 [validation]
 host = "82 portable library tests, 15 decoder and 3 integration tests passed; subsequent disjoint-target and retained-import/route-protection fixtures passed; current host/ARM64 lints deny warnings"
@@ -56,7 +56,7 @@ lints = "Warnings-denied host all-targets including native declarations and ARM6
 android_shell = "Java compiler module, DEX namespace and compiled resources/manifest checked; canonical package/activity/label confirmed"
 native = "Full renamed Dolphin build completed; pinned Mupen core compiled with declared patches; actual header/entrypoint/result/yield/shutdown fixtures and exact patch reproduction passed"
 retained = "8 critical inputs retain exact recorded SHA256/inode/size; baseline patch SHA256 retained; same signer independently verified"
-limits = "No completed device data migration/regrant, playable N64 or N64 save/reload/scene/cross-system acceptance claim; no public binary release"
+limits = "No current-package media regrant/affected gameplay result, playable N64, N64 save/reload/scene/cross-system acceptance or Fold migration claim; no public binary release"
 
 [linked_candidate]
 source = "22f0f147426d23d6d619c375b1ab8ceb5d75e650"
@@ -69,3 +69,14 @@ source = "016767298be311018c798b91c286fbf46b49dfc7"
 apk_sha256 = "45a664c994c9888e0277a92acaac84c3276ec278f9aceea7586f07a9b8a22489"
 core_sha256 = "af7bab08859b6f8a3d224328d603c60e0d0cd40cfe8a36fa77e668e0b826446f"
 status = "Combined package built and signed with retained identity; native/JNI/source/resource/notices/alignment checks passed; preserved with complete Dolphin/Mupen/Rust source; not installed or playable-qualified. Includes separated touch targets, analog/press feedback and verified legacy failed-cartridge relink; actual device acceptance remains pending"
+
+[pixel_migration]
+installed_source = "5d2246c0b82690a004e970eaf0dea75041e1ae8b"
+installed_apk_sha256 = "577616e684065719e1b91d6f6d701895189f0dc4ebbe9859b6a809b1ebafb9ea"
+entries = 2
+stable_identities = true
+ordinary_profile_bytes_verified = true
+legacy_source_unchanged = true
+media_regrant_verified = false
+return = "Custodian completed and verified physical display OFF/actual return after library-only migration"
+issue_outcome = "https://github.com/WigglyDon/ntx/issues/5#issuecomment-6512681530"

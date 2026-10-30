@@ -12,10 +12,11 @@ and distinct ordinary/scene persistence in source.
 Portable tests, host/native surface checks, Android Rust/Java/resource checks and
 relevant warnings-denied lints support this increment. The renamed GameCube APK
 and subsequent combined N64 package were linked, signed with the retained
-identity and privately preserved with exact corresponding source. Actual package-data migration, playable N64/save/reload and
-cross-system continuity are not yet qualified. The read-only migration export
-timed out before installation; cleanup-only recovery waits for qualified wireless
-connectivity. No new guest input or source mutation occurred. See
+identity and privately preserved with exact corresponding source. Pixel4 app-side data migration now preserves both original game/profile pairs
+and exact ordinary bytes, with unchanged legacy source and verified physical OFF/
+return. Media regrant, affected current-package gameplay, actual playable N64/
+save/reload and cross-system continuity remain unqualified. No new guest input
+or source mutation occurred. See
 [the exact migration boundary](IDENTITY_MIGRATION.md).
 
 ## Earned GameCube baseline: preserve, do not replay

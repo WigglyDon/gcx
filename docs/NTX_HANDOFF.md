@@ -1,14 +1,16 @@
-> Current successor increment (2026-10-29): same sole worker and checkout.
-> The renamed GameCube library/APK was built, signed with the retained key and
-> preserved privately (source22f0f147; APKbb52566a; engine15da3bfa). Pixel4
-> migration has not installed the new package: first admission budget refusal
-> was recovered with verified physical OFF return; subsequent read-only export
-> timed out and its cleanup-only recovery is waiting for qualified wireless
-> connectivity. Actual custody records remain authoritative; no new guest input
-> or source-data mutation occurred. The local-only supplement and ignored NTX
-> migration capsules preserve exact records. Pinned N64 native compilation, Rust
-> Android resources/runtime and distinct save/scene implementation are now in
-> progress; playable, save/reload and cross-system acceptance remain pending.
+> Current sole-successor status (2026-10-29): full active identity and linked
+> packages are implemented; direct Dolphin remains direct. Pixel4 app-side data
+> migration is verified on source5d2246c/APK577616e6: both original game/profile
+> pairs, exact ordinary profile bytes and unchanged legacy source. Physical OFF
+> and actual return were verified by the custodian. Media grants still require
+> reacquisition; no new guest play/save/scene result is claimed. Pinned Mupen
+> compiles, with Rust GLES/audio/input/runtime/ordinary/scene routing and private
+> source-bound packages. Later source includes explicit relink menus, frame
+> deadline waiting and a freshly compiled native-free offline scene inspector.
+> Current detailed outcome: NTX-5 comment6512681530 and docs/state.toml. All
+> legacy installation, signer, ordinary data and recovery candidates are kept.
+> The historical handoff below remains evidence, not current availability or
+> an instruction to repeat earned campaigns. Fold has no fresh personal window.
 
 # NTX successor handoff
 
