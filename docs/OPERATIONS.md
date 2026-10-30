@@ -23,6 +23,15 @@ helpers. When using the retained offline vendor set, add
 actual pinned Dolphin tree and patch. Use newly compiled xtask after relocation.
 Do not replay earned boot/save/scene/timing or retired quest campaigns.
 
+`cargo build --offline --locked -p ntx --bin ntx-checkpoint-inspect` builds a
+read-only GameCube continuation inspector without a native execution library.
+Pass a protected offline profile copy, checkpoint ID and an independently trusted
+binding JSON. It validates the complete container/current ordinary generation;
+it never boots or restores a machine and supplies no phone custody. This keeps
+cleanup/recovery verification independent from native boot fixtures or relocated
+cached executables. N64 has its own container/ordinary owner; this tool does not
+reinterpret an N64 checkpoint as a Dolphin scene.
+
 Canonical Android package is com.machinerhythm.ntx, activity NtxActivity, private
 root files/ntx and links machinerhythm-ntx://play/GameId. Legacy installations
 remain recovery sources. New package identity confers no old private data or

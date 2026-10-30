@@ -145,6 +145,14 @@ impl Runtime {
             self.report(e);
         }
     }
+    pub fn poll_timeout(&self) -> Duration {
+        if self.paused || self.failed || self.pending.is_some() {
+            return Duration::from_millis(8);
+        }
+        self.next
+            .saturating_duration_since(Instant::now())
+            .min(Duration::from_millis(8))
+    }
     pub fn commit(&mut self) -> Result<()> {
         self.pause(true);
         if self.failed {

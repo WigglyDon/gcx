@@ -101,6 +101,12 @@ impl std::ops::Deref for LiveRuntime {
     }
 }
 impl LiveRuntime {
+    fn poll_timeout(&self) -> Duration {
+        match self {
+            Self::N64(r) => r.poll_timeout(),
+            Self::Dolphin(_) => Duration::from_millis(8),
+        }
+    }
     fn pending(&self) -> bool {
         match self {
             Self::Dolphin(r) => r.pending_restore.is_some(),
@@ -1099,7 +1105,10 @@ fn run_owned(app: &AndroidApp) -> Result<()> {
         platform::menu(app, true, None);
     }
     while !destroyed {
-        app.poll_events(Some(Duration::from_millis(8)), |event| {
+        let poll_timeout = runtime
+            .as_ref()
+            .map_or(Duration::from_millis(8), LiveRuntime::poll_timeout);
+        app.poll_events(Some(poll_timeout), |event| {
             if let PollEvent::Main(event) = event {
                 match event {
                     MainEvent::InitWindow { .. } => {
