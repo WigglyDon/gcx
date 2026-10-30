@@ -27,11 +27,20 @@ In a new, capacity-admitted directory:
    replace-with = "vendored-sources"
    [source.vendored-sources]
    directory = ".local/corresponding-source-vendor"
-4. With the separately installed licensed SDK/NDK/toolchain identified by
+4. For a combined N64 candidate, restore both source archives at the exact
+   paths used by the source checker and receipt builder:
+   mkdir -p .local/source .local/source-archives
+   tar -xzf /candidate/mupen-active-source.tar.gz -C .local/source
+   cp /candidate/mupen-upstream-15bada85.tar.gz .local/source-archives/mupen64plus-next-15bada85.tar.gz
+   The active archive already contains both maintained patches; do not reapply.
+5. With the separately installed licensed SDK/NDK/toolchain identified by
    binding.json, set ANDROID_HOME and ANDROID_NDK_HOME as native/README.md explains.
    cargo xtask source-check
+   cargo xtask mupen-source-check
+   python3 native/mupen/check_boundary.py
    cargo xtask configure-android
    cargo xtask build-android
+   cargo xtask build-mupen
    cargo xtask prepare-android
    cargo xtask package-android-unsigned
 
@@ -51,6 +60,7 @@ certificate receipt and never generates a replacement key. Bit-identical APK rep
 timestamps and environment differ). Compare code/resources and recorded source
 inputs independently. No gameplay, audio, save/reload or hardware result follows
 from archive verification or build success.
+
 N64 source reconstruction for candidates containing libntx_mupen64plus_next.so:
 The preserved mupen-active-source.tar.gz contains the complete verified source
 tree with the two maintained patches already applied, including dated notices.
